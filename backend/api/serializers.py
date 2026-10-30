@@ -5,10 +5,13 @@ from .models import Product, ProductImage, DeliveryPersonnel, Order, OrderItem, 
 
 class ProductSerializer(serializers.ModelSerializer):
     tamil_name = serializers.CharField(required=False, allow_blank=True, default='')
-    image_url = serializers.CharField(source='image.secure_url', read_only=True, default='')
+    image_url = serializers.SerializerMethodField()
     image = serializers.PrimaryKeyRelatedField(queryset=ProductImage.objects.all(), required=False, allow_null=True)
     price = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01'))
     stock_kg = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0'))
+
+    def get_image_url(self, product):
+        return product.image.secure_url if product.image_id else product.image_url
 
     class Meta:
         model = Product

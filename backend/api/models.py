@@ -26,6 +26,7 @@ class Product(models.Model):
     image = models.ForeignKey(ProductImage, null=True, blank=True, on_delete=models.SET_NULL)
     updated_at = models.DateTimeField(auto_now=True)
     icon_key = models.CharField(max_length=40, default='tomato')
+    image_url = models.URLField(max_length=500, blank=True, default='')
     badges = models.JSONField(default=list)
 
     def __str__(self):
