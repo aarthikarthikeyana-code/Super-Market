@@ -329,3 +329,31 @@ def admin_reports(request):
         'period': 'Today',
         'generated_at': timezone.now().strftime('%d %b %Y, %I:%M %p'),
     })
+
+
+import cloudinary.uploader
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def upload_image(request):
+    file_to_upload = request.FILES.get('image') or request.data.get('image')
+    if not file_to_upload:
+        return Response({'error': 'No image provided'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        folder = request.data.get('folder', 'supermarket/products')
+        upload_result = cloudinary.uploader.upload(
+            file_to_upload,
+            folder=folder,
+            resource_type='image'
+        )
+        return Response({
+            'success': True,
+            'url': upload_result.get('secure_url'),
+            'public_id': upload_result.get('public_id'),
+            'format': upload_result.get('format'),
+            'bytes': upload_result.get('bytes'),
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

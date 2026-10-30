@@ -106,3 +106,20 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.JSONRenderer',
     ],
 }
+
+# Cloudinary Configuration
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+
+CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME', 'kbs5o32p')
+CLOUDINARY_API_KEY = os.getenv('CLOUDINARY_API_KEY', '682744343835859')
+CLOUDINARY_API_SECRET = os.getenv('CLOUDINARY_API_SECRET', '2mx-y4a723bZkCnjprfMNZVct1s')
+
+cloudinary.config(
+    cloud_name=CLOUDINARY_CLOUD_NAME,
+    api_key=CLOUDINARY_API_KEY,
+    api_secret=CLOUDINARY_API_SECRET,
+    secure=True,
+)
+

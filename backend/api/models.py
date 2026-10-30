@@ -11,6 +11,7 @@ class Product(models.Model):
     is_in_stock = models.BooleanField(default=True)
     description = models.TextField(blank=True)
     icon_key = models.CharField(max_length=40, default='tomato')
+    image_url = models.URLField(max_length=500, blank=True, default='')
     badges = models.JSONField(default=list)
 
     def __str__(self):

@@ -8,6 +8,7 @@ urlpatterns = [
     path('orders/', views.create_customer_order, name='create_customer_order'),
     path('orders/<str:order_id>/track/', views.track_order, name='track_order'),
     path('requests/', views.submit_new_item_request, name='submit_new_item_request'),
+    path('upload-image/', views.upload_image, name='upload_image'),
 
     # Admin APIs
     path('admin/login/', views.admin_login, name='admin_login'),
