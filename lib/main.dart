@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'nummakadai/core/theme/numma_theme.dart';
+
+import 'store/widgets.dart';
 import 'router/app_router.dart';
 
 void main() {
@@ -12,11 +13,7 @@ void main() {
       statusBarIconBrightness: Brightness.dark,
     ),
   );
-  runApp(
-    const ProviderScope(
-      child: AgaramSupermarketApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: AgaramSupermarketApp()));
 }
 
 class AgaramSupermarketApp extends StatelessWidget {
@@ -27,7 +24,7 @@ class AgaramSupermarketApp extends StatelessWidget {
     return MaterialApp.router(
       title: 'AGARAM Supermarket',
       debugShowCheckedModeBanner: false,
-      theme: NummaTheme.lightTheme,
+      theme: storeTheme(),
       routerConfig: appRouter,
     );
   }

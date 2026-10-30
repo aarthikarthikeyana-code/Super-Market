@@ -50,3 +50,16 @@ app.*.map.json
 # Generated APKs
 release_apks/
 *.apk
+
+# Local configuration and backend artifacts
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.sqlite3
+backend/staticfiles/
+config/mobile.local.json
+
+# Copy-paste deployment secrets (local only)
+backend/render.env

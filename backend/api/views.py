@@ -1,331 +1,364 @@
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
-from rest_framework import status
+import hashlib
+import hmac
+import json
+import secrets
+import uuid
+from datetime import timedelta
+from decimal import Decimal
+from django.conf import settings
+from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth.hashers import check_password, make_password
+from django.db import transaction
+from django.db.models import Q, Sum
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from .models import (
-    Product,
-    DeliveryAddress,
-    DeliveryPersonnel,
-    Order,
-    OrderItem,
-    NewItemRequest,
-)
-from .serializers import (
-    ProductSerializer,
-    DeliveryAddressSerializer,
-    DeliveryPersonnelSerializer,
-    OrderSerializer,
-    OrderItemSerializer,
-    NewItemRequestSerializer,
-)
+from django.utils.dateparse import parse_datetime
+from rest_framework import status
+from rest_framework.authtoken.models import Token
+from rest_framework.decorators import api_view, permission_classes, throttle_classes, authentication_classes
+from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
+from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
+from . import commerce, gateways
+from .models import Product, ProductImage, DeliveryPersonnel, Order, OrderEvent, CustomerProfile, CustomerLoginChallenge
+from .serializers import ProductSerializer, DeliveryPersonnelSerializer, OrderSerializer, CheckoutSerializer, CustomerPhoneSerializer, CustomerProfileSerializer, normalize_customer_phone
 
-# ----------------- CUSTOMER API VIEWS -----------------
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def get_products(request):
-    category = request.GET.get('category')
-    search = request.GET.get('search')
-    queryset = Product.objects.all()
-    if category:
-        queryset = queryset.filter(category__iexact=category)
-    if search:
-        queryset = queryset.filter(
-            tamil_name__icontains=search
-        ) | queryset.filter(
-            english_name__icontains=search
-        )
-    serializer = ProductSerializer(queryset, many=True)
-    return Response(serializer.data)
+class LoginThrottle(ScopedRateThrottle):
+    scope = 'login'
+    def allow_request(self, request, view):
+        view.throttle_scope = self.scope
+        return super().allow_request(request, view)
+
+
+class SessionThrottle(LoginThrottle):
+    scope = 'session'
+
+
+def orders_queryset():
+    return Order.objects.filter(customer__isnull=False).select_related('customer', 'assigned_to').prefetch_related('items__product__image', 'events')
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([AllowAny])
-def get_product_detail(request, pk):
-    try:
-        product = Product.objects.get(pk=pk)
-        return Response(ProductSerializer(product).data)
-    except Product.DoesNotExist:
-        return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
-
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def create_customer_order(request):
-    data = request.data
-    order_id = data.get('order_id', f"#ORD{timezone.now().strftime('%H%M%S')}")
-    items_data = data.get('items', [])
-
-    order = Order.objects.create(
-        order_id=order_id,
-        customer_name=data.get('customer_name', 'Priya S'),
-        customer_phone=data.get('customer_phone', '+91 98765 43210'),
-        delivery_address=data.get('delivery_address', '123, Green Street, Chennai - 600023'),
-        delivery_date=data.get('delivery_date', '16 Apr 2025'),
-        time_slot=data.get('time_slot', '04:00 PM - 06:00 PM'),
-        delivery_instructions=data.get('delivery_instructions', ''),
-        payment_method=data.get('payment_method', 'Cash on Delivery (COD)'),
-        subtotal=data.get('subtotal', 82.0),
-        delivery_charge=data.get('delivery_charge', 0.0),
-        total_amount=data.get('total_amount', 82.0),
-        status='New',
-    )
-
-    for item in items_data:
-        prod_id = item.get('product_id')
-        prod = None
-        if prod_id:
-            try:
-                prod = Product.objects.get(id=prod_id)
-            except Product.DoesNotExist:
-                pass
-        
-        OrderItem.objects.create(
-            order=order,
-            product=prod,
-            tamil_name=item.get('tamil_name', ''),
-            english_name=item.get('english_name', ''),
-            quantity=item.get('quantity', 1),
-            unit=item.get('unit', 'Kg'),
-            unit_price=item.get('unit_price', 30.0),
-            total_price=item.get('total_price', 30.0),
-            is_packed=True,
-            is_out_of_stock=False,
-        )
-
-    return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
+@throttle_classes([])
+def health(request):
+    return Response({'status': 'ok', 'service': 'Agaram Supermarket', 'api_version': 2})
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([AllowAny])
-def track_order(request, order_id):
-    try:
-        clean_id = order_id if order_id.startswith('#') else f"#{order_id}"
-        order = Order.objects.get(order_id__iexact=clean_id)
-        return Response(OrderSerializer(order).data)
-    except Order.DoesNotExist:
-        # Fallback to latest order
-        latest = Order.objects.first()
-        if latest:
-            return Response(OrderSerializer(latest).data)
-        return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+def store_config(request):
+    return Response({'api_version': 2, 'store_name': 'Agaram Supermarket', 'currency': 'INR', 'delivery_charge': settings.DELIVERY_CHARGE,
+                     'online_payments_enabled': settings.PAYMENT_GATEWAY_ENABLED and bool(settings.RAZORPAY_KEY_ID),
+                     'test_mode': settings.RAZORPAY_KEY_ID.startswith('rzp_test_'), 'delivery_mode': 'on_demand', 'customer_login_mode': 'otp' if settings.CUSTOMER_OTP_ENABLED else 'demo_code'})
 
 
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([AllowAny])
-def submit_new_item_request(request):
-    data = request.data
-    req = NewItemRequest.objects.create(
-        item_name=data.get('item_name', 'புதினா'),
-        customer_phone=data.get('customer_phone', '+91 98765 43210'),
-        notes=data.get('notes', 'Requested via Search Not Found dialog'),
-    )
-    return Response(NewItemRequestSerializer(req).data, status=status.HTTP_201_CREATED)
-
-
-# ----------------- ADMIN API VIEWS -----------------
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def admin_login(request):
-    admin_id = request.data.get('admin_id')
-    password = request.data.get('password')
-    # Default admin credentials check
-    if admin_id in ['admin', 'admin@freshness.com', 'admin123'] and (password in ['admin', 'admin123', 'password'] or not password):
-        return Response({
-            'success': True,
-            'token': 'supermarket-admin-session-token-xyz',
-            'admin': {
-                'id': 'ADM01',
-                'name': 'Supermarket Store Admin',
-                'role': 'Store Manager',
-            }
-        })
-    # Accept any login for prototype demonstration
-    return Response({
-        'success': True,
-        'token': 'supermarket-admin-session-token-xyz',
-        'admin': {
-            'id': admin_id or 'ADM01',
-            'name': 'Supermarket Store Admin',
-            'role': 'Store Manager',
-        }
-    })
-
-
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def admin_dashboard(request):
-    new_orders_count = Order.objects.filter(status='New').count()
-    total_orders_count = Order.objects.count()
-    out_of_stock_count = Product.objects.filter(is_in_stock=False).count()
-    new_requests_count = NewItemRequest.objects.filter(status='Pending').count()
-
-    today_orders = Order.objects.all()[:5]
-
-    return Response({
-        'stats': {
-            'new_orders': new_orders_count or 12,
-            'total_orders': total_orders_count or 28,
-            'out_of_stock': out_of_stock_count or 6,
-            'new_item_requests': new_requests_count or 4,
-        },
-        'today_orders': OrderSerializer(today_orders, many=True).data,
-    })
-
-
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def admin_orders_list(request):
-    filter_status = request.GET.get('status', 'all').lower()
-    queryset = Order.objects.all()
-    if filter_status == 'new':
-        queryset = queryset.filter(status__iexact='New')
-    elif filter_status == 'packed':
-        queryset = queryset.filter(status__iexact='Packed')
-    elif filter_status == 'preparing':
-        queryset = queryset.filter(status__iexact='Preparing')
-    elif filter_status == 'out_for_delivery':
-        queryset = queryset.filter(status__iexact='Out for Delivery')
-    
-    return Response(OrderSerializer(queryset, many=True).data)
-
-
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def admin_order_detail(request, order_id):
-    clean_id = order_id if order_id.startswith('#') else f"#{order_id}"
-    try:
-        order = Order.objects.get(order_id__iexact=clean_id)
-        return Response(OrderSerializer(order).data)
-    except Order.DoesNotExist:
-        order = Order.objects.first()
-        if order:
-            return Response(OrderSerializer(order).data)
-        return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+@throttle_classes([SessionThrottle])
+def customer_session(request):
+    if settings.CUSTOMER_OTP_ENABLED:
+        return Response({'detail': 'OTP sign-in is not configured yet. Please contact the store.'}, status=503)
+    serializer = CustomerPhoneSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    phone = serializer.validated_data['phone']
+    CustomerLoginChallenge.objects.filter(expires_at__lt=timezone.now()).delete()
+    code = str(10000 + secrets.randbelow(90000))
+    challenge = CustomerLoginChallenge.objects.create(phone=phone, code_hash=make_password(code), expires_at=timezone.now() + timedelta(minutes=5))
+    return Response({'challenge_id': str(challenge.pk), 'demo_code': code, 'expires_in': 300, 'mode': 'demo_code'})
 
 
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([AllowAny])
-def admin_pack_order(request, order_id):
-    clean_id = order_id if order_id.startswith('#') else f"#{order_id}"
+@throttle_classes([SessionThrottle])
+def verify_customer_session(request):
+    if settings.CUSTOMER_OTP_ENABLED:
+        return Response({'detail': 'SMS OTP sign-in is not configured yet.'}, status=503)
     try:
-        order = Order.objects.get(order_id__iexact=clean_id)
-    except Order.DoesNotExist:
-        order = Order.objects.first()
-    
-    if order:
-        order.status = 'Packed'
-        order.packed_at = timezone.now()
-        order.save()
-        return Response({'success': True, 'order': OrderSerializer(order).data})
-    return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
-
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def admin_assign_delivery(request, order_id):
-    clean_id = order_id if order_id.startswith('#') else f"#{order_id}"
-    person_id = request.data.get('person_id')
-    person_name = request.data.get('person_name', 'Karthik')
-
-    try:
-        order = Order.objects.get(order_id__iexact=clean_id)
-    except Order.DoesNotExist:
-        order = Order.objects.first()
-
-    person = None
-    if person_id:
-        person = DeliveryPersonnel.objects.filter(id=person_id).first()
-    if not person:
-        person = DeliveryPersonnel.objects.filter(name__icontains=person_name).first()
-
-    if order:
-        if person:
-            order.assigned_to = person
-        order.save()
-        return Response({'success': True, 'order': OrderSerializer(order).data})
-    return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
-
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def admin_dispatch_order(request, order_id):
-    clean_id = order_id if order_id.startswith('#') else f"#{order_id}"
-    try:
-        order = Order.objects.get(order_id__iexact=clean_id)
-    except Order.DoesNotExist:
-        order = Order.objects.first()
-
-    if order:
-        order.status = 'Out for Delivery'
-        order.dispatched_at = timezone.now()
-        order.save()
-        return Response({'success': True, 'order': OrderSerializer(order).data})
-    return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+        challenge_id = uuid.UUID(str(request.data.get('challenge_id', '')))
+    except (ValueError, TypeError):
+        raise ValidationError({'detail': 'Request a new verification code.'}) from None
+    code = str(request.data.get('code', ''))
+    with transaction.atomic():
+        challenge = get_object_or_404(CustomerLoginChallenge.objects.select_for_update(), pk=challenge_id)
+        if challenge.used or challenge.expires_at <= timezone.now() or challenge.attempts >= 5:
+            return Response({'detail': 'This code has expired or was already used. Request a new code.'}, status=400)
+        if len(code) != 5 or not code.isdigit() or not check_password(code, challenge.code_hash):
+            challenge.attempts += 1
+            challenge.save(update_fields=['attempts'])
+            return Response({'detail': 'Incorrect code. Enter the 5-digit code shown on this screen.'}, status=400)
+        challenge.used = True
+        challenge.save(update_fields=['used'])
+        phone = challenge.phone
+        user, _ = get_user_model().objects.get_or_create(
+            username='customer_' + phone[1:], defaults={'password': make_password(None)})
+        if user.is_staff or user.is_superuser or not user.is_active:
+            return Response({'detail': 'This customer account is unavailable.'}, status=403)
+        profile, created = CustomerProfile.objects.get_or_create(user=user, defaults={'phone': phone})
+        token, _ = Token.objects.get_or_create(user=user)
+    return Response({'token': token.key, 'profile': CustomerProfileSerializer(profile).data,
+                     'created': created, 'phone_verified': False}, status=201 if created else 200)
 
 
 @api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def customer_profile(request):
+    profile = get_object_or_404(CustomerProfile, user=request.user)
+    if request.method == 'PATCH':
+        serializer = CustomerProfileSerializer(profile, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+    return Response(CustomerProfileSerializer(profile).data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def customer_wishlist(request):
+    profile = get_object_or_404(CustomerProfile, user=request.user)
+    return Response(ProductSerializer(profile.wishlist.filter(is_active=True).select_related('image').order_by('english_name'), many=True).data)
+
+
+@api_view(['POST', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def customer_wishlist_item(request, pk):
+    profile = get_object_or_404(CustomerProfile, user=request.user)
+    product = get_object_or_404(Product, pk=pk, **({'is_active': True} if request.method == 'POST' else {}))
+    if request.method == 'POST':
+        profile.wishlist.add(product)
+    else:
+        profile.wishlist.remove(product)
+    return Response(status=204)
+
+
+@api_view(['POST'])
+@authentication_classes([])
 @permission_classes([AllowAny])
-def admin_stock_management(request):
-    if request.method == 'GET':
-        products = Product.objects.all()
-        return Response(ProductSerializer(products, many=True).data)
-    elif request.method == 'PATCH':
-        product_id = request.data.get('product_id')
-        is_in_stock = request.data.get('is_in_stock')
-        stock_kg = request.data.get('stock_kg')
-        try:
-            p = Product.objects.get(id=product_id)
-            if is_in_stock is not None:
-                p.is_in_stock = is_in_stock
-            if stock_kg is not None:
-                p.stock_kg = stock_kg
-            p.save()
-            return Response(ProductSerializer(p).data)
-        except Product.DoesNotExist:
-            return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
+@throttle_classes([LoginThrottle])
+def admin_login(request):
+    identifier = str(request.data.get('admin_id', '')).strip()
+    password = request.data.get('password', '')
+    if not identifier or not isinstance(password, str) or not password:
+        raise ValidationError({'detail': 'Enter your admin email and password.'})
+    user_model = get_user_model()
+    account = user_model.objects.filter(Q(username__iexact=identifier) | Q(email__iexact=identifier)).first()
+    user = authenticate(request, username=account.username if account else identifier, password=password)
+    if not user or not user.is_staff or not user.is_active:
+        return Response({'detail': 'Invalid admin email or password.'}, status=401)
+    token, _ = Token.objects.get_or_create(user=user)
+    return Response({'token': token.key, 'admin': {'name': user.get_full_name() or 'Store administrator', 'email': user.email}})
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def admin_logout(request):
+    request.auth.delete()
+    return Response(status=204)
+
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def get_products(request):
+    products = Product.objects.filter(is_active=True).select_related('image').order_by('english_name')
+    if request.query_params.get('category'):
+        products = products.filter(category=request.query_params['category'])
+    if request.query_params.get('search'):
+        query = request.query_params['search'][:100]
+        products = products.filter(Q(english_name__icontains=query) | Q(tamil_name__icontains=query) | Q(brand__icontains=query))
+    return Response(ProductSerializer(products, many=True).data)
+
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def get_product_detail(request, pk):
+    return Response(ProductSerializer(get_object_or_404(Product, pk=pk, is_active=True)).data)
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([AllowAny])
-def admin_new_item_requests(request):
+@permission_classes([IsAdminUser])
+def admin_products(request):
     if request.method == 'GET':
-        requests = NewItemRequest.objects.all()
-        return Response(NewItemRequestSerializer(requests, many=True).data)
-    elif request.method == 'POST':
-        request_id = request.data.get('request_id')
-        action = request.data.get('action') # approve or reject
+        products = Product.objects.filter(is_active=True).select_related('image').order_by('english_name')
+        return Response(ProductSerializer(products, many=True).data)
+    serializer = ProductSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    product = serializer.save(id='P' + uuid.uuid4().hex, is_active=True)
+    return Response(ProductSerializer(product).data, status=201)
+
+
+@api_view(['PATCH', 'DELETE'])
+@permission_classes([IsAdminUser])
+def admin_product_detail(request, pk):
+    with transaction.atomic():
+        product = get_object_or_404(Product.objects.select_for_update(), pk=pk, is_active=True)
+        if request.method == 'DELETE':
+            product.is_active = False
+            product.save(update_fields=['is_active', 'updated_at'])
+            return Response(status=204)
+        serializer = ProductSerializer(product, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def upload_product_image(request):
+    file = request.FILES.get('image')
+    if not file:
+        raise ValidationError({'image': 'Choose a product photo.'})
+    result = gateways.upload_image(file)
+    image = ProductImage.objects.create(public_id=result['public_id'], secure_url=result['secure_url'], uploaded_by=request.user)
+    return Response({'id': str(image.pk), 'image_url': image.secure_url}, status=201)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def customer_orders(request):
+    if request.method == 'GET':
+        return Response(OrderSerializer(orders_queryset().filter(customer=request.user), many=True).data)
+    profile = get_object_or_404(CustomerProfile, user=request.user)
+    serializer = CheckoutSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    if normalize_customer_phone(serializer.validated_data['customer_phone']) != profile.phone:
+        raise ValidationError({'customer_phone': 'Use the phone number of the signed-in account.'})
+    serializer.validated_data['customer_phone'] = profile.phone
+    commerce.expire_pending_orders()
+    order = commerce.create_order(request.user, serializer.validated_data)
+    return Response({'order': OrderSerializer(order).data, 'checkout': commerce.checkout_data(order)}, status=201)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def customer_order_detail(request, order_id):
+    order = get_object_or_404(orders_queryset(), order_id=order_id, customer=request.user)
+    return Response({'order': OrderSerializer(order).data, 'checkout': commerce.checkout_data(order)})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def verify_payment(request, order_id):
+    order = get_object_or_404(orders_queryset(), order_id=order_id, customer=request.user)
+    payment_id = str(request.data.get('razorpay_payment_id', ''))
+    if not payment_id.startswith('pay_') or len(payment_id) > 100 or not order.razorpay_order_id:
+        raise ValidationError({'detail': 'Invalid payment reference.'})
+    commerce.verify_signature(order, payment_id, str(request.data.get('razorpay_signature', '')))
+    order = commerce.confirm_payment(order, payment_id)
+    return Response(OrderSerializer(order).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def cancel_checkout(request, order_id):
+    with transaction.atomic():
+        order = get_object_or_404(Order.objects.select_for_update(), order_id=order_id, customer=request.user)
+        if order.status == 'Cancelled' and order.payment_status in ['expired', 'cancelled']:
+            return Response(OrderSerializer(order).data)
+        if order.status != 'Payment Pending' or order.payment_status != 'pending':
+            raise ValidationError({'detail': 'Only an unpaid checkout can be cancelled here. Contact the store for other orders.'})
+        commerce.release_stock(order)
+        order.status = 'Cancelled'
+        order.payment_status = 'cancelled'
+        order.save()
+        OrderEvent.objects.create(order=order, status='Cancelled', note='Unpaid checkout cancelled by customer.')
+    return Response(OrderSerializer(order).data)
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+@throttle_classes([])
+def razorpay_webhook(request):
+    if not settings.RAZORPAY_WEBHOOK_SECRET:
+        return Response({'detail': 'Webhook is not configured.'}, status=503)
+    expected = hmac.new(settings.RAZORPAY_WEBHOOK_SECRET.encode(), request.body, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, request.headers.get('X-Razorpay-Signature', '')):
+        return Response({'detail': 'Invalid webhook signature.'}, status=400)
+    try:
+        data = json.loads(request.body)
+        if data.get('event') not in ['payment.captured', 'order.paid']:
+            return Response({'received': True})
+        payment = data['payload']['payment']['entity']
+        order = Order.objects.filter(razorpay_order_id=payment['order_id']).first()
+        if order:
+            commerce.confirm_payment(order, payment['id'])
+    except (KeyError, ValueError, TypeError):
+        return Response({'detail': 'Invalid webhook payload.'}, status=400)
+    return Response({'received': True})
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_dashboard(request):
+    orders = orders_queryset()
+    fulfilled = orders.filter(payment_status__in=['paid', 'cod']).exclude(status='Cancelled')
+    return Response({'total_products': Product.objects.filter(is_active=True).count(),
+                     'total_orders': fulfilled.count(), 'awaiting_payment': orders.filter(payment_status='pending').count(),
+                     'active_deliveries': fulfilled.filter(status='Out for Delivery').count(),
+                     'new_orders': fulfilled.filter(status='New').count(),
+                     'revenue': str(fulfilled.filter(payment_status='paid').aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')),
+                     'delivered': fulfilled.filter(status='Delivered').count(),
+                     'low_stock': Product.objects.filter(is_active=True, stock_kg__lte=5).count(),
+                     'recent_orders': OrderSerializer(orders[:10], many=True).data})
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_orders(request):
+    orders = orders_queryset()
+    if request.query_params.get('status'):
+        orders = orders.filter(status=request.query_params['status'])
+    return Response(OrderSerializer(orders, many=True).data)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAdminUser])
+def admin_order_update(request, order_id):
+    get_object_or_404(Order, order_id=order_id, customer__isnull=False)
+    note = str(request.data.get('delivery_note', ''))
+    if len(note) > 255:
+        raise ValidationError({'delivery_note': 'Use at most 255 characters.'})
+    eta = None
+    if request.data.get('estimated_delivery_at'):
+        eta = parse_datetime(str(request.data['estimated_delivery_at']))
+        if not eta or timezone.is_naive(eta):
+            raise ValidationError({'estimated_delivery_at': 'Use an ISO 8601 timestamp with timezone.'})
+    person_id = request.data.get('assigned_to')
+    if person_id is not None:
         try:
-            req = NewItemRequest.objects.get(id=request_id)
-            if action == 'approve':
-                req.status = 'Approved'
-            elif action == 'reject':
-                req.status = 'Rejected'
-            req.save()
-            return Response(NewItemRequestSerializer(req).data)
-        except NewItemRequest.DoesNotExist:
-            return Response({'error': 'Request not found'}, status=status.HTTP_404_NOT_FOUND)
+            person_id = int(person_id)
+        except (ValueError, TypeError):
+            raise ValidationError({'assigned_to': 'Choose a valid delivery person.'}) from None
+    order = commerce.transition_order(order_id, request.data.get('status'), note, person_id, eta)
+    return Response(OrderSerializer(order).data)
 
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
+@api_view(['GET', 'POST'])
+@permission_classes([IsAdminUser])
 def admin_delivery_personnel(request):
-    personnel = DeliveryPersonnel.objects.all()
-    return Response(DeliveryPersonnelSerializer(personnel, many=True).data)
+    if request.method == 'GET':
+        return Response(DeliveryPersonnelSerializer(DeliveryPersonnel.objects.filter(is_active=True).order_by('name'), many=True).data)
+    serializer = DeliveryPersonnelSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data, status=201)
 
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def admin_reports(request):
-    return Response({
-        'summary': {
-            'total_orders': 28,
-            'delivered': 24,
-            'out_of_stock_items': 4,
-            'new_item_requests': 6,
-        },
-        'period': 'Today',
-        'generated_at': timezone.now().strftime('%d %b %Y, %I:%M %p'),
-    })
+@api_view(['PATCH'])
+@permission_classes([IsAdminUser])
+def admin_delivery_person_detail(request, pk):
+    person = get_object_or_404(DeliveryPersonnel, pk=pk)
+    if request.data.get('is_active') is False and person.assigned_orders.exclude(status__in=['Delivered', 'Cancelled']).exists():
+        raise ValidationError({'detail': 'Reassign this person?s active orders before deactivating.'})
+    serializer = DeliveryPersonnelSerializer(person, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)

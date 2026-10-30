@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../nummakadai/presentation/numma_admin_flow_shell.dart';
-import '../nummakadai_customer/presentation/customer_flow_shell.dart';
+
+import '../store/admin_app.dart';
+import '../store/customer_app.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
@@ -9,25 +10,25 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/',
       builder: (BuildContext context, GoRouterState state) {
-        return const NummaAdminFlowShell();
+        return const StorefrontScreen();
       },
     ),
     GoRoute(
       path: '/admin',
       builder: (BuildContext context, GoRouterState state) {
-        return const NummaAdminFlowShell();
+        return const AdminConsoleScreen();
       },
     ),
     GoRoute(
       path: '/customer',
       builder: (BuildContext context, GoRouterState state) {
-        return const NummaCustomerFlowShell();
+        return const StorefrontScreen();
       },
     ),
     GoRoute(
       path: '/customer-app',
       builder: (BuildContext context, GoRouterState state) {
-        return const NummaCustomerFlowShell();
+        return const StorefrontScreen();
       },
     ),
   ],
