@@ -9,6 +9,13 @@ final storeApiProvider = Provider<StoreApi>((ref) => StoreApi());
 final catalogProvider = FutureProvider<List<StoreProduct>>(
   (ref) => ref.watch(storeApiProvider).products(),
 );
+final catalogBrowseProvider = FutureProvider<Map<String, dynamic>>((ref) {
+  final api = ref.watch(storeApiProvider);
+  void changed() => ref.invalidateSelf();
+  api.feedChanges.addListener(changed);
+  ref.onDispose(() => api.feedChanges.removeListener(changed));
+  return api.browseCatalog();
+});
 final storeConfigProvider = FutureProvider<Map<String, dynamic>>(
   (ref) => ref.watch(storeApiProvider).config(),
 );

@@ -58,8 +58,7 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
-    - assets/images/storefront-harvest.png
-    - assets/images/delivery-handover.png
+    - assets/images/
     - assets/fonts/OFL.txt
   fonts:
     - family: NotoSansTamil

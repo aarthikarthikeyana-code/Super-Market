@@ -88,7 +88,7 @@ class DeliveryPersonnel(models.Model):
     def ready_for_deliveries(self):
         from django.utils import timezone
         licence_valid = self.vehicle_type in ['walking', 'bicycle'] or bool(self.licence_expiry and self.licence_expiry >= timezone.localdate())
-        return bool(self.is_active and self.user_id and self.user.is_active and not self.user.is_staff and self.documents_verified and licence_valid)
+        return bool(self.is_active and self.user_id and self.user.is_active and not self.user.is_staff and self.user.has_usable_password() and self.documents_verified and licence_valid)
 
     def __str__(self):
         return f"{self.name} ({self.status})"

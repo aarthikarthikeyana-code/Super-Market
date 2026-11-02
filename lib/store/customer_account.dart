@@ -7,6 +7,8 @@ import 'models.dart';
 import 'widgets.dart';
 import 'paged_feed.dart';
 
+import 'login_screen.dart';
+
 Future<bool> ensureCustomerAccount(BuildContext context, WidgetRef ref) async {
   try {
     final account = await ref.read(customerAccountProvider.future);
@@ -14,7 +16,7 @@ Future<bool> ensureCustomerAccount(BuildContext context, WidgetRef ref) async {
     if (!context.mounted) return false;
     return await Navigator.push<bool>(
           context,
-          MaterialPageRoute(builder: (_) => const CustomerPhoneSignInScreen()),
+          MaterialPageRoute(builder: (_) => const CustomerLoginScreen()),
         ) ==
         true;
   } catch (e) {

@@ -23,8 +23,6 @@ services:
         sync: false
       - key: CUSTOMER_OTP_ENABLED
         value: false
-      - key: DELIVERY_PHONE_LOGIN_ENABLED
-        value: true
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY

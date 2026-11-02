@@ -116,6 +116,7 @@ class StoreApi {
         !customer &&
         !employee &&
         (uri.path == '/config/' ||
+            uri.path == '/catalog/browse/' ||
             (uri.path == '/products/' &&
                 uri.queryParameters['paginate'] == 'true'));
     final cached = cacheable ? _publicCache[path] : null;
@@ -391,10 +392,19 @@ class StoreApi {
     );
   }
 
+  Future<Map<String, dynamic>> browseCatalog() async =>
+      Map<String, dynamic>.from(await request('GET', '/catalog/browse/'));
+
   Future<StorePage<StoreProduct>> productPage({
     String? cursor,
     String search = '',
     String category = 'All',
+    String? brand,
+    double? minPrice,
+    double? maxPrice,
+    String? ordering,
+    bool? inStock,
+    String? collection,
     bool admin = false,
   }) async {
     if (cursor == null) await config();
@@ -405,7 +415,14 @@ class StoreApi {
       admin: admin,
       filters: {
         if (search.isNotEmpty) 'search': search,
-        if (category != 'All') 'category': category,
+        if (category != 'All' && category.isNotEmpty) 'category': category,
+        if (brand != null && brand.isNotEmpty && brand != 'All') 'brand': brand,
+        if (minPrice != null) 'min_price': minPrice.toString(),
+        if (maxPrice != null) 'max_price': maxPrice.toString(),
+        if (ordering != null && ordering.isNotEmpty) 'ordering': ordering,
+        if (inStock == true) 'in_stock': 'true',
+        if (collection != null && collection.isNotEmpty)
+          'collection': collection,
       },
     );
   }
@@ -663,16 +680,12 @@ class StoreApi {
     ),
   );
 
-  Future<void> deliveryLogin(String code, String credential) async {
-    final configuration = await config();
-    final phoneLogin = configuration['delivery_login_mode'] == 'phone_demo';
+  Future<void> deliveryLogin(String identifier, String password) async {
+    await config();
     final result = await request(
       'POST',
       '/delivery/login/',
-      data: {
-        'employee_code': code.trim(),
-        if (phoneLogin) 'phone': credential.trim() else 'password': credential,
-      },
+      data: {'employee_code': identifier.trim(), 'password': password},
     );
     deliveryToken = result['token'];
     staffWorkspace = '/delivery';

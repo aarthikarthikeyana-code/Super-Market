@@ -10,6 +10,19 @@ from rest_framework.exceptions import ValidationError
 from .models import Product, Order, OrderItem, OrderEvent, DeliveryPersonnel
 
 
+# Store policy excludes fresh produce, while allowing dried fruit, juices and oils.
+PRODUCE_CATEGORY_PATTERN = r'^\s*(?:(?:fresh\s+)?(?:fruits?|vegetables?)(?:\s*(?:&|and|/|-)\s*(?:fruits?|vegetables?))?|fresh\s+produce|produce|காய்கறிகள்|காய்கறி|பழங்கள்|பழம்)\s*$'
+
+
+def is_grocery_category(category):
+    import re
+    return not re.fullmatch(PRODUCE_CATEGORY_PATTERN, category, re.IGNORECASE)
+
+
+def grocery_products(queryset=None):
+    return (queryset if queryset is not None else Product.objects.all()).filter(is_active=True).exclude(category__iregex=PRODUCE_CATEGORY_PATTERN)
+
+
 def release_stock(order):
     if order.stock_released:
         return
@@ -37,8 +50,8 @@ def create_order(customer, data):
     existing = Order.objects.filter(customer=customer, idempotency_key=data['idempotency_key']).first()
     if existing:
         return existing
-    products = {p.pk: p for p in Product.objects.select_for_update().filter(
-        pk__in=[i['product_id'] for i in data['items']], is_active=True).order_by('pk')}
+    products = {p.pk: p for p in grocery_products(Product.objects.select_for_update()).filter(
+        pk__in=[i['product_id'] for i in data['items']]).order_by('pk')}
     subtotal = Decimal('0.00')
     for item in data['items']:
         product = products.get(item['product_id'])

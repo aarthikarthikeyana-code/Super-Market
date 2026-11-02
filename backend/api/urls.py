@@ -10,6 +10,7 @@ urlpatterns = [
     path('customer/wishlist/', views.customer_wishlist),
     path('customer/wishlist/<str:pk>/', views.customer_wishlist_item),
     path('products/', views.get_products),
+    path('catalog/browse/', views.browse_catalog),
     path('products/<str:pk>/', views.get_product_detail),
     path('orders/', views.customer_orders),
     path('orders/<str:order_id>/', views.customer_order_detail),

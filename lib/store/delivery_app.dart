@@ -34,7 +34,6 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
   final _code = TextEditingController(), _password = TextEditingController();
   final _form = GlobalKey<FormState>();
   bool _signedIn = false, _busy = false, _history = false;
-  bool _phoneLogin = false, _loadingLoginMode = true;
   late final StoreApi _api;
   int _tab = 0;
   String? _error;
@@ -48,7 +47,6 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
     _signedIn =
         widget.initialEmployeeCode == null && _api.deliveryToken != null;
     _api.staffChanges.addListener(_staffChanged);
-    _loadLoginMode();
     _poll = Timer.periodic(const Duration(seconds: 15), (_) {
       if (_signedIn) refreshDelivery(ref);
     });
@@ -69,24 +67,8 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
     }
   }
 
-  Future<void> _loadLoginMode() async {
-    try {
-      final configuration = await _api.config();
-      if (mounted) {
-        setState(
-          () => _phoneLogin =
-              configuration['delivery_login_mode'] == 'phone_demo',
-        );
-      }
-    } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
-    } finally {
-      if (mounted) setState(() => _loadingLoginMode = false);
-    }
-  }
-
   Future<void> _login() async {
-    if (_busy || _loadingLoginMode || !_form.currentState!.validate()) return;
+    if (_busy || !_form.currentState!.validate()) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -188,9 +170,7 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            _phoneLogin
-                                ? 'Enter your employee ID and the mobile number registered by your administrator.'
-                                : 'Use the employee ID and password created by your store administrator.',
+                            'Use your employee ID or registered mobile number, and the password set by your administrator.',
                             style: TextStyle(height: 1.6),
                           ),
                           const SizedBox(height: 24),
@@ -199,30 +179,22 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
                             enabled: !_busy,
                             textCapitalization: TextCapitalization.characters,
                             decoration: const InputDecoration(
-                              labelText: 'Employee ID',
-                              hintText: 'BB2026001',
+                              labelText: 'Employee ID or mobile number',
+                              hintText: 'BB2026001 or registered mobile',
                             ),
                             validator: (v) => (v?.trim().isEmpty ?? true)
-                                ? 'Enter your employee ID'
+                                ? 'Enter your employee ID or mobile number'
                                 : null,
                           ),
                           const SizedBox(height: 14),
                           TextFormField(
                             controller: _password,
                             enabled: !_busy,
-                            obscureText: !_phoneLogin,
-                            keyboardType: _phoneLogin
-                                ? TextInputType.phone
-                                : TextInputType.visiblePassword,
-                            decoration: InputDecoration(
-                              labelText: _phoneLogin
-                                  ? 'Registered mobile number'
-                                  : 'Password',
-                            ),
+                            obscureText: true,
+                            keyboardType: TextInputType.visiblePassword,
+                            decoration: InputDecoration(labelText: 'Password'),
                             validator: (v) => (v?.isEmpty ?? true)
-                                ? (_phoneLogin
-                                      ? 'Enter your registered mobile number'
-                                      : 'Enter your password')
+                                ? 'Enter your password'
                                 : null,
                             onFieldSubmitted: (_) => _login(),
                           ),
@@ -238,9 +210,7 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
                           SizedBox(
                             width: double.infinity,
                             child: FilledButton(
-                              onPressed: _busy || _loadingLoginMode
-                                  ? null
-                                  : _login,
+                              onPressed: _busy ? null : _login,
                               child: Text(
                                 _busy ? 'Signing in…' : 'Sign in to deliveries',
                               ),
@@ -248,9 +218,7 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            _phoneLogin
-                                ? 'Temporary test login using ID and phone number. Ask your administrator to update an incorrect number.'
-                                : 'Forgot your password? Ask your store administrator to reset it.',
+                            'Forgot your password? Ask your store administrator to reset it.',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.black54,

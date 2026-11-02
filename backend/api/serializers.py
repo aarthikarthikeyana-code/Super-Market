@@ -2,11 +2,10 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.conf import settings
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError
-from .commerce import cash_total
+from .commerce import cash_total, is_grocery_category
 from decimal import Decimal
 from rest_framework import serializers
 from .models import Product, ProductImage, DeliveryPersonnel, EmployeeCodeSequence, Order, OrderItem, OrderEvent, CustomerProfile, CashHandover
@@ -25,13 +24,19 @@ def next_employee_code():
 class ProductSerializer(serializers.ModelSerializer):
     tamil_name = serializers.CharField(required=True, allow_blank=False, max_length=120)
     english_name = serializers.CharField(required=False, allow_blank=True, default='', max_length=120)
+    category = serializers.CharField(max_length=60, default='Groceries')
     image_url = serializers.SerializerMethodField()
     image = serializers.PrimaryKeyRelatedField(queryset=ProductImage.objects.all(), required=False, allow_null=True)
     price = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01'))
     stock_kg = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0'))
 
     def get_image_url(self, product):
-        return product.image.secure_url if product.image_id else product.image_url
+        return product.image.secure_url if product.image_id else ''
+
+    def validate_category(self, category):
+        if not is_grocery_category(category):
+            raise serializers.ValidationError('This store sells groceries only; fresh fruit and vegetable categories are not supported.')
+        return category
 
     class Meta:
         model = Product
@@ -179,7 +184,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
         return [{'id': str(d.pk), 'kind': d.kind, 'uploaded_at': d.uploaded_at} for d in person.documents.all()]
 
     def get_has_login(self, person):
-        return bool(person.user_id)
+        return bool(person.user_id and person.user.has_usable_password())
 
     def validate_password(self, password):
         try:
@@ -223,7 +228,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
                     raise ValidationError({key: 'Required for motor vehicle delivery.'})
             if value('licence_expiry') < timezone.localdate() and value('documents_verified', False) and value('is_active', False):
                 raise ValidationError({'licence_expiry': 'Renew the driving licence before assigning deliveries.'})
-        if not settings.DELIVERY_PHONE_LOGIN_ENABLED and (not self.instance or not self.instance.user_id):
+        if not self.instance or not self.instance.user_id or not self.instance.user.has_usable_password():
             if not attrs.get('password'):
                 raise ValidationError({'password': 'Set a password for the employee login.'})
         if value('documents_verified', False) and (not value('document_consent', False) or not value('id_proof_type')):

@@ -7,7 +7,8 @@ from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.hashers import check_password, make_password
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Count, OuterRef, Subquery, Value, IntegerField
+from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -73,7 +74,7 @@ def health(request):
 @permission_classes([AllowAny])
 def store_config(request):
     return Response({'api_version': 5, 'store_name': 'Agaram Supermarket', 'currency': 'INR', 'delivery_charge': settings.DELIVERY_CHARGE,
-                     'online_payments_enabled': False, 'payment_methods': ['cod'], 'cash_on_delivery_enabled': True, 'delivery_mode': 'on_demand', 'delivery_login_mode': 'phone_demo' if settings.DELIVERY_PHONE_LOGIN_ENABLED else 'password', 'customer_login_mode': 'otp' if settings.CUSTOMER_OTP_ENABLED else 'demo_code'})
+                     'online_payments_enabled': False, 'payment_methods': ['cod'], 'cash_on_delivery_enabled': True, 'delivery_mode': 'on_demand', 'delivery_login_mode': 'password', 'customer_login_mode': 'otp' if settings.CUSTOMER_OTP_ENABLED else 'demo_code'})
 
 
 @api_view(['POST'])
@@ -141,7 +142,7 @@ def customer_profile(request):
 @permission_classes([IsAuthenticated])
 def customer_wishlist(request):
     profile = get_object_or_404(CustomerProfile, user=request.user)
-    products = profile.wishlist.filter(is_active=True).select_related('image')
+    products = commerce.grocery_products(profile.wishlist.all()).select_related('image')
     if request.query_params.get('ids_only') == 'true':
         return Response(list(products.values_list('id', flat=True)))
     return collection_response(request, products, ProductSerializer, ('tamil_name', 'pk'))
@@ -151,7 +152,7 @@ def customer_wishlist(request):
 @permission_classes([IsAuthenticated])
 def customer_wishlist_item(request, pk):
     profile = get_object_or_404(CustomerProfile, user=request.user)
-    product = get_object_or_404(Product, pk=pk, **({'is_active': True} if request.method == 'POST' else {}))
+    product = get_object_or_404(commerce.grocery_products() if request.method == 'POST' else Product.objects.all(), pk=pk)
     if request.method == 'POST':
         profile.wishlist.add(product)
     else:
@@ -184,29 +185,107 @@ def admin_logout(request):
     return Response(status=204)
 
 
+def ranked_products(products, metric='units_sold'):
+    from .models import OrderItem
+    completed = OrderItem.objects.filter(product_id=OuterRef('pk'), order__status='Delivered',
+        order__payment_status__in=['collected', 'paid'], order__customer__isnull=False, quantity__gt=0)
+    totals = completed.values('product_id').annotate(total=Sum('quantity') if metric == 'units_sold' else Count('order_id', distinct=True)).values('total')
+    return products.annotate(**{metric: Coalesce(Subquery(totals[:1], output_field=IntegerField()), Value(0))})
+
+
+def product_facets(products, field):
+    photos = products.filter(**{field: OuterRef(field)}, image__isnull=False).order_by('pk').values('image__secure_url')
+    return [dict(name=row[field], count=row['count'], image_url=row['photo'] or '')
+            for row in products.exclude(**{field: ''}).values(field).annotate(count=Count('pk'), photo=Subquery(photos[:1])).order_by(field)]
+
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def browse_catalog(request):
+    products = commerce.grocery_products()
+    collections = []
+    for key, label, queryset in [
+        ('best_sellers', 'Best Sellers', ranked_products(products).filter(units_sold__gt=0)),
+        ('most_bought', 'Most Bought', ranked_products(products, 'purchase_count').filter(purchase_count__gt=0)),
+        ('under_100', 'Under ₹100', products.filter(price__lt=100)),
+    ]:
+        count = queryset.count()
+        if count:
+            photo = queryset.filter(image__isnull=False).order_by('pk').values_list('image__secure_url', flat=True).first()
+            collections.append({'key': key, 'label': label, 'count': count, 'image_url': photo or ''})
+    return Response({'categories': product_facets(products, 'category'), 'brands': product_facets(products, 'brand'),
+        'collections': collections, 'capabilities': {'deals': False, 'new_arrivals': False, 'value_packs': False},
+        'total_products': products.count()})
+
+
 @api_view(['GET'])
 @authentication_classes([])
 @permission_classes([AllowAny])
 def get_products(request):
-    products = Product.objects.filter(is_active=True).select_related('image').order_by('tamil_name')
+    catalog = commerce.grocery_products().select_related('image')
+    products = catalog
     if request.query_params.get('ids'):
         ids = request.query_params['ids'].split(',')
         if len(ids) > 100 or any(len(pk) > 64 for pk in ids):
             raise ValidationError({'ids': 'Request at most 100 product IDs at a time.'})
         products = products.filter(pk__in=ids)
-    if request.query_params.get('category'):
-        products = products.filter(category=request.query_params['category'])
-    if request.query_params.get('search'):
-        query = request.query_params['search'][:100]
-        products = products.filter(Q(english_name__icontains=query) | Q(tamil_name__icontains=query) | Q(brand__icontains=query))
-    return collection_response(request, products, ProductSerializer, ('tamil_name', 'pk'), {'categories': list(Product.objects.filter(is_active=True).order_by('category').values_list('category', flat=True).distinct())})
+    for field in ['category', 'brand']:
+        value = request.query_params.get(field, '').strip()
+        if value and value != 'All':
+            products = products.filter(**{field + '__iexact': value})
+    prices = {}
+    for field, lookup in [('min_price', 'gte'), ('max_price', 'lte')]:
+        if field in request.query_params:
+            try:
+                value = Decimal(request.query_params[field])
+                if not value.is_finite() or value < 0 or value > Decimal('99999999.99'):
+                    raise ValueError()
+            except (ValueError, ArithmeticError):
+                raise ValidationError({field: 'Enter a finite, non-negative price up to 99999999.99.'}) from None
+            prices[field] = value
+            products = products.filter(**{'price__' + lookup: value})
+    if prices.get('min_price', 0) > prices.get('max_price', Decimal('99999999.99')):
+        raise ValidationError({'max_price': 'Maximum price must be at least the minimum price.'})
+    if request.query_params.get('in_stock') == 'true':
+        products = products.filter(is_in_stock=True, stock_kg__gte=1)
+    raw_query = request.query_params.get('search', '')[:100].strip()
+    # Keep exact words too; spelling alternatives must not rewrite a brand.
+    aliases = {'basmathi': 'basmati', 'biscut': 'biscuit', 'biscit': 'biscuit',
+               'sunflwer': 'sunflower', 'sunflowr': 'sunflower', 'dhal': 'dal', 'dhall': 'dal', 'sooji': 'rava', 'ata': 'atta'}
+    for word in raw_query.split():
+        term = Q()
+        for value in {word, aliases.get(word.casefold(), word)}:
+            for field in ['english_name', 'tamil_name', 'brand', 'category', 'description', 'sku']:
+                term |= Q(**{field + '__icontains': value})
+        products = products.filter(term)
+    collection = request.query_params.get('collection', '')
+    ordering = request.query_params.get('ordering', '')
+    if collection in ['best_sellers', 'most_bought']:
+        metric = 'units_sold' if collection == 'best_sellers' else 'purchase_count'
+        products = ranked_products(products, metric).filter(**{metric + '__gt': 0})
+        cursor_order = ('-' + metric, 'pk')
+    elif collection == 'under_100':
+        products = products.filter(price__lt=100)
+        cursor_order = ('price', 'pk')
+    elif collection:
+        raise ValidationError({'collection': 'This collection is not supported by the current catalog.'})
+    else:
+        cursor_order = ('tamil_name', 'pk')
+    if ordering in ['price', '-price']:
+        cursor_order = (ordering, 'pk')
+    elif ordering not in ['', 'name']:
+        raise ValidationError({'ordering': 'Choose name, price, or -price. Arrival dates are not recorded.'})
+    return collection_response(request, products.order_by(*cursor_order), ProductSerializer, cursor_order, {
+        'categories': list(catalog.exclude(category='').order_by('category').values_list('category', flat=True).distinct()),
+        'brands': list(catalog.exclude(brand='').order_by('brand').values_list('brand', flat=True).distinct())})
 
 
 @api_view(['GET'])
 @authentication_classes([])
 @permission_classes([AllowAny])
 def get_product_detail(request, pk):
-    return Response(ProductSerializer(get_object_or_404(Product, pk=pk, is_active=True)).data)
+    return Response(ProductSerializer(get_object_or_404(commerce.grocery_products().select_related('image'), pk=pk)).data)
 
 
 # Naming vocabulary, not catalog records. Unknown names stay for manual review.
@@ -421,7 +500,7 @@ def admin_delivery_personnel(request):
             query = request.query_params['search'][:100]
             people = people.filter(Q(name__icontains=query) | Q(phone__icontains=query) | Q(employee_code__icontains=query))
         if request.query_params.get('ready') == 'true':
-            people = people.filter(is_active=True, documents_verified=True, user__is_active=True, user__is_staff=False).filter(Q(vehicle_type__in=['walking', 'bicycle']) | Q(licence_expiry__gte=timezone.localdate()))
+            people = people.filter(is_active=True, documents_verified=True, user__is_active=True, user__is_staff=False).exclude(user__password__startswith='!').filter(Q(vehicle_type__in=['walking', 'bicycle']) | Q(licence_expiry__gte=timezone.localdate()))
         return collection_response(request, people, EmployeeSerializer, ('name', 'pk'))
     serializer = EmployeeSerializer(data=request.data, context={'request': request})
     serializer.is_valid(raise_exception=True)
@@ -448,7 +527,7 @@ def admin_delivery_person_detail(request, pk):
 class IsDeliveryEmployee(BasePermission):
     def has_permission(self, request, view):
         user = request.user
-        return bool(user and user.is_authenticated and user.is_active and not user.is_staff
+        return bool(user and user.is_authenticated and user.is_active and not user.is_staff and user.has_usable_password()
                     and DeliveryPersonnel.objects.filter(user=user, is_active=True).exists())
 
 
@@ -465,25 +544,25 @@ def employee_info(person):
 @permission_classes([AllowAny])
 @throttle_classes([DeliveryLoginThrottle])
 def employee_login(request):
-    code = str(request.data.get('employee_code', '')).strip().upper()
+    identifier = str(request.data.get('identifier', request.data.get('employee_code', request.data.get('phone', '')))).strip()
     password = request.data.get('password', '')
-    person = DeliveryPersonnel.objects.select_related('user').filter(employee_code=code, is_active=True).first()
-    message = 'Invalid employee ID or mobile number.' if settings.DELIVERY_PHONE_LOGIN_ENABLED else 'Invalid employee ID or password.'
+    message = 'Invalid employee ID/mobile number or password.'
+    if not identifier or not isinstance(password, str) or not password:
+        raise ValidationError({'detail': message})
+    people = DeliveryPersonnel.objects.select_related('user').filter(is_active=True)
+    try:
+        phone = normalize_customer_phone(identifier)
+    except ValidationError:
+        people = people.filter(employee_code=identifier.upper())
+    else:
+        people = people.filter(phone__in=[phone, phone[3:], phone[1:]])
+    matches = list(people[:2])
+    person = matches[0] if len(matches) == 1 else None
     if not person or not person.user_id or not person.user.is_active or person.user.is_staff or person.user.is_superuser:
         raise ValidationError({'detail': message})
-    if settings.DELIVERY_PHONE_LOGIN_ENABLED and 'phone' in request.data:
-        try:
-            phone = normalize_customer_phone(request.data['phone'])
-            registered = normalize_customer_phone(person.phone)
-        except (ValidationError, TypeError):
-            raise ValidationError({'detail': message}) from None
-        if not secrets.compare_digest(phone, registered):
-            raise ValidationError({'detail': message})
-        user = person.user
-    else:
-        user = authenticate(request, username=person.user.username, password=password) if isinstance(password, str) else None
-        if not user:
-            raise ValidationError({'detail': message})
+    user = authenticate(request, username=person.user.username, password=password)
+    if not user:
+        raise ValidationError({'detail': message})
     token, _ = Token.objects.get_or_create(user=user)
     return Response({'token': token.key, 'employee': employee_info(person)})
 
