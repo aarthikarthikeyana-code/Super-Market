@@ -25,6 +25,14 @@ final GoRouter appRouter = GoRouter(
       },
     ),
     GoRoute(
+      path: '/employee',
+      builder: (BuildContext context, GoRouterState state) {
+        return EmployeeConsoleScreen(
+          onSwitchToAdmin: () => context.go('/admin'),
+        );
+      },
+    ),
+    GoRoute(
       path: '/customer',
       builder: (BuildContext context, GoRouterState state) {
         return const StorefrontScreen();

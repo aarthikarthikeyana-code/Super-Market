@@ -509,6 +509,12 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
                     : 'Save employee details',
               ),
             ),
+            if (_person?['has_login'] == true)
+              OutlinedButton.icon(
+                onPressed: _busy ? null : () => Navigator.pop(context, _person),
+                icon: const Icon(Icons.login),
+                label: const Text('View employee portal'),
+              ),
             _heading('Private document photos'),
             if (_person == null)
               const Text(

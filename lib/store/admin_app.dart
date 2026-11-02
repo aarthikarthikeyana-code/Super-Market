@@ -10,6 +10,7 @@ import 'models.dart';
 import 'state.dart';
 import 'widgets.dart';
 import 'delivery_staff.dart';
+import 'delivery_app.dart';
 import 'paged_feed.dart';
 import 'employee_picker.dart';
 
@@ -50,6 +51,8 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       if (mounted) showStoreError(context, e);
     }
     if (!mounted) return;
+    ref.read(activeRoleProvider.notifier).setRole('admin');
+    ref.read(activeEmployeeProvider.notifier).setEmployee(null);
     refreshCommerce(ref);
     context.go('/');
   }
@@ -60,86 +63,152 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Theme(
-    data: storeTheme(),
-    child: !_signedIn
-        ? AdminSignInScreen(onSuccess: _loginSuccess)
-        : Scaffold(
-            appBar: AppBar(
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Agaram Workspace',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 21),
+  Widget build(BuildContext context) {
+    final activeRole = ref.watch(activeRoleProvider);
+    final activeEmployee = ref.watch(activeEmployeeProvider);
+
+    if (_signedIn && activeRole == 'employee') {
+      return Theme(
+        data: storeTheme(),
+        child: EmployeeConsoleScreen(
+          employee: activeEmployee,
+          onSwitchToAdmin: () {
+            ref.read(activeRoleProvider.notifier).setRole('admin');
+          },
+        ),
+      );
+    }
+
+    return Theme(
+      data: storeTheme(),
+      child: !_signedIn
+          ? AdminSignInScreen(onSuccess: _loginSuccess)
+          : Scaffold(
+              appBar: AppBar(
+                toolbarHeight: 80,
+                title: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        const Text(
+                          'Agaram Workspace',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE4F0E7),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFF006B3C),
+                              width: 1,
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.admin_panel_settings,
+                                size: 13,
+                                color: Color(0xFF006B3C),
+                              ),
+                              SizedBox(width: 3),
+                              Text(
+                                'Role: Admin',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF006B3C),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      [
+                        'Store overview',
+                        'Product catalog',
+                        'Order management',
+                        'Staff & Employees',
+                      ][_tab],
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  IconButton(
+                    tooltip: 'Refresh',
+                    onPressed: () => refreshCommerce(ref),
+                    icon: const Icon(Icons.refresh),
                   ),
-                  Text(
-                    [
-                      'Store overview',
-                      'Product catalog',
-                      'Order management',
-                      'Delivery team',
-                    ][_tab],
-                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  IconButton(
+                    tooltip: 'Logout',
+                    onPressed: _logout,
+                    icon: const Icon(Icons.logout),
                   ),
                 ],
               ),
-              actions: [
-                IconButton(
-                  tooltip: 'Refresh',
-                  onPressed: () => refreshCommerce(ref),
-                  icon: const Icon(Icons.refresh),
-                ),
-                IconButton(
-                  tooltip: 'Logout',
-                  onPressed: _logout,
-                  icon: const Icon(Icons.logout),
-                ),
-              ],
+              body: switch (_tab) {
+                0 => _overview(),
+                1 => _products(),
+                2 => _orders(),
+                _ => _team(),
+              },
+              floatingActionButton: _tab == 1
+                  ? FloatingActionButton.extended(
+                      onPressed: () => _editProduct(),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add product'),
+                    )
+                  : _tab == 3
+                  ? FloatingActionButton.extended(
+                      onPressed: () => _editPerson(),
+                      icon: const Icon(Icons.person_add_alt_1_rounded),
+                      label: const Text('Create Employee'),
+                    )
+                  : null,
+              bottomNavigationBar: NavigationBar(
+                selectedIndex: _tab,
+                onDestinationSelected: (i) => setState(() => _tab = i),
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.space_dashboard_outlined),
+                    label: 'Overview',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.inventory_2_outlined),
+                    label: 'Products',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.receipt_long_outlined),
+                    label: 'Orders',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.badge_outlined),
+                    label: 'Employees',
+                  ),
+                ],
+              ),
             ),
-            body: switch (_tab) {
-              0 => _overview(),
-              1 => _products(),
-              2 => _orders(),
-              _ => _team(),
-            },
-            floatingActionButton: _tab == 1
-                ? FloatingActionButton.extended(
-                    onPressed: () => _editProduct(),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add product'),
-                  )
-                : _tab == 3
-                ? FloatingActionButton.extended(
-                    onPressed: () => _editPerson(),
-                    icon: const Icon(Icons.person_add_outlined),
-                    label: const Text('Add delivery person'),
-                  )
-                : null,
-            bottomNavigationBar: NavigationBar(
-              selectedIndex: _tab,
-              onDestinationSelected: (i) => setState(() => _tab = i),
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.space_dashboard_outlined),
-                  label: 'Overview',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.inventory_2_outlined),
-                  label: 'Products',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.receipt_long_outlined),
-                  label: 'Orders',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.delivery_dining),
-                  label: 'Delivery',
-                ),
-              ],
-            ),
-          ),
-  );
+    );
+  }
+
   Widget _overview() => DataView(
     value: ref.watch(adminDashboardProvider),
     onRetry: () => ref.invalidate(adminDashboardProvider),
@@ -470,42 +539,79 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       onEmptyAction: () => _editPerson(),
       itemBuilder: (_, p, _) {
         return Card(
-          child: ListTile(
-            onTap: () => _editPerson(p),
-            leading: CircleAvatar(
-              backgroundColor: const Color(0xFFE4F0E7),
-              child: Text('${p['name']}'.substring(0, 1).toUpperCase()),
-            ),
-            title: Text(
-              '${p['name']}',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            subtitle: Text(
-              '${p['employee_code'] ?? 'Complete onboarding'} | ${p['phone']}\n${p['active_orders']} orders | ${money(amount(p['cash_to_handover']))} cash due',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            isThreeLine: true,
-            trailing: StatusChip(
-              p['is_active'] == true
-                  ? p['ready_for_deliveries'] == true
-                        ? '${p['status']}'
-                        : 'Onboarding'
-                  : 'Inactive',
-            ),
+          child: Column(
+            children: [
+              ListTile(
+                onTap: () => _editPerson(p),
+                leading: CircleAvatar(
+                  backgroundColor: const Color(0xFFE4F0E7),
+                  child: Text('${p['name']}'.substring(0, 1).toUpperCase()),
+                ),
+                title: Text(
+                  '${p['name']}',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(
+                  '${p['employee_code'] ?? 'Complete onboarding'} | ${p['phone']}\n${p['active_orders']} orders | ${money(amount(p['cash_to_handover']))} cash due',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                isThreeLine: true,
+                trailing: StatusChip(
+                  p['is_active'] == true
+                      ? p['ready_for_deliveries'] == true
+                            ? '${p['status']}'
+                            : 'Onboarding'
+                      : 'Inactive',
+                ),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: p['has_login'] == true
+                      ? () => _openEmployee(p)
+                      : null,
+                  icon: const Icon(Icons.login),
+                  label: const Text('View employee portal'),
+                ),
+              ),
+            ],
           ),
         );
       },
     );
   }
 
+  void _openEmployee(Map<String, dynamic> person) {
+    ref.read(activeEmployeeProvider.notifier).setEmployee(person);
+    ref.read(activeRoleProvider.notifier).setRole('employee');
+  }
+
   Future<void> _editPerson([Map<String, dynamic>? person]) async {
-    await Navigator.push(
+    final selected = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(builder: (_) => EmployeeEditorScreen(person: person)),
     );
+    if (!mounted) return;
     ref.invalidate(deliveryTeamProvider);
+    if (selected != null) _openEmployee(selected);
   }
+}
+
+// Employee portal uses the authenticated delivery API, never the admin feed.
+class EmployeeConsoleScreen extends StatelessWidget {
+  final Map<String, dynamic>? employee;
+  final VoidCallback onSwitchToAdmin;
+  const EmployeeConsoleScreen({
+    super.key,
+    this.employee,
+    required this.onSwitchToAdmin,
+  });
+  @override
+  Widget build(BuildContext context) => DeliveryConsoleScreen(
+    initialEmployeeCode: employee?['employee_code'] as String?,
+    onExit: onSwitchToAdmin,
+  );
 }
 
 class AdminSignInScreen extends ConsumerStatefulWidget {

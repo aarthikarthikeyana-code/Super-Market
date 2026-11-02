@@ -18,7 +18,13 @@ void refreshDelivery(WidgetRef ref) {
 }
 
 class DeliveryConsoleScreen extends ConsumerStatefulWidget {
-  const DeliveryConsoleScreen({super.key});
+  final String? initialEmployeeCode;
+  final VoidCallback? onExit;
+  const DeliveryConsoleScreen({
+    super.key,
+    this.initialEmployeeCode,
+    this.onExit,
+  });
   @override
   ConsumerState<DeliveryConsoleScreen> createState() => _DeliveryConsoleState();
 }
@@ -33,6 +39,7 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
   @override
   void initState() {
     super.initState();
+    _code.text = widget.initialEmployeeCode ?? '';
     // A fresh staff route authenticates before revealing any cached identity.
     _signedIn = false;
     _poll = Timer.periodic(const Duration(seconds: 15), (_) {
@@ -91,6 +98,18 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
     data: storeTheme(),
     child: Scaffold(
       appBar: AppBar(
+        leading: widget.onExit == null
+            ? null
+            : IconButton(
+                tooltip: 'Return to admin',
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _busy
+                    ? null
+                    : () async {
+                        await _logout();
+                        if (mounted) widget.onExit?.call();
+                      },
+              ),
         title: Text(_signedIn ? 'Agaram Delivery' : 'Delivery employee login'),
         actions: [
           if (_signedIn) ...[

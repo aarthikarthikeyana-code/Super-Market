@@ -46,6 +46,29 @@ final deliverySummaryProvider = FutureProvider<Map<String, dynamic>>(
   (ref) => ref.watch(storeApiProvider).deliveryDashboard(),
 );
 
+// Role management: 'admin' or 'employee'
+class ActiveRoleNotifier extends Notifier<String> {
+  @override
+  String build() => 'admin';
+  void setRole(String role) => state = role;
+}
+
+final activeRoleProvider = NotifierProvider<ActiveRoleNotifier, String>(
+  ActiveRoleNotifier.new,
+);
+
+// Active Employee payload when switched to employee role
+class ActiveEmployeeNotifier extends Notifier<Map<String, dynamic>?> {
+  @override
+  Map<String, dynamic>? build() => null;
+  void setEmployee(Map<String, dynamic>? emp) => state = emp;
+}
+
+final activeEmployeeProvider =
+    NotifierProvider<ActiveEmployeeNotifier, Map<String, dynamic>?>(
+      ActiveEmployeeNotifier.new,
+    );
+
 class StoreCart extends Notifier<List<CartLine>> {
   @override
   List<CartLine> build() {
