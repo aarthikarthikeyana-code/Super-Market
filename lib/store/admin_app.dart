@@ -782,6 +782,17 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
       _sku;
   String _imageId = '', _imageUrl = '';
   bool _busy = false, _uploading = false, _available = true;
+  Timer? _nameDebounce;
+  int _nameGeneration = 0;
+  bool _suggestingName = false, _applyingName = false;
+  String
+  _autoTamil = '',
+  _nameHint =
+      'Type an English grocery name for a Tamil suggestion, or enter Tamil directly.';
+  bool get _namePending =>
+      _suggestingName || (_nameDebounce?.isActive ?? false);
+  bool get _mayFillTamil =>
+      _tamil.text.trim().isEmpty || _tamil.text == _autoTamil;
   @override
   void initState() {
     super.initState();
@@ -789,7 +800,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
     _name = TextEditingController(text: p?.englishName ?? '');
     _tamil = TextEditingController(text: p?.tamilName ?? '');
     _brand = TextEditingController(text: p?.brand ?? '');
-    _category = TextEditingController(text: p?.category ?? '');
+    _category = TextEditingController(text: p?.category ?? 'Groceries');
     _price = TextEditingController(text: p?.price.toStringAsFixed(2) ?? '');
     _stock = TextEditingController(text: p?.stock.toStringAsFixed(0) ?? '');
     _unit = TextEditingController(text: p?.unit ?? '');
@@ -798,10 +809,96 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
     _imageId = p?.imageId ?? '';
     _imageUrl = p?.imageUrl ?? '';
     _available = p?.inStock ?? true;
+    _name.addListener(_queueTamilName);
+    _tamil.addListener(_tamilEdited);
+  }
+
+  void _tamilEdited() {
+    if (_applyingName) return;
+    _nameGeneration++;
+    _nameDebounce?.cancel();
+    setState(() {
+      _suggestingName = false;
+      _autoTamil = '';
+      _nameHint =
+          'Your Tamil name will be used. You can edit it before publishing.';
+    });
+  }
+
+  void _queueTamilName() {
+    _nameGeneration++;
+    _nameDebounce?.cancel();
+    if (!_mayFillTamil) {
+      setState(() {
+        _suggestingName = false;
+        _nameHint =
+            'Your edited Tamil name is kept. Tap Suggest Tamil to replace it.';
+      });
+      return;
+    }
+    _applyingName = true;
+    _tamil.clear();
+    _applyingName = false;
+    _autoTamil = '';
+    setState(() {
+      _suggestingName = false;
+      _nameHint =
+          'Tamil suggestions appear as you type. Please review the name.';
+    });
+    if (_name.text.trim().isNotEmpty) {
+      _nameDebounce = Timer(
+        const Duration(milliseconds: 450),
+        () => _suggestTamilName(),
+      );
+    }
+  }
+
+  Future<void> _suggestTamilName({bool replace = false}) async {
+    _nameDebounce?.cancel();
+    final english = _name.text.trim();
+    if (english.isEmpty || (!replace && !_mayFillTamil)) return;
+    final generation = ++_nameGeneration;
+    setState(() {
+      _suggestingName = true;
+      _nameHint = 'Finding a Tamil name…';
+    });
+    try {
+      final tamil = await ref.read(storeApiProvider).suggestTamilName(english);
+      if (!mounted ||
+          generation != _nameGeneration ||
+          _name.text.trim() != english) {
+        return;
+      }
+      setState(() {
+        if (tamil != null && tamil.isNotEmpty) {
+          _applyingName = true;
+          _tamil.text = tamil;
+          _applyingName = false;
+          _autoTamil = tamil;
+          _nameHint =
+              'Tamil suggestion added. Please check it before publishing.';
+        } else {
+          _nameHint = 'Enter the Tamil name for this product; an automatic suggestion is not available.';
+        }
+      });
+    } catch (_) {
+      if (mounted && generation == _nameGeneration) {
+        setState(
+          () => _nameHint =
+              'Could not suggest a name. You can enter Tamil directly.',
+        );
+      }
+    } finally {
+      if (mounted && generation == _nameGeneration) {
+        setState(() => _suggestingName = false);
+      }
+    }
   }
 
   @override
   void dispose() {
+    _nameGeneration++;
+    _nameDebounce?.cancel();
     for (final c in [
       _name,
       _tamil,
@@ -846,7 +943,12 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
   }
 
   Future<void> _save() async {
-    if (_busy || _uploading || !_form.currentState!.validate()) return;
+    if (_busy ||
+        _uploading ||
+        _namePending ||
+        !_form.currentState!.validate()) {
+      return;
+    }
     setState(() => _busy = true);
     try {
       await ref.read(storeApiProvider).saveProduct({
@@ -923,9 +1025,60 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 10),
+              const Text(
+                'Square photo · 1000 × 1000 recommended · JPG, PNG or WebP · Max 8 MB',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.black54,
+                  height: 1.5,
+                ),
+              ),
               const SizedBox(height: 22),
-              _field(_tamil, 'Tamil product name', required: true),
+              const Text(
+                'Make it easy to find.',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: storeInk,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'A clear name, a real photo and the right price. Your product is published straight to the store.',
+                style: TextStyle(color: Colors.black54, height: 1.5),
+              ),
+              const SizedBox(height: 20),
               _field(_name, 'English name (optional)'),
+              _field(_tamil, 'Tamil product name', required: true),
+              if (_suggestingName) const LinearProgressIndicator(minHeight: 2),
+              Row(
+                children: [
+                  const Icon(Icons.translate, size: 18, color: storeGreen),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _nameHint,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.5,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: _busy || _uploading || _suggestingName
+                      ? null
+                      : () => _suggestTamilName(replace: true),
+                  icon: const Icon(Icons.auto_awesome, size: 16),
+                  label: const Text('Suggest Tamil'),
+                ),
+              ),
               _field(_brand, 'Brand (optional)'),
               _field(_category, 'Category', required: true),
               _field(
@@ -976,7 +1129,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
               ),
               const SizedBox(height: 22),
               FilledButton(
-                onPressed: _busy || _uploading ? null : _save,
+                onPressed: _busy || _uploading || _namePending ? null : _save,
                 child: Text(
                   _busy
                       ? 'Saving product...'
@@ -1002,8 +1155,9 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
     child: TextFormField(
+      key: ValueKey(label),
       controller: controller,
-      enabled: !_busy,
+      enabled: !_busy && !_uploading,
       maxLines: lines,
       keyboardType: numeric
           ? const TextInputType.numberWithOptions(decimal: true)

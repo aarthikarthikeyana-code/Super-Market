@@ -1,4 +1,5 @@
 import secrets
+import re
 import uuid
 from datetime import timedelta
 from decimal import Decimal
@@ -206,6 +207,72 @@ def get_products(request):
 @permission_classes([AllowAny])
 def get_product_detail(request, pk):
     return Response(ProductSerializer(get_object_or_404(Product, pk=pk, is_active=True)).data)
+
+
+# Naming vocabulary, not catalog records. Unknown names stay for manual review.
+GROCERY_TAMIL_NAMES = {
+    'rice': 'அரிசி', 'ponni rice': 'பொன்னி அரிசி', 'ponni boiled rice': 'பொன்னி புழுங்கல் அரிசி',
+    'boiled rice': 'புழுங்கல் அரிசி', 'raw rice': 'பச்சரிசி', 'idli rice': 'இட்லி அரிசி',
+    'basmati rice': 'பாசுமதி அரிசி', 'brown rice': 'பழுப்பு அரிசி',
+    'toor dal': 'துவரம் பருப்பு', 'tur dal': 'துவரம் பருப்பு', 'arhar dal': 'துவரம் பருப்பு',
+    'urad dal': 'உளுத்தம் பருப்பு', 'black gram': 'உளுத்தம் பருப்பு',
+    'moong dal': 'பாசிப் பருப்பு', 'mung dal': 'பாசிப் பருப்பு', 'green gram': 'பச்சைப் பயறு',
+    'chana dal': 'கடலைப் பருப்பு', 'bengal gram': 'கடலைப் பருப்பு',
+    'chickpeas': 'கொண்டைக்கடலை', 'kabuli chana': 'வெள்ளைக் கொண்டைக்கடலை',
+    'black chana': 'கருப்புக் கொண்டைக்கடலை', 'masoor dal': 'மசூர் பருப்பு',
+    'wheat': 'கோதுமை', 'wheat flour': 'கோதுமை மாவு', 'atta': 'கோதுமை மாவு',
+    'whole wheat atta': 'முழுக் கோதுமை மாவு', 'maida': 'மைதா மாவு',
+    'rice flour': 'அரிசி மாவு', 'gram flour': 'கடலை மாவு', 'besan': 'கடலை மாவு',
+    'rava': 'ரவை', 'sooji': 'ரவை', 'semolina': 'ரவை', 'vermicelli': 'சேமியா',
+    'sugar': 'சர்க்கரை', 'brown sugar': 'நாட்டுச் சர்க்கரை', 'jaggery': 'வெல்லம்',
+    'salt': 'உப்பு', 'rock salt': 'கல் உப்பு', 'iodized salt': 'அயோடின் உப்பு',
+    'groundnut oil': 'கடலை எண்ணெய்', 'peanut oil': 'கடலை எண்ணெய்',
+    'sesame oil': 'நல்லெண்ணெய்', 'gingelly oil': 'நல்லெண்ணெய்',
+    'coconut oil': 'தேங்காய் எண்ணெய்', 'sunflower oil': 'சூரியகாந்தி எண்ணெய்',
+    'ghee': 'நெய்', 'butter': 'வெண்ணெய்', 'milk': 'பால்', 'curd': 'தயிர்',
+    'turmeric': 'மஞ்சள்', 'turmeric powder': 'மஞ்சள் தூள்', 'chilli powder': 'மிளகாய்த் தூள்',
+    'chili powder': 'மிளகாய்த் தூள்', 'red chilli powder': 'மிளகாய்த் தூள்',
+    'coriander powder': 'மல்லித் தூள்', 'cumin powder': 'சீரகத் தூள்',
+    'sambar powder': 'சாம்பார் பொடி', 'rasam powder': 'ரசப் பொடி',
+    'garam masala': 'கரம் மசாலா', 'mustard': 'கடுகு', 'mustard seeds': 'கடுகு',
+    'cumin': 'சீரகம்', 'cumin seeds': 'சீரகம்', 'fennel seeds': 'சோம்பு',
+    'fenugreek': 'வெந்தயம்', 'fenugreek seeds': 'வெந்தயம்', 'black pepper': 'மிளகு',
+    'pepper': 'மிளகு', 'cardamom': 'ஏலக்காய்', 'cloves': 'கிராம்பு',
+    'cinnamon': 'பட்டை', 'tamarind': 'புளி', 'asafoetida': 'பெருங்காயம்',
+    'red chilli': 'காய்ந்த மிளகாய்', 'coriander seeds': 'மல்லி',
+    'tea': 'தேயிலை', 'tea powder': 'தேயிலைத் தூள்', 'coffee': 'காபி',
+    'coffee powder': 'காபித் தூள்', 'honey': 'தேன்', 'cashew': 'முந்திரி',
+    'cashew nuts': 'முந்திரி', 'almonds': 'பாதாம்', 'raisins': 'உலர் திராட்சை',
+    'dates': 'பேரீச்சம்பழம்', 'peanuts': 'நிலக்கடலை', 'roasted gram': 'பொட்டுக்கடலை',
+    'oats': 'ஓட்ஸ்', 'poha': 'அவல்', 'flattened rice': 'அவல்', 'sago': 'ஜவ்வரிசி',
+    'ragi flour': 'கேழ்வரகு மாவு', 'ragi': 'கேழ்வரகு', 'millet': 'சிறுதானியம்',
+    'bajra': 'கம்பு', 'jowar': 'சோளம்', 'thinai': 'தினை',
+    'onion': 'வெங்காயம்', 'tomato': 'தக்காளி', 'potato': 'உருளைக்கிழங்கு',
+    'carrot': 'கேரட்', 'beans': 'பீன்ஸ்', 'brinjal': 'கத்திரிக்காய்',
+    'garlic': 'பூண்டு', 'ginger': 'இஞ்சி', 'coconut': 'தேங்காய்',
+    'curry leaves': 'கறிவேப்பிலை', 'mint': 'புதினா', 'coriander leaves': 'கொத்தமல்லி',
+}
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def suggest_tamil_product_name(request):
+    name = request.query_params.get('english_name', '').strip()
+    if not name or len(name) > 120:
+        raise ValidationError({'english_name': 'Enter an English product name, up to 120 characters.'})
+    normalized = re.sub(r'[\s_-]+', ' ', name.casefold()).strip()
+    quantity = ''
+    pack = re.search(r'\s+(\d+(?:\.\d+)?)\s*(kg|kilograms?|g|gm|gms|grams?|l|ltr|litres?|liters?|ml|pack|pcs)\.?$', normalized)
+    if pack:
+        units = {'kg': 'கிலோ', 'g': 'கிராம்', 'gm': 'கிராம்', 'gms': 'கிராம்',
+                 'l': 'லிட்டர்', 'ltr': 'லிட்டர்', 'ml': 'மில்லி', 'pack': 'பேக்', 'pcs': 'எண்ணிக்கை'}
+        unit = pack[2]
+        unit = 'kg' if unit.startswith('kilogram') else 'g' if unit.startswith('gram') else 'l' if unit.startswith(('liter', 'litre')) else unit
+        quantity = ' ' + pack[1] + ' ' + units[unit]
+        normalized = normalized[:pack.start()].strip()
+    translated = GROCERY_TAMIL_NAMES.get(normalized)
+    return Response({'tamil_name': translated + quantity if translated else '',
+                     'matched': bool(translated), 'requires_review': True})
 
 
 @api_view(['GET', 'POST'])

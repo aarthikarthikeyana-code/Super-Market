@@ -4,12 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'models.dart';
 import 'loading.dart';
 
-const storeGreen = Color(0xFF14543C);
-const storeInk = Color(0xFF172C26);
-const storeCream = Color(0xFFFAF8F2);
+const storeGreen = Color(0xFF0D634B);
+const storeInk = Color(0xFF17382D);
+const storeCream = Color(0xFFF7F8F2);
 const storeGold = Color(0xFFE6B85C);
 ThemeData storeTheme() => ThemeData(
   useMaterial3: true,
+  fontFamilyFallback: const ['NotoSansTamil'],
   scaffoldBackgroundColor: storeCream,
   colorScheme: ColorScheme.fromSeed(
     seedColor: storeGreen,
@@ -21,6 +22,22 @@ ThemeData storeTheme() => ThemeData(
     foregroundColor: storeInk,
     centerTitle: false,
     elevation: 0,
+  ),
+  navigationBarTheme: NavigationBarThemeData(
+    height: 72,
+    backgroundColor: Colors.white,
+    indicatorColor: const Color(0xFFE1F0D3),
+    labelTextStyle: WidgetStateProperty.resolveWith(
+      (states) => TextStyle(
+        fontSize: 11,
+        fontWeight: states.contains(WidgetState.selected)
+            ? FontWeight.w800
+            : FontWeight.w500,
+        color: states.contains(WidgetState.selected)
+            ? storeGreen
+            : const Color(0xFF6E7D74),
+      ),
+    ),
   ),
   inputDecorationTheme: InputDecorationTheme(
     filled: true,
@@ -148,9 +165,11 @@ class StoreHero extends StatelessWidget {
   const StoreHero({super.key});
   @override
   Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(28),
+    borderRadius: BorderRadius.circular(26),
     child: SizedBox(
-      height: 265,
+      height:
+          216 +
+          (MediaQuery.textScalerOf(context).scale(1) - 1).clamp(0.0, 1.5) * 300,
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -163,9 +182,9 @@ class StoreHero extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Color(0xE8113024),
-                  Color(0x70113024),
-                  Color(0x00113024),
+                  Color(0xFA0C3E2E),
+                  Color(0xB50C3E2E),
+                  Color(0x180C3E2E),
                 ],
                 stops: [0, .55, 1],
               ),
@@ -177,7 +196,7 @@ class StoreHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'FRESH FROM YOUR\nNEIGHBOURHOOD',
+                  'THE EVERYDAY GROCERY STORE',
                   style: TextStyle(
                     color: storeGold,
                     fontSize: 10,
@@ -187,9 +206,9 @@ class StoreHero extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 const Text(
-                  'Fresh picks.\nAt your door.',
+                  'Good food.\nMade simple.',
                   style: TextStyle(
-                    fontSize: 29,
+                    fontSize: 31,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                     height: 1.1,
@@ -210,12 +229,14 @@ class StoreHero extends StatelessWidget {
                     children: [
                       Icon(Icons.payments_outlined, size: 16, color: storeInk),
                       SizedBox(width: 6),
-                      Text(
-                        'Pay on delivery',
-                        style: TextStyle(
-                          color: storeInk,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                      Flexible(
+                        child: Text(
+                          'Shop now. Pay at your door.',
+                          style: TextStyle(
+                            color: storeInk,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ],
@@ -480,7 +501,13 @@ class OrderJourney extends StatelessWidget {
 class ProductPhoto extends StatelessWidget {
   final String url;
   final double height;
-  const ProductPhoto(this.url, {super.key, this.height = 130});
+  final BoxFit fit;
+  const ProductPhoto(
+    this.url, {
+    super.key,
+    this.height = 130,
+    this.fit = BoxFit.cover,
+  });
   @override
   Widget build(BuildContext context) {
     final placeholder = Container(
@@ -498,7 +525,7 @@ class ProductPhoto extends StatelessWidget {
       url,
       height: height,
       width: double.infinity,
-      fit: BoxFit.cover,
+      fit: fit,
       errorBuilder: (_, error, stack) => placeholder,
       loadingBuilder: (context, child, event) => event == null
           ? child

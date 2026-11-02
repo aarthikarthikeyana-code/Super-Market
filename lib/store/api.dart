@@ -518,6 +518,18 @@ class StoreApi {
     );
   }
 
+  Future<String?> suggestTamilName(String english) async {
+    final data = await request(
+      'GET',
+      Uri(
+        path: '/admin/products/tamil-name/',
+        queryParameters: {'english_name': english},
+      ).toString(),
+      admin: true,
+    ).timeout(const Duration(seconds: 12));
+    return data['matched'] == true ? data['tamil_name'] as String : null;
+  }
+
   Future<void> deleteProduct(String id) async {
     await request('DELETE', '/admin/products/$id/', admin: true);
   }

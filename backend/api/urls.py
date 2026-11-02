@@ -29,6 +29,7 @@ urlpatterns = [
     path('admin/logout/', views.admin_logout),
     path('admin/dashboard/', views.admin_dashboard),
     path('admin/products/', views.admin_products),
+    path('admin/products/tamil-name/', views.suggest_tamil_product_name),
     path('admin/products/<str:pk>/', views.admin_product_detail),
     path('admin/images/', views.upload_product_image),
     path('admin/orders/', views.admin_orders),

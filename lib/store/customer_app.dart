@@ -85,23 +85,37 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
       data: storeTheme(),
       child: Scaffold(
         appBar: AppBar(
-          title: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          toolbarHeight: 76,
+          title: const Row(
             children: [
-              Text(
-                'AGARAM',
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
-                  fontSize: 22,
-                ),
+              CircleAvatar(
+                backgroundColor: storeGreen,
+                foregroundColor: Colors.white,
+                radius: 21,
+                child: Icon(Icons.shopping_basket_outlined, size: 24),
               ),
-              Text(
-                'SUPERMARKET',
-                style: TextStyle(
-                  fontSize: 10,
-                  letterSpacing: 3,
-                  color: storeGreen,
+              SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AGARAM',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.8,
+                        fontSize: 21,
+                      ),
+                    ),
+                    Text(
+                      'YOUR EVERYDAY GROCER',
+                      style: TextStyle(
+                        fontSize: 8,
+                        letterSpacing: 1.1,
+                        color: storeGreen,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -164,6 +178,26 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
           2 => _orders(),
           _ => const CustomerAccountScreen(),
         },
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+        floatingActionButton: _tab == 0 && count > 0
+            ? Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      elevation: 5,
+                      padding: const EdgeInsets.symmetric(vertical: 17),
+                    ),
+                    onPressed: () => setState(() => _tab = 1),
+                    icon: const Icon(Icons.shopping_bag_outlined, size: 20),
+                    label: Text(
+                      'View cart · $count items · ${money(cart.fold<double>(0, (sum, line) => sum + line.total))}',
+                    ),
+                  ),
+                ),
+              )
+            : null,
         bottomNavigationBar: NavigationBar(
           selectedIndex: _tab,
           onDestinationSelected: (i) {
@@ -229,15 +263,21 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const StoreHero(),
-              const SizedBox(height: 10),
-              const StoreServiceStrip(),
-              const SizedBox(height: 16),
+              const Text(
+                'What’s on your list today?',
+                style: TextStyle(
+                  fontSize: 24,
+                  height: 1.2,
+                  fontWeight: FontWeight.w800,
+                  color: storeInk,
+                ),
+              ),
+              const SizedBox(height: 14),
               TextField(
                 controller: _searchInput,
                 maxLength: 100,
                 decoration: const InputDecoration(
-                  hintText: 'Search products or brands',
+                  hintText: 'Search groceries in Tamil or English',
                   prefixIcon: Icon(Icons.search),
                   counterText: '',
                 ),
@@ -251,7 +291,11 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                   );
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
+              const StoreHero(),
+              const SizedBox(height: 8),
+              const StoreServiceStrip(),
+              const SizedBox(height: 14),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
@@ -260,6 +304,14 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(
+                          showCheckmark: false,
+                          avatar: Icon(
+                            category == 'All'
+                                ? Icons.grid_view_rounded
+                                : Icons.shopping_basket_outlined,
+                            size: 17,
+                            color: storeGreen,
+                          ),
                           label: Text(category),
                           selected: _category == category,
                           onSelected: (_) =>
@@ -271,25 +323,35 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
               ),
               const SizedBox(height: 24),
               const Text(
-                'Shop the essentials',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+                'Everyday essentials',
+                style: TextStyle(
+                  fontSize: 23,
+                  fontWeight: FontWeight.w800,
+                  color: storeInk,
+                ),
               ),
             ],
           ),
         ),
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          0,
+          20,
+          ref.watch(storeCartProvider).isEmpty ? 20 : 90,
+        ),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: constraints.maxWidth > 700 ? 4 : 2,
-          mainAxisExtent: 320,
+          mainAxisExtent: 340,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
         ),
         itemBuilder: (_, product, _) => _productCard(product),
         emptyTitle: _search.isEmpty && _category == 'All'
-            ? 'Our shelves are getting ready'
+            ? 'Your grocery shelf is opening soon'
             : 'No matching products',
-        emptyMessage:
-            'Try another search or category, or pull down to refresh.',
+        emptyMessage: _search.isEmpty && _category == 'All'
+            ? 'Products published by Agaram will appear here. Pull down to check for updates.'
+            : 'Try another product name or category.',
         endContent: const Padding(
           padding: EdgeInsets.fromLTRB(20, 0, 20, 28),
           child: DeliveryStoryCard(),
@@ -306,7 +368,15 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
           children: [
             InkWell(
               onTap: () => _showProduct(p),
-              child: ProductPhoto(p.imageUrl, height: 142),
+              child: Container(
+                color: const Color(0xFFF0F5EC),
+                padding: const EdgeInsets.all(8),
+                child: ProductPhoto(
+                  p.imageUrl,
+                  height: 146,
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
             Positioned(
               top: 4,
@@ -348,8 +418,8 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                 Text(
                   p.name,
                   style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -371,7 +441,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                         ),
                       ),
                     ),
-                    IconButton.filledTonal(
+                    IconButton.filled(
                       tooltip: p.available ? 'Add ${p.name}' : 'Out of stock',
                       onPressed: p.available ? () => _addToCart(p) : null,
                       icon: Icon(

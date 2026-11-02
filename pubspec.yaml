@@ -60,6 +60,11 @@ flutter:
   assets:
     - assets/images/storefront-harvest.png
     - assets/images/delivery-handover.png
+    - assets/fonts/OFL.txt
+  fonts:
+    - family: NotoSansTamil
+      fonts:
+        - asset: assets/fonts/NotoSansTamil.ttf
 
 
   # An image asset can refer to one or more resolution-specific "variants", see
