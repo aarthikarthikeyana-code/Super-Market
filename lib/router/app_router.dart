@@ -20,6 +20,19 @@ final GoRouter appRouter = GoRouter(
       },
     ),
     GoRoute(
+      path: '/employee',
+      builder: (BuildContext context, GoRouterState state) {
+        return EmployeeConsoleScreen(
+          employee: const {
+            'name': 'Store Executive',
+            'role': 'Store Staff',
+            'phone': '+91 98765 43210',
+          },
+          onSwitchToAdmin: () => context.go('/admin'),
+        );
+      },
+    ),
+    GoRoute(
       path: '/customer',
       builder: (BuildContext context, GoRouterState state) {
         return const StorefrontScreen();

@@ -344,8 +344,8 @@ class StoreApi {
       List<Map<String, dynamic>>.from(
         await request('GET', '/admin/delivery-personnel/', admin: true),
       );
-  Future<void> savePerson(Map<String, dynamic> data, {int? id}) async {
-    await request(
+  Future<Map<String, dynamic>> savePerson(Map<String, dynamic> data, {int? id}) async {
+    final res = await request(
       id == null ? 'POST' : 'PATCH',
       id == null
           ? '/admin/delivery-personnel/'
@@ -353,6 +353,7 @@ class StoreApi {
       admin: true,
       data: data,
     );
+    return res is Map<String, dynamic> ? res : data;
   }
 
   Future<void> updateOrder(String id, Map<String, dynamic> data) async {

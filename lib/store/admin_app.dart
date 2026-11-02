@@ -55,86 +55,131 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Theme(
-    data: storeTheme(),
-    child: !_signedIn
-        ? AdminSignInScreen(onSuccess: _loginSuccess)
-        : Scaffold(
-            appBar: AppBar(
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Agaram Workspace',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 21),
+  Widget build(BuildContext context) {
+    final activeRole = ref.watch(activeRoleProvider);
+    final activeEmployee = ref.watch(activeEmployeeProvider);
+
+    if (activeRole == 'employee') {
+      return Theme(
+        data: storeTheme(),
+        child: EmployeeConsoleScreen(
+          employee: activeEmployee,
+          onSwitchToAdmin: () {
+            ref.read(activeRoleProvider.notifier).setRole('admin');
+          },
+        ),
+      );
+    }
+
+    return Theme(
+      data: storeTheme(),
+      child: !_signedIn
+          ? AdminSignInScreen(onSuccess: _loginSuccess)
+          : Scaffold(
+              appBar: AppBar(
+                title: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'Agaram Workspace',
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE4F0E7),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFF006B3C), width: 1),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.admin_panel_settings, size: 13, color: Color(0xFF006B3C)),
+                              SizedBox(width: 3),
+                              Text(
+                                'Role: Admin',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF006B3C),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      [
+                        'Store overview',
+                        'Product catalog',
+                        'Order management',
+                        'Staff & Employees',
+                      ][_tab],
+                      style: const TextStyle(fontSize: 12, color: Colors.black54),
+                    ),
+                  ],
+                ),
+                actions: [
+                  IconButton(
+                    tooltip: 'Refresh',
+                    onPressed: () => refreshCommerce(ref),
+                    icon: const Icon(Icons.refresh),
                   ),
-                  Text(
-                    [
-                      'Store overview',
-                      'Product catalog',
-                      'Order management',
-                      'Delivery team',
-                    ][_tab],
-                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  IconButton(
+                    tooltip: 'Logout',
+                    onPressed: _logout,
+                    icon: const Icon(Icons.logout),
                   ),
                 ],
               ),
-              actions: [
-                IconButton(
-                  tooltip: 'Refresh',
-                  onPressed: () => refreshCommerce(ref),
-                  icon: const Icon(Icons.refresh),
-                ),
-                IconButton(
-                  tooltip: 'Logout',
-                  onPressed: _logout,
-                  icon: const Icon(Icons.logout),
-                ),
-              ],
+              body: switch (_tab) {
+                0 => _overview(),
+                1 => _products(),
+                2 => _orders(),
+                _ => _team(),
+              },
+              floatingActionButton: _tab == 1
+                  ? FloatingActionButton.extended(
+                      onPressed: () => _editProduct(),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add product'),
+                    )
+                  : _tab == 3
+                  ? FloatingActionButton.extended(
+                      onPressed: () => _editPerson(),
+                      icon: const Icon(Icons.person_add_alt_1_rounded),
+                      label: const Text('Create Employee'),
+                    )
+                  : null,
+              bottomNavigationBar: NavigationBar(
+                selectedIndex: _tab,
+                onDestinationSelected: (i) => setState(() => _tab = i),
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.space_dashboard_outlined),
+                    label: 'Overview',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.inventory_2_outlined),
+                    label: 'Products',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.receipt_long_outlined),
+                    label: 'Orders',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.badge_outlined),
+                    label: 'Employees',
+                  ),
+                ],
+              ),
             ),
-            body: switch (_tab) {
-              0 => _overview(),
-              1 => _products(),
-              2 => _orders(),
-              _ => _team(),
-            },
-            floatingActionButton: _tab == 1
-                ? FloatingActionButton.extended(
-                    onPressed: () => _editProduct(),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add product'),
-                  )
-                : _tab == 3
-                ? FloatingActionButton.extended(
-                    onPressed: () => _editPerson(),
-                    icon: const Icon(Icons.person_add_outlined),
-                    label: const Text('Add delivery person'),
-                  )
-                : null,
-            bottomNavigationBar: NavigationBar(
-              selectedIndex: _tab,
-              onDestinationSelected: (i) => setState(() => _tab = i),
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.space_dashboard_outlined),
-                  label: 'Overview',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.inventory_2_outlined),
-                  label: 'Products',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.receipt_long_outlined),
-                  label: 'Orders',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.delivery_dining),
-                  label: 'Delivery',
-                ),
-              ],
-            ),
-          ),
-  );
+    );
+  }
   Widget _overview() => DataView(
     value: ref.watch(adminDashboardProvider),
     onRetry: () => ref.invalidate(adminDashboardProvider),
@@ -443,10 +488,10 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     builder: (team) {
       if (team.isEmpty) {
         return EmptyPanel(
-          icon: Icons.delivery_dining,
-          title: 'Set up your delivery team',
-          message: 'Add real delivery people, assign orders and keep customers informed at each step.',
-          action: 'Add delivery person',
+          icon: Icons.badge_outlined,
+          title: 'Register store employees',
+          message: 'Add store executives, order packers, cashiers and delivery staff. You can switch into any employee role with one tap.',
+          action: 'Create Employee',
           onAction: () => _editPerson(),
         );
       }
@@ -456,23 +501,104 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
         separatorBuilder: (_, i) => const SizedBox(height: 12),
         itemBuilder: (_, i) {
           final p = team[i];
+          final roleName = p['role'] ?? 'Store Executive';
           return Card(
-            child: ListTile(
-              onTap: () => _editPerson(p),
-              leading: CircleAvatar(
-                backgroundColor: const Color(0xFFE4F0E7),
-                child: Text('${p['name']}'.substring(0, 1).toUpperCase()),
-              ),
-              title: Text(
-                '${p['name']}',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              subtitle: Text(
-                '${p['phone']}\n${p['active_orders']} active orders',
-              ),
-              isThreeLine: true,
-              trailing: StatusChip(
-                p['is_active'] == true ? '${p['status']}' : 'Inactive',
+            elevation: 1,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CircleAvatar(
+                        radius: 22,
+                        backgroundColor: const Color(0xFFE4F0E7),
+                        child: Text(
+                          '${p['name']}'.substring(0, 1).toUpperCase(),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF006B3C),
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${p['name']}',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            const SizedBox(height: 3),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE4F0E7),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                roleName,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF006B3C),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${p['phone']}',
+                              style: const TextStyle(fontSize: 12, color: Colors.black54),
+                            ),
+                          ],
+                        ),
+                      ),
+                      StatusChip(
+                        p['is_active'] == true ? '${p['status'] ?? 'Active'}' : 'Inactive',
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 18),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${p['active_orders'] ?? 0} active tasks',
+                        style: const TextStyle(fontSize: 12, color: Colors.black54),
+                      ),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 18),
+                            tooltip: 'Edit details',
+                            onPressed: () => _editPerson(p),
+                          ),
+                          const SizedBox(width: 4),
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF006B3C),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            icon: const Icon(Icons.visibility_rounded, size: 16),
+                            label: const Text('View Employee'),
+                            onPressed: () {
+                              // AUTOMATICALLY CHANGE ROLE AS EMPLOYEE
+                              ref.read(activeRoleProvider.notifier).setRole('employee');
+                              ref.read(activeEmployeeProvider.notifier).setEmployee(p);
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           );
@@ -480,46 +606,80 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       );
     },
   );
+
   Future<void> _editPerson([Map<String, dynamic>? person]) async {
     final name = TextEditingController(text: person?['name'] ?? ''),
         phone = TextEditingController(text: person?['phone'] ?? '');
+    String role = person?['role'] ?? 'Store Executive';
     final form = GlobalKey<FormState>();
     bool active = person?['is_active'] ?? true, busy = false;
+    Map<String, dynamic>? savedPersonPayload;
+
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialog) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           title: Text(
-            person == null ? 'Add delivery person' : 'Edit delivery person',
+            person == null ? 'Create Employee' : 'Edit Employee',
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           content: Form(
             key: form,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: name,
-                  decoration: const InputDecoration(labelText: 'Name'),
-                  validator: (s) =>
-                      (s?.trim().length ?? 0) < 2 ? 'Enter a name' : null,
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: phone,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Mobile number'),
-                  validator: (s) =>
-                      !RegExp(r'^\+?[0-9]{10,15}$').hasMatch(s?.trim() ?? '')
-                      ? 'Enter a valid mobile number'
-                      : null,
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Active'),
-                  value: active,
-                  onChanged: busy ? null : (v) => setDialog(() => active = v),
-                ),
-              ],
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextFormField(
+                    controller: name,
+                    decoration: const InputDecoration(
+                      labelText: 'Employee Name *',
+                      prefixIcon: Icon(Icons.person_outline),
+                    ),
+                    validator: (s) =>
+                        (s?.trim().length ?? 0) < 2 ? 'Enter a valid name' : null,
+                  ),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    value: role,
+                    decoration: const InputDecoration(
+                      labelText: 'Employee Role *',
+                      prefixIcon: Icon(Icons.badge_outlined),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'Store Executive', child: Text('Store Executive')),
+                      DropdownMenuItem(value: 'Order Packer & Verification', child: Text('Order Packer & Verification')),
+                      DropdownMenuItem(value: 'Billing Cashier', child: Text('Billing Cashier')),
+                      DropdownMenuItem(value: 'Delivery Executive', child: Text('Delivery Executive')),
+                      DropdownMenuItem(value: 'Inventory Staff', child: Text('Inventory Staff')),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) setDialog(() => role = v);
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: phone,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Mobile number *',
+                      prefixIcon: Icon(Icons.phone_outlined),
+                    ),
+                    validator: (s) =>
+                        !RegExp(r'^\+?[0-9]{10,15}$').hasMatch(s?.trim() ?? '')
+                        ? 'Enter a valid mobile number'
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Active Staff Status'),
+                    value: active,
+                    onChanged: busy ? null : (v) => setDialog(() => active = v),
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
@@ -534,11 +694,17 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                       if (!form.currentState!.validate()) return;
                       setDialog(() => busy = true);
                       try {
-                        await ref.read(storeApiProvider).savePerson({
+                        final payload = {
                           'name': name.text.trim(),
+                          'role': role,
                           'phone': phone.text.trim(),
                           'is_active': active,
-                        }, id: person?['id']);
+                        };
+                        final res = await ref.read(storeApiProvider).savePerson(payload, id: person?['id']);
+                        savedPersonPayload = {
+                          ...payload,
+                          ...res,
+                        };
                         ref.invalidate(deliveryTeamProvider);
                         if (ctx.mounted) Navigator.pop(ctx);
                       } catch (e) {
@@ -548,15 +714,520 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                         }
                       }
                     },
-              child: Text(busy ? 'Saving...' : 'Save'),
+              child: Text(busy ? 'Saving...' : 'Save Employee'),
             ),
           ],
         ),
       ),
     );
+
+    // Prompt user to View the Employee and automatically change role
+    if (savedPersonPayload != null && mounted) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          contentPadding: const EdgeInsets.all(22),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE4F0E7),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle_rounded,
+                  color: Color(0xFF006B3C),
+                  size: 42,
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Employee Saved Successfully!',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${savedPersonPayload!['name']} ($role) has been registered in the store system.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12.5, color: Colors.black54),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF9FBF9),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE4F0E7)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.badge_outlined, color: Color(0xFF006B3C)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${savedPersonPayload!['name']}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                          ),
+                          Text(
+                            'Role: $role • ${savedPersonPayload!['phone']}',
+                            style: const TextStyle(fontSize: 11.5, color: Color(0xFF006B3C)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF006B3C),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.visibility_rounded, size: 18),
+                  label: const Text(
+                    'View the Employee',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    // AUTOMATICALLY CHANGE ROLE TO EMPLOYEE!
+                    ref.read(activeRoleProvider.notifier).setRole('employee');
+                    ref.read(activeEmployeeProvider.notifier).setEmployee(savedPersonPayload);
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Continue as Admin'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     await Future<void>.delayed(const Duration(milliseconds: 300));
     name.dispose();
     phone.dispose();
+  }
+}
+
+/// Full Employee Console View / Portal Screen
+class EmployeeConsoleScreen extends ConsumerStatefulWidget {
+  final Map<String, dynamic>? employee;
+  final VoidCallback onSwitchToAdmin;
+
+  const EmployeeConsoleScreen({
+    super.key,
+    required this.employee,
+    required this.onSwitchToAdmin,
+  });
+
+  @override
+  ConsumerState<EmployeeConsoleScreen> createState() => _EmployeeConsoleScreenState();
+}
+
+class _EmployeeConsoleScreenState extends ConsumerState<EmployeeConsoleScreen> {
+  final Map<String, bool> _packedItems = {
+    'item_1': true,
+    'item_2': true,
+    'item_3': false,
+  };
+
+  void _confirmReturnToAdmin() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Switch to Admin Role?'),
+        content: const Text(
+          'You are currently logged in as Employee. Do you want to return to the Admin Dashboard?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Stay as Employee'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF006B3C)),
+            onPressed: () {
+              Navigator.pop(ctx);
+              widget.onSwitchToAdmin();
+            },
+            child: const Text('Switch to Admin'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final emp = widget.employee;
+    final empName = emp?['name'] ?? 'Store Staff';
+    final empRole = emp?['role'] ?? 'Store Executive';
+    final empPhone = emp?['phone'] ?? '+91 98765 43210';
+    final ordersAsync = ref.watch(adminOrdersProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text(
+                  'Employee Portal',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE4F0E7),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF006B3C)),
+                  ),
+                  child: const Text(
+                    'Role: Employee',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF006B3C),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Text(
+              'Active Employee: $empName',
+              style: const TextStyle(fontSize: 12, color: Colors.black54),
+            ),
+          ],
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilledButton.tonalIcon(
+              style: FilledButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                backgroundColor: const Color(0xFFE4F0E7),
+                foregroundColor: const Color(0xFF006B3C),
+              ),
+              icon: const Icon(Icons.admin_panel_settings, size: 16),
+              label: const Text('Admin View'),
+              onPressed: _confirmReturnToAdmin,
+            ),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Employee Identity Profile Card
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF006B3C), Color(0xFF07894F)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF006B3C).withOpacity(0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 26,
+                        backgroundColor: Colors.white,
+                        child: Text(
+                          empName.substring(0, 1).toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF006B3C),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              empName,
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              empRole,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFFEAF7EE),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              empPhone,
+                              style: const TextStyle(fontSize: 11, color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          '● On Duty',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // Employee Duty Quick Metrics
+            Row(
+              children: [
+                _buildMetricCard('Assigned Tasks', '6', Icons.checklist_rounded, const Color(0xFF006B3C)),
+                const SizedBox(width: 10),
+                _buildMetricCard('To Pack', '3', Icons.inventory_2_outlined, Colors.orange.shade800),
+                const SizedBox(width: 10),
+                _buildMetricCard('Verified', '12', Icons.verified_outlined, Colors.blue.shade700),
+              ],
+            ),
+            const SizedBox(height: 22),
+
+            // Section 1: Order Packing & Verification Duty
+            const Text(
+              'Order Fulfillment & Packing (Assigned Order)',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Check off packed items before dispatching order #NK20251022',
+              style: TextStyle(fontSize: 12, color: Colors.black54),
+            ),
+            const SizedBox(height: 10),
+
+            Card(
+              elevation: 1,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  children: [
+                    _buildCheckItem('item_1', 'துவரம் பருப்பு (Toor Dal 1 kg)', '₹275'),
+                    const Divider(height: 16),
+                    _buildCheckItem('item_2', 'அரிசி (Ponni Boiled Rice 5 kg)', '₹325'),
+                    const Divider(height: 16),
+                    _buildCheckItem('item_3', 'சமையல் எண்ணெய் (Refined Oil 1 L)', '₹165'),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF006B3C),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.check_circle_outline, size: 18),
+                        label: const Text('Mark Order Packed & Ready'),
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Order items verified and marked as Packed!'),
+                              backgroundColor: Color(0xFF006B3C),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 22),
+
+            // Section 2: Store Live Orders Overview
+            const Text(
+              'Active Customer Orders Queue',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            ordersAsync.when(
+              data: (orders) {
+                if (orders.isEmpty) {
+                  return const Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text('No active orders right now.'),
+                    ),
+                  );
+                }
+                return Column(
+                  children: orders.take(3).map((o) {
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: const Icon(Icons.shopping_bag_outlined, color: Color(0xFF006B3C)),
+                        title: Text(o.id, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text('${o.items.length} items • ${money(o.total)}'),
+                        trailing: StatusChip(o.status),
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, __) => const Text('Unable to load queue'),
+            ),
+
+            const SizedBox(height: 22),
+
+            // Role Banner Notice
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.amber.shade300),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.amber.shade900),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'You are working in Employee Role ($empName). Administrative controls and settings are restricted.',
+                      style: TextStyle(fontSize: 12, color: Colors.amber.shade900),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Big Switch Back Button
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF006B3C),
+                  side: const BorderSide(color: Color(0xFF006B3C), width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.swap_horiz_rounded),
+                label: const Text(
+                  'Switch Back to Admin Role',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                onPressed: _confirmReturnToAdmin,
+              ),
+            ),
+            const SizedBox(height: 30),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetricCard(String title, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.black12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 11, color: Colors.black54),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCheckItem(String keyId, String title, String price) {
+    final checked = _packedItems[keyId] ?? false;
+    return InkWell(
+      onTap: () => setState(() => _packedItems[keyId] = !checked),
+      child: Row(
+        children: [
+          Checkbox(
+            value: checked,
+            activeColor: const Color(0xFF006B3C),
+            onChanged: (v) => setState(() => _packedItems[keyId] = v ?? false),
+          ),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                decoration: checked ? TextDecoration.lineThrough : null,
+                color: checked ? Colors.black45 : Colors.black87,
+              ),
+            ),
+          ),
+          Text(price, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        ],
+      ),
+    );
   }
 }
 
