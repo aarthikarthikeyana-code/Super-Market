@@ -786,7 +786,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
   void initState() {
     super.initState();
     final p = widget.product;
-    _name = TextEditingController(text: p?.name ?? '');
+    _name = TextEditingController(text: p?.englishName ?? '');
     _tamil = TextEditingController(text: p?.tamilName ?? '');
     _brand = TextEditingController(text: p?.brand ?? '');
     _category = TextEditingController(text: p?.category ?? '');
@@ -924,8 +924,8 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                 ),
               ),
               const SizedBox(height: 22),
-              _field(_name, 'Product name', required: true),
-              _field(_tamil, 'Tamil name (optional)'),
+              _field(_tamil, 'Tamil product name', required: true),
+              _field(_name, 'English name (optional)'),
               _field(_brand, 'Brand (optional)'),
               _field(_category, 'Category', required: true),
               _field(
@@ -1195,7 +1195,7 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
           for (final i in _order.items)
             ListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text('${i['english_name']}'),
+              title: Text(productLabel(i)),
               subtitle: Text('${i['unit']} \u00d7 ${i['quantity']}'),
               trailing: Text(money(amount(i['total_price']))),
             ),

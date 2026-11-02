@@ -570,7 +570,7 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
               for (final item in _order.items)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text('${item['english_name']}'),
+                  title: Text(productLabel(item)),
                   subtitle: Text('${item['quantity']} × ${item['unit']}'),
                   trailing: Text(money(amount(item['total_price']))),
                 ),

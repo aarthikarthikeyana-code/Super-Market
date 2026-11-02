@@ -13,7 +13,7 @@ class ProductImage(models.Model):
 class Product(models.Model):
     id = models.CharField(max_length=64, primary_key=True)
     tamil_name = models.CharField(max_length=120)
-    english_name = models.CharField(max_length=120)
+    english_name = models.CharField(max_length=120, blank=True)
     category = models.CharField(max_length=60, default='Vegetables')
     price = models.DecimalField(max_digits=10, decimal_places=2)
     unit = models.CharField(max_length=40, default='Kg')
@@ -30,7 +30,7 @@ class Product(models.Model):
     badges = models.JSONField(default=list)
 
     class Meta:
-        indexes = [models.Index(fields=['english_name', 'id'], name='product_catalog_cursor_idx')]
+        indexes = [models.Index(fields=['tamil_name', 'id'], name='product_catalog_cursor_idx')]
 
     def __str__(self):
         return f"{self.tamil_name} ({self.english_name})"

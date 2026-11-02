@@ -593,7 +593,7 @@ class OrderSummaryCard extends StatelessWidget {
             const SizedBox(height: 14),
             Text(
               order.items
-                  .map((i) => '${i['english_name']} × ${i['quantity']}')
+                  .map((i) => '${productLabel(i)} × ${i['quantity']}')
                   .join(', '),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,

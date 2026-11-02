@@ -415,7 +415,8 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
               p.name,
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
             ),
-            if (p.tamilName.isNotEmpty) Text(p.tamilName),
+            if (p.tamilName.isNotEmpty && p.tamilName != p.name)
+              Text(p.tamilName),
             const SizedBox(height: 8),
             Text(
               '${money(p.price)} / ${p.unit}',
@@ -1268,7 +1269,7 @@ class _TrackingState extends ConsumerState<OrderTrackingScreen> {
                 for (final item in order.items)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text('${item['english_name']}'),
+                    title: Text(productLabel(item)),
                     subtitle: Text(
                       '${item['unit']} \u00d7 ${item['quantity']}',
                     ),

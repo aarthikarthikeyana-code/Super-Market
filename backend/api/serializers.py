@@ -13,7 +13,8 @@ from .models import Product, ProductImage, DeliveryPersonnel, Order, OrderItem, 
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    tamil_name = serializers.CharField(required=False, allow_blank=True, default='')
+    tamil_name = serializers.CharField(required=True, allow_blank=False, max_length=120)
+    english_name = serializers.CharField(required=False, allow_blank=True, default='', max_length=120)
     image_url = serializers.SerializerMethodField()
     image = serializers.PrimaryKeyRelatedField(queryset=ProductImage.objects.all(), required=False, allow_null=True)
     price = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01'))

@@ -143,7 +143,7 @@ def customer_wishlist(request):
     products = profile.wishlist.filter(is_active=True).select_related('image')
     if request.query_params.get('ids_only') == 'true':
         return Response(list(products.values_list('id', flat=True)))
-    return collection_response(request, products, ProductSerializer, ('english_name', 'pk'))
+    return collection_response(request, products, ProductSerializer, ('tamil_name', 'pk'))
 
 
 @api_view(['POST', 'DELETE'])
@@ -187,7 +187,7 @@ def admin_logout(request):
 @authentication_classes([])
 @permission_classes([AllowAny])
 def get_products(request):
-    products = Product.objects.filter(is_active=True).select_related('image').order_by('english_name')
+    products = Product.objects.filter(is_active=True).select_related('image').order_by('tamil_name')
     if request.query_params.get('ids'):
         ids = request.query_params['ids'].split(',')
         if len(ids) > 100 or any(len(pk) > 64 for pk in ids):
@@ -198,7 +198,7 @@ def get_products(request):
     if request.query_params.get('search'):
         query = request.query_params['search'][:100]
         products = products.filter(Q(english_name__icontains=query) | Q(tamil_name__icontains=query) | Q(brand__icontains=query))
-    return collection_response(request, products, ProductSerializer, ('english_name', 'pk'), {'categories': list(Product.objects.filter(is_active=True).order_by('category').values_list('category', flat=True).distinct())})
+    return collection_response(request, products, ProductSerializer, ('tamil_name', 'pk'), {'categories': list(Product.objects.filter(is_active=True).order_by('category').values_list('category', flat=True).distinct())})
 
 
 @api_view(['GET'])
@@ -212,10 +212,10 @@ def get_product_detail(request, pk):
 @permission_classes([IsAdminUser])
 def admin_products(request):
     if request.method == 'GET':
-        products = Product.objects.filter(is_active=True).select_related('image').order_by('english_name')
+        products = Product.objects.filter(is_active=True).select_related('image').order_by('tamil_name')
         if request.query_params.get('search'):
             products = products.filter(Q(english_name__icontains=request.query_params['search'][:100]) | Q(tamil_name__icontains=request.query_params['search'][:100]) | Q(brand__icontains=request.query_params['search'][:100]))
-        return collection_response(request, products, ProductSerializer, ('english_name', 'pk'))
+        return collection_response(request, products, ProductSerializer, ('tamil_name', 'pk'))
     serializer = ProductSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     product = serializer.save(id='P' + uuid.uuid4().hex, is_active=True)

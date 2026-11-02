@@ -2,6 +2,11 @@ import 'dart:math';
 
 double amount(dynamic value) => double.tryParse('$value') ?? 0;
 String money(num value) => '₹${value.toStringAsFixed(2)}';
+String productLabel(Map<String, dynamic> data) {
+  final english = '${data['english_name'] ?? ''}'.trim();
+  return english.isNotEmpty ? english : '${data['tamil_name'] ?? ''}'.trim();
+}
+
 String newUuid() {
   final random = Random.secure();
   final bytes = List<int>.generate(16, (_) => random.nextInt(256));
@@ -13,7 +18,7 @@ String newUuid() {
 
 class StoreProduct {
   final String id,
-      name,
+      englishName,
       tamilName,
       category,
       brand,
@@ -26,7 +31,7 @@ class StoreProduct {
   final bool inStock;
   const StoreProduct({
     required this.id,
-    required this.name,
+    required String name,
     this.tamilName = '',
     required this.category,
     this.brand = '',
@@ -38,7 +43,8 @@ class StoreProduct {
     required this.price,
     required this.stock,
     this.inStock = true,
-  });
+  }) : englishName = name;
+  String get name => englishName.trim().isNotEmpty ? englishName : tamilName;
   factory StoreProduct.fromJson(Map<String, dynamic> j) => StoreProduct(
     id: '${j['id']}',
     name: j['english_name'] ?? '',
@@ -57,7 +63,7 @@ class StoreProduct {
   bool get available => inStock && stock >= 1;
   Map<String, dynamic> toJson() => {
     'id': id,
-    'english_name': name,
+    'english_name': englishName,
     'tamil_name': tamilName,
     'category': category,
     'brand': brand,
