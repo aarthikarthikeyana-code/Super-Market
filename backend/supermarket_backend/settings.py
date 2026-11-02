@@ -114,10 +114,6 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {'anon': '1000/hour', 'user': '3000/hour', 'login': '10/min', 'session': '20/hour'},
     'EXCEPTION_HANDLER': 'api.errors.exception_handler',
 }
-PAYMENT_GATEWAY_ENABLED = os.getenv('PAYMENT_GATEWAY_ENABLED', 'false').lower() == 'true'
-RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID', '')
-RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET', '')
-RAZORPAY_WEBHOOK_SECRET = os.getenv('RAZORPAY_WEBHOOK_SECRET', '')
 CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME', '')
 CLOUDINARY_API_KEY = os.getenv('CLOUDINARY_API_KEY', '')
 CLOUDINARY_API_SECRET = os.getenv('CLOUDINARY_API_SECRET', '')

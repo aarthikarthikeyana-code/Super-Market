@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'models.dart';
@@ -18,8 +19,18 @@ class StoreApi {
     defaultValue: 'https://super-market-33m1.onrender.com/api',
   );
   final Dio dio;
+  final feedChanges = ValueNotifier<int>(0);
   final FlutterSecureStorage storage;
+  // Public catalog data only. Never retain customer, staff or cash responses.
+  final _publicCache = <String, ({DateTime expires, String json})>{};
+  int _cacheGeneration = 0;
+  void clearPublicCache() {
+    _cacheGeneration++;
+    _publicCache.clear();
+  }
+
   String? adminToken;
+  String? deliveryToken;
   String? _customerToken;
   Map<String, dynamic>? _customerAccount;
   Future<Map<String, dynamic>?>? _restoringCustomer;
@@ -41,6 +52,7 @@ class StoreApi {
     dynamic data,
     bool admin = false,
     bool customer = false,
+    bool employee = false,
   }) async {
     String? token;
     if (admin) {
@@ -50,6 +62,26 @@ class StoreApi {
       }
     }
     if (customer) token = await customerToken();
+    if (employee) {
+      token = deliveryToken;
+      if (token == null) {
+        throw StoreException('Sign in with your delivery employee ID.');
+      }
+    }
+    final uri = Uri.parse(path);
+    final cacheable =
+        method == 'GET' &&
+        !admin &&
+        !customer &&
+        !employee &&
+        (uri.path == '/config/' ||
+            (uri.path == '/products/' &&
+                uri.queryParameters['paginate'] == 'true'));
+    final cached = cacheable ? _publicCache[path] : null;
+    if (cached != null && cached.expires.isAfter(DateTime.now())) {
+      return jsonDecode(cached.json);
+    }
+    final cacheGeneration = _cacheGeneration;
     try {
       final response = await dio.request(
         path,
@@ -59,9 +91,29 @@ class StoreApi {
           headers: token == null ? {} : {'Authorization': 'Token $token'},
         ),
       );
+      if (cacheable && cacheGeneration == _cacheGeneration) {
+        _publicCache.removeWhere(
+          (_, entry) => !entry.expires.isAfter(DateTime.now()),
+        );
+        if (_publicCache.length >= 32) {
+          _publicCache.remove(_publicCache.keys.first);
+        }
+        _publicCache[path] = (
+          expires: DateTime.now().add(const Duration(seconds: 20)),
+          json: jsonEncode(response.data),
+        );
+      }
+      if (method != 'GET') clearPublicCache();
+      if (method != 'GET' &&
+          !path.contains('login') &&
+          !path.contains('logout') &&
+          !path.contains('session')) {
+        feedChanges.value++;
+      }
       return response.data;
     } on DioException catch (e) {
       if (e.response?.statusCode == 401 && admin) adminToken = null;
+      if (e.response?.statusCode == 401 && employee) deliveryToken = null;
       final body = e.response?.data;
       if (body is Map) {
         final detail = body['detail'];
@@ -241,9 +293,159 @@ class StoreApi {
         .toList();
   }
 
+  Future<StorePage<T>> _page<T>(
+    String path,
+    T Function(Map<String, dynamic>) decode, {
+    String? cursor,
+    Map<String, String> filters = const {},
+    bool admin = false,
+    bool customer = false,
+    bool employee = false,
+  }) async {
+    final data = await request(
+      'GET',
+      Uri(
+        path: path,
+        queryParameters: {
+          'paginate': 'true',
+          'page_size': '24',
+          'cursor': ?cursor,
+          ...filters,
+        },
+      ).toString(),
+      admin: admin,
+      customer: customer,
+      employee: employee,
+    );
+    if (data is! Map || data['results'] is! List) {
+      throw StoreException(
+        'The store needs an update for scrolling lists. Please try again after deployment.',
+      );
+    }
+    final next = data['next'];
+    final nextCursor = next == null
+        ? null
+        : Uri.parse('$next').queryParameters['cursor'];
+    if (next != null && (nextCursor == null || nextCursor.isEmpty)) {
+      throw StoreException(
+        'Unable to continue this list. Pull down to refresh.',
+      );
+    }
+    return StorePage(
+      items: (data['results'] as List)
+          .map((j) => decode(Map<String, dynamic>.from(j)))
+          .toList(),
+      nextCursor: nextCursor,
+      metadata: Map<String, dynamic>.from(data),
+    );
+  }
+
+  Future<StorePage<StoreProduct>> productPage({
+    String? cursor,
+    String search = '',
+    String category = 'All',
+    bool admin = false,
+  }) async {
+    if (cursor == null) await config();
+    return _page(
+      admin ? '/admin/products/' : '/products/',
+      StoreProduct.fromJson,
+      cursor: cursor,
+      admin: admin,
+      filters: {
+        if (search.isNotEmpty) 'search': search,
+        if (category != 'All') 'category': category,
+      },
+    );
+  }
+
+  Future<StorePage<StoreOrder>> orderPage({
+    String? cursor,
+    bool admin = false,
+    String status = 'All',
+    bool employee = false,
+    bool history = false,
+  }) => _page(
+    employee
+        ? '/delivery/orders/'
+        : admin
+        ? '/admin/orders/'
+        : '/orders/',
+    (j) => StoreOrder(j),
+    cursor: cursor,
+    admin: admin,
+    customer: !admin && !employee,
+    employee: employee,
+    filters: {
+      if (status != 'All') 'status': status,
+      if (employee) 'scope': history ? 'completed' : 'active',
+    },
+  );
+  Future<StorePage<Map<String, dynamic>>> employeePage({
+    String? cursor,
+    String search = '',
+    bool ready = false,
+  }) => _page(
+    '/admin/delivery-personnel/',
+    (j) => j,
+    cursor: cursor,
+    admin: true,
+    filters: {
+      if (search.isNotEmpty) 'search': search,
+      if (ready) 'ready': 'true',
+    },
+  );
+  Future<StorePage<StoreProduct>> wishlistPage(String? cursor) => _page(
+    '/customer/wishlist/',
+    StoreProduct.fromJson,
+    cursor: cursor,
+    customer: true,
+  );
+  Future<List<String>> wishlistIds() async => (await request(
+    'GET',
+    '/customer/wishlist/?ids_only=true',
+    customer: true,
+  ) as List).map((id) => '$id').toList();
+  Future<StorePage<Map<String, dynamic>>> cashDuePage(int id, String? cursor) =>
+      _page(
+        '/admin/delivery-personnel/$id/cash-handover/',
+        (j) => j,
+        cursor: cursor,
+        admin: true,
+      );
+  Future<StorePage<Map<String, dynamic>>> receiptPage({
+    int? employeeId,
+    String? cursor,
+  }) => _page(
+    employeeId == null
+        ? '/delivery/receipts/'
+        : '/admin/delivery-personnel/$employeeId/receipts/',
+    (j) => j,
+    cursor: cursor,
+    admin: employeeId != null,
+    employee: employeeId == null,
+  );
+
+  Future<List<StoreProduct>> productsByIds(List<String> ids) async {
+    if (ids.isEmpty) return [];
+    await config();
+    final products = <StoreProduct>[];
+    for (var start = 0; start < ids.length; start += 100) {
+      final batch = ids.skip(start).take(100).join(',');
+      final rows = await request(
+        'GET',
+        Uri(path: '/products/', queryParameters: {'ids': batch}).toString(),
+      ) as List;
+      products.addAll(
+        rows.map((j) => StoreProduct.fromJson(Map<String, dynamic>.from(j))),
+      );
+    }
+    return products;
+  }
+
   Future<Map<String, dynamic>> config() async {
     final data = Map<String, dynamic>.from(await request('GET', '/config/'));
-    if (data['api_version'] != 2) {
+    if (data['api_version'] != 5) {
       throw StoreException(
         'The store is being updated. Please try again shortly.',
       );
@@ -296,23 +498,6 @@ class StoreApi {
     await finishCheckout();
   }
 
-  Future<StoreOrder> verifyPayment(
-    String orderId,
-    String paymentId,
-    String signature,
-  ) async => StoreOrder(
-    Map<String, dynamic>.from(
-      await request(
-        'POST',
-        '/orders/$orderId/verify-payment/',
-        customer: true,
-        data: {
-          'razorpay_payment_id': paymentId,
-          'razorpay_signature': signature,
-        },
-      ),
-    ),
-  );
   Future<Map<String, dynamic>> upload(List<int> bytes, String name) async =>
       Map<String, dynamic>.from(
         await request(
@@ -344,18 +529,128 @@ class StoreApi {
       List<Map<String, dynamic>>.from(
         await request('GET', '/admin/delivery-personnel/', admin: true),
       );
-  Future<void> savePerson(Map<String, dynamic> data, {int? id}) async {
-    await request(
-      id == null ? 'POST' : 'PATCH',
-      id == null
-          ? '/admin/delivery-personnel/'
-          : '/admin/delivery-personnel/$id/',
-      admin: true,
-      data: data,
+  Future<Map<String, dynamic>> savePerson(
+    Map<String, dynamic> data, {
+    int? id,
+  }) async {
+    return Map<String, dynamic>.from(
+      await request(
+        id == null ? 'POST' : 'PATCH',
+        id == null
+            ? '/admin/delivery-personnel/'
+            : '/admin/delivery-personnel/$id/',
+        admin: true,
+        data: data,
+      ),
     );
   }
 
-  Future<void> updateOrder(String id, Map<String, dynamic> data) async {
-    await request('PATCH', '/admin/orders/$id/', admin: true, data: data);
+  Future<Map<String, dynamic>> employeeRecord(int id) async =>
+      Map<String, dynamic>.from(
+        await request('GET', '/admin/delivery-personnel/$id/', admin: true),
+      );
+  Future<void> uploadEmployeeDocument(
+    int id,
+    String kind,
+    List<int> bytes,
+    String name,
+  ) async {
+    await request(
+      'POST',
+      '/admin/delivery-personnel/$id/documents/',
+      admin: true,
+      data: FormData.fromMap({
+        'kind': kind,
+        'document': MultipartFile.fromBytes(bytes, filename: name),
+      }),
+    );
   }
+
+  Future<String> employeeDocumentUrl(int id, String documentId) async =>
+      (await request(
+        'GET',
+        '/admin/delivery-personnel/$id/documents/$documentId/',
+        admin: true,
+      ))['url'];
+  Future<void> deleteEmployeeDocument(int id, String documentId) async {
+    await request(
+      'DELETE',
+      '/admin/delivery-personnel/$id/documents/$documentId/',
+      admin: true,
+    );
+  }
+
+  Future<Map<String, dynamic>> cashHandover(int id) async =>
+      Map<String, dynamic>.from(
+        await request(
+          'GET',
+          '/admin/delivery-personnel/$id/cash-handover/',
+          admin: true,
+        ),
+      );
+  Future<Map<String, dynamic>> receiveCash(
+    int id,
+    Map<String, dynamic> data,
+  ) async => Map<String, dynamic>.from(
+    await request(
+      'POST',
+      '/admin/delivery-personnel/$id/cash-handover/',
+      admin: true,
+      data: data,
+    ),
+  );
+
+  Future<void> deliveryLogin(String code, String password) async {
+    await config();
+    final result = await request(
+      'POST',
+      '/delivery/login/',
+      data: {'employee_code': code.trim(), 'password': password},
+    );
+    deliveryToken = result['token'];
+  }
+
+  Future<void> deliveryLogout() async {
+    try {
+      if (deliveryToken != null) {
+        await request('POST', '/delivery/logout/', employee: true);
+      }
+    } finally {
+      deliveryToken = null;
+    }
+  }
+
+  Future<Map<String, dynamic>> deliveryDashboard() async =>
+      Map<String, dynamic>.from(
+        await request('GET', '/delivery/dashboard/', employee: true),
+      );
+  Future<List<StoreOrder>> deliveryOrders() async =>
+      (await request('GET', '/delivery/orders/', employee: true) as List)
+          .map((j) => StoreOrder(Map<String, dynamic>.from(j)))
+          .toList();
+  Future<StoreOrder> deliveryOrder(String id) async => StoreOrder(
+    Map<String, dynamic>.from(
+      await request('GET', '/delivery/orders/$id/', employee: true),
+    ),
+  );
+  Future<StoreOrder> updateDelivery(
+    String id,
+    Map<String, dynamic> data,
+  ) async => StoreOrder(
+    Map<String, dynamic>.from(
+      await request(
+        'PATCH',
+        '/delivery/orders/$id/',
+        employee: true,
+        data: data,
+      ),
+    ),
+  );
+
+  Future<StoreOrder> updateOrder(String id, Map<String, dynamic> data) async =>
+      StoreOrder(
+        Map<String, dynamic>.from(
+          await request('PATCH', '/admin/orders/$id/', admin: true, data: data),
+        ),
+      );
 }

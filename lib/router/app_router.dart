@@ -3,10 +3,15 @@ import 'package:go_router/go_router.dart';
 
 import '../store/admin_app.dart';
 import '../store/customer_app.dart';
+import '../store/delivery_app.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
   routes: [
+    GoRoute(
+      path: '/delivery',
+      builder: (_, _) => const DeliveryConsoleScreen(),
+    ),
     GoRoute(
       path: '/',
       builder: (BuildContext context, GoRouterState state) {

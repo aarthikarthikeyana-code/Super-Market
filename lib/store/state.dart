@@ -23,6 +23,10 @@ final wishlistProvider = FutureProvider<List<StoreProduct>>((ref) async {
   if (account == null) return [];
   return ref.watch(storeApiProvider).wishlist();
 });
+final wishlistIdsProvider = FutureProvider<List<String>>((ref) async {
+  if (await ref.watch(customerAccountProvider.future) == null) return [];
+  return ref.watch(storeApiProvider).wishlistIds();
+});
 final myOrdersProvider = FutureProvider<List<StoreOrder>>(
   (ref) => ref.watch(storeApiProvider).orders(),
 );
@@ -35,6 +39,12 @@ final adminDashboardProvider = FutureProvider<Map<String, dynamic>>(
 final deliveryTeamProvider = FutureProvider<List<Map<String, dynamic>>>(
   (ref) => ref.watch(storeApiProvider).personnel(),
 );
+final deliveryWorkProvider = FutureProvider<List<StoreOrder>>(
+  (ref) => ref.watch(storeApiProvider).deliveryOrders(),
+);
+final deliverySummaryProvider = FutureProvider<Map<String, dynamic>>(
+  (ref) => ref.watch(storeApiProvider).deliveryDashboard(),
+);
 
 class StoreCart extends Notifier<List<CartLine>> {
   @override
@@ -45,13 +55,17 @@ class StoreCart extends Notifier<List<CartLine>> {
   }
 
   bool _edited = false;
+  String? restoreError;
   Future<void> _writes = Future.value();
   Future<void> _restore(StoreApi api) async {
+    ref.read(cartLoadingProvider.notifier).setLoading(true);
     try {
       final saved = await api.storage.read(key: 'agaram_cart');
       if (saved == null) return;
       final rows = jsonDecode(saved) as List;
-      final products = await api.products();
+      final products = await api.productsByIds(
+        rows.map((row) => '${row['id']}').toList(),
+      );
       if (!ref.mounted || _edited) return;
       final restored = <CartLine>[];
       for (final row in rows) {
@@ -70,12 +84,17 @@ class StoreCart extends Notifier<List<CartLine>> {
         }
       }
       state = restored;
-    } catch (_) {
+    } catch (e) {
+      if (ref.mounted && !_edited) restoreError = e.toString();
       // Keep the saved cart for the next online restore; never substitute products.
+    } finally {
+      if (ref.mounted) ref.read(cartLoadingProvider.notifier).setLoading(false);
     }
   }
 
   void _set(List<CartLine> lines) {
+    restoreError = null;
+    ref.read(cartLoadingProvider.notifier).setLoading(false);
     _edited = true;
     state = lines;
     final storage = ref.read(storeApiProvider).storage;
@@ -141,7 +160,18 @@ final storeCartProvider = NotifierProvider<StoreCart, List<CartLine>>(
   StoreCart.new,
 );
 
+class CartLoading extends Notifier<bool> {
+  @override
+  bool build() => true;
+  void setLoading(bool value) => state = value;
+}
+
+final cartLoadingProvider = NotifierProvider<CartLoading, bool>(
+  CartLoading.new,
+);
+
 void refreshCommerce(WidgetRef ref) {
+  ref.read(storeApiProvider).feedChanges.value++;
   ref.invalidate(catalogProvider);
   ref.invalidate(myOrdersProvider);
   ref.invalidate(adminOrdersProvider);

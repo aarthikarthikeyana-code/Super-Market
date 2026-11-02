@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'state.dart';
 import 'models.dart';
 import 'widgets.dart';
+import 'paged_feed.dart';
 
 Future<bool> ensureCustomerAccount(BuildContext context, WidgetRef ref) async {
   try {
@@ -61,6 +62,7 @@ class _PhoneSignInState extends ConsumerState<CustomerPhoneSignInScreen> {
       ref.invalidate(customerProfileProvider);
       ref.invalidate(myOrdersProvider);
       ref.invalidate(wishlistProvider);
+      ref.invalidate(wishlistIdsProvider);
       Navigator.pop(context, true);
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
@@ -247,6 +249,7 @@ class _WishlistState extends ConsumerState<CustomerWishlistScreen> {
     try {
       await ref.read(storeApiProvider).setWishlist(id, false);
       ref.invalidate(wishlistProvider);
+      ref.invalidate(wishlistIdsProvider);
     } catch (e) {
       if (mounted) showStoreError(context, e);
     } finally {
@@ -257,102 +260,74 @@ class _WishlistState extends ConsumerState<CustomerWishlistScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('My wishlist')),
-    body: DataView(
-      value: ref.watch(wishlistProvider),
-      onRetry: () => ref.invalidate(wishlistProvider),
-      builder: (products) => products.isEmpty
-          ? const EmptyPanel(
-              icon: Icons.favorite_border,
-              title: 'Save your favourites',
-              message: 'Tap the heart on a product to keep it here for later.',
-            )
-          : RefreshIndicator(
-              onRefresh: () async {
-                ref.invalidate(wishlistProvider);
-                await ref.read(wishlistProvider.future);
-              },
-              child: ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: products.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 12),
-                itemBuilder: (_, i) {
-                  final product = products[i];
-                  return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 80,
-                            child: ProductPhoto(product.imageUrl, height: 80),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  product.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                Text(
-                                  '${money(product.price)} / ${product.unit}',
-                                ),
-                                TextButton.icon(
-                                  onPressed: !product.available
-                                      ? null
-                                      : () async {
-                                          if (await ensureCustomerAccount(
-                                                context,
-                                                ref,
-                                              ) &&
-                                              mounted) {
-                                            ref
-                                                .read(
-                                                  storeCartProvider.notifier,
-                                                )
-                                                .add(product);
-                                            if (context.mounted) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text(
-                                                        'Added to cart',
-                                                      ),
-                                                    ),
-                                                  );
-                                            }
-                                          }
-                                        },
-                                  icon: const Icon(
-                                    Icons.add_shopping_cart,
-                                    size: 18,
-                                  ),
-                                  label: Text(
-                                    product.available
-                                        ? 'Add to cart'
-                                        : 'Out of stock',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'Remove from wishlist',
-                            onPressed: _busy.contains(product.id)
-                                ? null
-                                : () => _remove(product.id),
-                            icon: const Icon(Icons.favorite, color: storeGreen),
-                          ),
-                        ],
+    body: PagedFeed<StoreProduct>(
+      queryKey: (
+        'wishlist',
+        ref.watch(customerAccountProvider).asData?.value?['phone'],
+      ),
+      changes: ref.watch(storeApiProvider).feedChanges,
+      load: ref.read(storeApiProvider).wishlistPage,
+      identity: (p) => p.id,
+      emptyTitle: 'Save your favourites',
+      emptyMessage: 'Tap the heart on a product to keep it here for later.',
+      itemBuilder: (_, product, _) {
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 80,
+                  child: ProductPhoto(product.imageUrl, height: 80),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product.name,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
-                    ),
-                  );
-                },
-              ),
+                      Text('${money(product.price)} / ${product.unit}'),
+                      TextButton.icon(
+                        onPressed: !product.available
+                            ? null
+                            : () async {
+                                if (await ensureCustomerAccount(context, ref) &&
+                                    mounted) {
+                                  ref
+                                      .read(storeCartProvider.notifier)
+                                      .add(product);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Added to cart'),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                        icon: const Icon(Icons.add_shopping_cart, size: 18),
+                        label: Text(
+                          product.available ? 'Add to cart' : 'Out of stock',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Remove from wishlist',
+                  onPressed: _busy.contains(product.id)
+                      ? null
+                      : () => _remove(product.id),
+                  icon: const Icon(Icons.favorite, color: storeGreen),
+                ),
+              ],
             ),
+          ),
+        );
+      },
     ),
   );
 }
@@ -399,6 +374,7 @@ class _CustomerAccountState extends ConsumerState<CustomerAccountScreen> {
       ref.invalidate(customerProfileProvider);
       ref.invalidate(myOrdersProvider);
       ref.invalidate(wishlistProvider);
+      ref.invalidate(wishlistIdsProvider);
       ref.invalidate(storeCartProvider);
       if (change) await ensureCustomerAccount(context, ref);
     } catch (e) {
@@ -410,6 +386,7 @@ class _CustomerAccountState extends ConsumerState<CustomerAccountScreen> {
 
   @override
   Widget build(BuildContext context) => DataView(
+    retainOnRefresh: false,
     value: ref.watch(customerAccountProvider),
     onRetry: () => ref.invalidate(customerAccountProvider),
     builder: (account) {

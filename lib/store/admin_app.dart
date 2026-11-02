@@ -9,6 +9,9 @@ import 'api.dart';
 import 'models.dart';
 import 'state.dart';
 import 'widgets.dart';
+import 'delivery_staff.dart';
+import 'paged_feed.dart';
+import 'employee_picker.dart';
 
 class AdminConsoleScreen extends ConsumerStatefulWidget {
   const AdminConsoleScreen({super.key});
@@ -19,12 +22,14 @@ class AdminConsoleScreen extends ConsumerStatefulWidget {
 class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   bool _signedIn = false;
   int _tab = 0;
+  String _orderFilter = 'All';
   Timer? _poll;
   @override
   void initState() {
     super.initState();
     _poll = Timer.periodic(const Duration(seconds: 20), (_) {
       if (_signedIn) {
+        ref.read(storeApiProvider).feedChanges.value++;
         ref.invalidate(adminOrdersProvider);
         ref.invalidate(adminDashboardProvider);
         if (_tab == 3) ref.invalidate(deliveryTeamProvider);
@@ -165,17 +170,22 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'Captured online payments',
+                  'Cash collected at delivery',
                   style: TextStyle(color: Color(0xFFD2E7D9)),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  money(amount(data['revenue'])),
+                  money(amount(data['cash_collected'])),
                   style: const TextStyle(
                     fontSize: 34,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                   ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Received by store: ${money(amount(data['cash_received_by_store']))}\nWith employees: ${money(amount(data['cash_with_employees']))}',
+                  style: const TextStyle(color: Colors.white70, height: 1.5),
                 ),
               ],
             ),
@@ -215,7 +225,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
           ),
           const SizedBox(height: 22),
           Text(
-            '${data['awaiting_payment']} awaiting payment / ${data['delivered']} delivered',
+            '${money(amount(data['cash_due']))} cash to collect Â· ${data['delivered']} delivered',
             style: const TextStyle(color: Colors.black54),
           ),
           const SizedBox(height: 24),
@@ -277,158 +287,166 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     if (result == true) refreshCommerce(ref);
   }
 
-  Widget _products() => DataView(
-    value: ref.watch(catalogProvider),
-    onRetry: () => ref.invalidate(catalogProvider),
-    builder: (products) {
-      if (products.isEmpty) {
-        return EmptyPanel(
-          icon: Icons.inventory_2_outlined,
-          title: 'Build your product catalog',
-          message: 'Upload a product photo, set your price and stock, and publish it to the customer store.',
-          action: 'Add your first product',
-          onAction: () => _editProduct(),
-        );
-      }
-      return RefreshIndicator(
-        onRefresh: () async {
-          await ref.refresh(catalogProvider.future).then((_) {});
-        },
-        child: ListView.separated(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-          itemCount: products.length,
-          separatorBuilder: (_, i) => const SizedBox(height: 12),
-          itemBuilder: (ctx, i) {
-            final p = products[i];
-            return Card(
-              child: InkWell(
-                onTap: () => _editProduct(p),
-                borderRadius: BorderRadius.circular(20),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 72,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: ProductPhoto(p.imageUrl, height: 72),
+  Widget _products() {
+    final api = ref.watch(storeApiProvider);
+    return PagedFeed<StoreProduct>(
+      queryKey: ('adminProducts', api.adminToken),
+      changes: api.feedChanges,
+      load: (cursor) => api.productPage(cursor: cursor, admin: true),
+      identity: (p) => p.id,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+      emptyTitle: 'Build your product catalog',
+      emptyMessage:
+          'Publish real products with prices, stock and product photos.',
+      emptyAction: 'Add your first product',
+      onEmptyAction: () => _editProduct(),
+      itemBuilder: (ctx, p, _) {
+        return Card(
+          child: InkWell(
+            onTap: () => _editProduct(p),
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 72,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: ProductPhoto(p.imageUrl, height: 72),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          p.name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              p.name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
-                              ),
+                        Text(
+                          '${p.category} / ${p.unit}',
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${money(p.price)} / Stock: ${p.stock.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            color: storeGreen,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuButton<String>(
+                    onSelected: (action) async {
+                      if (action == 'edit') {
+                        _editProduct(p);
+                        return;
+                      }
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Remove product?'),
+                          content: Text(
+                            '${p.name} will no longer appear in the customer store. Existing order records are preserved.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancel'),
                             ),
-                            Text(
-                              '${p.category} / ${p.unit}',
-                              style: const TextStyle(
-                                color: Colors.black54,
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              '${money(p.price)} / Stock: ${p.stock.toStringAsFixed(0)}',
-                              style: const TextStyle(
-                                color: storeGreen,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Remove'),
                             ),
                           ],
                         ),
-                      ),
-                      PopupMenuButton<String>(
-                        onSelected: (action) async {
-                          if (action == 'edit') {
-                            _editProduct(p);
-                            return;
-                          }
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('Remove product?'),
-                              content: Text(
-                                '${p.name} will no longer appear in the customer store. Existing order records are preserved.',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx, false),
-                                  child: const Text('Cancel'),
-                                ),
-                                FilledButton(
-                                  onPressed: () => Navigator.pop(ctx, true),
-                                  child: const Text('Remove'),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (confirm == true) {
-                            try {
-                              await ref
-                                  .read(storeApiProvider)
-                                  .deleteProduct(p.id);
-                              refreshCommerce(ref);
-                            } catch (e) {
-                              if (mounted) showStoreError(context, e);
-                            }
-                          }
-                        },
-                        itemBuilder: (_) => const [
-                          PopupMenuItem(
-                            value: 'edit',
-                            child: Text('Edit product'),
-                          ),
-                          PopupMenuItem(
-                            value: 'remove',
-                            child: Text('Remove product'),
-                          ),
-                        ],
+                      );
+                      if (confirm == true) {
+                        try {
+                          await ref.read(storeApiProvider).deleteProduct(p.id);
+                          refreshCommerce(ref);
+                        } catch (e) {
+                          if (mounted) showStoreError(context, e);
+                        }
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'edit', child: Text('Edit product')),
+                      PopupMenuItem(
+                        value: 'remove',
+                        child: Text('Remove product'),
                       ),
                     ],
                   ),
-                ),
+                ],
               ),
-            );
-          },
-        ),
-      );
-    },
-  );
-  Widget _orders() => DataView(
-    value: ref.watch(adminOrdersProvider),
-    onRetry: () => ref.invalidate(adminOrdersProvider),
-    builder: (orders) {
-      if (orders.isEmpty) {
-        return const EmptyPanel(
-          icon: Icons.receipt_long_outlined,
-          title: 'Ready for your first order',
-          message: 'Customer orders will arrive here with verified prices and payment status.',
+            ),
+          ),
         );
-      }
-      return RefreshIndicator(
-        onRefresh: () async {
-          await ref.refresh(adminOrdersProvider.future).then((_) {});
-        },
-        child: ListView.separated(
-          padding: const EdgeInsets.all(20),
-          itemCount: orders.length,
-          separatorBuilder: (_, i) => const SizedBox(height: 14),
-          itemBuilder: (_, i) => OrderSummaryCard(
-            order: orders[i],
-            onTap: () => _openOrder(orders[i]),
+      },
+    );
+  }
+
+  Widget _orders() {
+    final api = ref.watch(storeApiProvider);
+    return Column(
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+          child: Row(
+            children: [
+              for (final status in [
+                'All',
+                'New',
+                'Preparing',
+                'Packed',
+                'Out for Delivery',
+                'Delivery Attempted',
+                'Delivered',
+                'Cancelled',
+              ])
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(status),
+                    selected: _orderFilter == status,
+                    onSelected: (_) => setState(() => _orderFilter = status),
+                  ),
+                ),
+            ],
           ),
         ),
-      );
-    },
-  );
+        Expanded(
+          child: PagedFeed<StoreOrder>(
+            queryKey: ('adminOrders', api.adminToken, _orderFilter),
+            changes: api.feedChanges,
+            load: (cursor) => api.orderPage(
+              cursor: cursor,
+              admin: true,
+              status: _orderFilter,
+            ),
+            identity: (o) => o.id,
+            emptyTitle: 'No orders in this stage',
+            emptyMessage: 'Choose another stage or pull down to refresh.',
+            itemBuilder: (_, order, _) =>
+                OrderSummaryCard(order: order, onTap: () => _openOrder(order)),
+          ),
+        ),
+      ],
+    );
+  }
+
   Future<void> _openOrder(StoreOrder order) async {
     await Navigator.push(
       context,
@@ -437,126 +455,56 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     if (mounted) refreshCommerce(ref);
   }
 
-  Widget _team() => DataView(
-    value: ref.watch(deliveryTeamProvider),
-    onRetry: () => ref.invalidate(deliveryTeamProvider),
-    builder: (team) {
-      if (team.isEmpty) {
-        return EmptyPanel(
-          icon: Icons.delivery_dining,
-          title: 'Set up your delivery team',
-          message: 'Add real delivery people, assign orders and keep customers informed at each step.',
-          action: 'Add delivery person',
-          onAction: () => _editPerson(),
+  Widget _team() {
+    final api = ref.watch(storeApiProvider);
+    return PagedFeed<Map<String, dynamic>>(
+      queryKey: ('adminTeam', api.adminToken),
+      changes: api.feedChanges,
+      load: (cursor) => api.employeePage(cursor: cursor),
+      identity: (p) => '${p['id']}',
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+      emptyTitle: 'Set up your delivery team',
+      emptyMessage:
+          'Create real delivery employee accounts and assign their work.',
+      emptyAction: 'Create employee',
+      onEmptyAction: () => _editPerson(),
+      itemBuilder: (_, p, _) {
+        return Card(
+          child: ListTile(
+            onTap: () => _editPerson(p),
+            leading: CircleAvatar(
+              backgroundColor: const Color(0xFFE4F0E7),
+              child: Text('${p['name']}'.substring(0, 1).toUpperCase()),
+            ),
+            title: Text(
+              '${p['name']}',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            subtitle: Text(
+              '${p['employee_code'] ?? 'Complete onboarding'} | ${p['phone']}\n${p['active_orders']} orders | ${money(amount(p['cash_to_handover']))} cash due',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            isThreeLine: true,
+            trailing: StatusChip(
+              p['is_active'] == true
+                  ? p['ready_for_deliveries'] == true
+                        ? '${p['status']}'
+                        : 'Onboarding'
+                  : 'Inactive',
+            ),
+          ),
         );
-      }
-      return ListView.separated(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-        itemCount: team.length,
-        separatorBuilder: (_, i) => const SizedBox(height: 12),
-        itemBuilder: (_, i) {
-          final p = team[i];
-          return Card(
-            child: ListTile(
-              onTap: () => _editPerson(p),
-              leading: CircleAvatar(
-                backgroundColor: const Color(0xFFE4F0E7),
-                child: Text('${p['name']}'.substring(0, 1).toUpperCase()),
-              ),
-              title: Text(
-                '${p['name']}',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              subtitle: Text(
-                '${p['phone']}\n${p['active_orders']} active orders',
-              ),
-              isThreeLine: true,
-              trailing: StatusChip(
-                p['is_active'] == true ? '${p['status']}' : 'Inactive',
-              ),
-            ),
-          );
-        },
-      );
-    },
-  );
-  Future<void> _editPerson([Map<String, dynamic>? person]) async {
-    final name = TextEditingController(text: person?['name'] ?? ''),
-        phone = TextEditingController(text: person?['phone'] ?? '');
-    final form = GlobalKey<FormState>();
-    bool active = person?['is_active'] ?? true, busy = false;
-    await showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialog) => AlertDialog(
-          title: Text(
-            person == null ? 'Add delivery person' : 'Edit delivery person',
-          ),
-          content: Form(
-            key: form,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: name,
-                  decoration: const InputDecoration(labelText: 'Name'),
-                  validator: (s) =>
-                      (s?.trim().length ?? 0) < 2 ? 'Enter a name' : null,
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: phone,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Mobile number'),
-                  validator: (s) =>
-                      !RegExp(r'^\+?[0-9]{10,15}$').hasMatch(s?.trim() ?? '')
-                      ? 'Enter a valid mobile number'
-                      : null,
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Active'),
-                  value: active,
-                  onChanged: busy ? null : (v) => setDialog(() => active = v),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: busy ? null : () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: busy
-                  ? null
-                  : () async {
-                      if (!form.currentState!.validate()) return;
-                      setDialog(() => busy = true);
-                      try {
-                        await ref.read(storeApiProvider).savePerson({
-                          'name': name.text.trim(),
-                          'phone': phone.text.trim(),
-                          'is_active': active,
-                        }, id: person?['id']);
-                        ref.invalidate(deliveryTeamProvider);
-                        if (ctx.mounted) Navigator.pop(ctx);
-                      } catch (e) {
-                        if (ctx.mounted) {
-                          showStoreError(ctx, e);
-                          setDialog(() => busy = false);
-                        }
-                      }
-                    },
-              child: Text(busy ? 'Saving...' : 'Save'),
-            ),
-          ],
-        ),
-      ),
+      },
     );
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    name.dispose();
-    phone.dispose();
+  }
+
+  Future<void> _editPerson([Map<String, dynamic>? person]) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => EmployeeEditorScreen(person: person)),
+    );
+    ref.invalidate(deliveryTeamProvider);
   }
 }
 
@@ -974,6 +922,7 @@ class AdminOrderScreen extends ConsumerStatefulWidget {
 class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
   late StoreOrder _order;
   int? _person;
+  String _personName = '';
   bool _busy = false;
   final _note = TextEditingController(), _minutes = TextEditingController();
   @override
@@ -981,6 +930,7 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
     super.initState();
     _order = widget.initialOrder;
     _person = _order.data['assigned_to'];
+    _personName = '${_order.data['assigned_to_details']?['name'] ?? ''}';
     _note.text = _order.data['delivery_note'] ?? '';
   }
 
@@ -991,7 +941,10 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
     super.dispose();
   }
 
-  Future<void> _update({String? next}) async {
+  Future<void> _update({
+    String? next,
+    Map<String, dynamic> extra = const {},
+  }) async {
     if (_busy) return;
     final minutes = _minutes.text.trim().isEmpty
         ? null
@@ -1006,7 +959,7 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
     }
     setState(() => _busy = true);
     try {
-      await ref.read(storeApiProvider).updateOrder(_order.id, {
+      final updated = await ref.read(storeApiProvider).updateOrder(_order.id, {
         'status': ?next,
         if (_person != null) 'assigned_to': _person,
         'delivery_note': _note.text.trim(),
@@ -1015,10 +968,16 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
               .add(Duration(minutes: minutes))
               .toUtc()
               .toIso8601String(),
+        ...extra,
       });
-      final orders = await ref.refresh(adminOrdersProvider.future).then((_) {});
-      final updated = orders.where((o) => o.id == _order.id).firstOrNull;
-      if (updated != null && mounted) setState(() => _order = updated);
+      if (mounted) {
+        setState(() {
+          _order = updated;
+          _minutes.clear();
+          _note.text = updated.data['delivery_note'] ?? '';
+        });
+      }
+      ref.invalidate(adminOrdersProvider);
       ref.invalidate(adminDashboardProvider);
       ref.invalidate(deliveryTeamProvider);
       if (mounted) {
@@ -1034,6 +993,42 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
       if (mounted) showStoreError(context, e);
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _advance() async {
+    final next = _order.nextStatus;
+    if (next == 'Delivered' && _order.paymentStatus == 'cod') {
+      final extra = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (_) => OrderActionDialog(kind: 'cash', total: _order.total),
+      );
+      if (extra != null && mounted) await _update(next: next, extra: extra);
+    } else {
+      await _update(next: next);
+    }
+  }
+
+  Future<void> _recordAttempt() async {
+    final extra = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => const OrderActionDialog(kind: 'attempt'),
+    );
+    if (extra != null && mounted) {
+      await _update(next: 'Delivery Attempted', extra: extra);
+    }
+  }
+
+  Future<void> _cancelOrder() async {
+    final extra = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => OrderActionDialog(
+        kind: 'cancel',
+        requireReturn: _order.status != 'New',
+      ),
+    );
+    if (extra != null && mounted) {
+      await _update(next: 'Cancelled', extra: extra);
     }
   }
 
@@ -1059,6 +1054,10 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
             ],
           ),
           const SizedBox(height: 22),
+          CodPaymentCard(order: _order),
+          const SizedBox(height: 16),
+          OrderJourney(order: _order),
+          const SizedBox(height: 16),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(18),
@@ -1110,34 +1109,30 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 14),
-            DataView(
-              value: ref.watch(deliveryTeamProvider),
-              onRetry: () => ref.invalidate(deliveryTeamProvider),
-              builder: (team) {
-                final people = team
-                    .where((p) => p['is_active'] == true)
-                    .toList();
-                return DropdownButtonFormField<int>(
-                  initialValue: people.any((p) => p['id'] == _person)
-                      ? _person
-                      : null,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Assign delivery person',
-                  ),
-                  items: [
-                    for (final p in people)
-                      DropdownMenuItem(
-                        value: p['id'] as int,
-                        child: Text(
-                          '${p['name']} (${p['active_orders']} active)',
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                  onChanged: _busy ? null : (v) => setState(() => _person = v),
-                );
-              },
+            OutlinedButton.icon(
+              onPressed: _busy
+                  ? null
+                  : () async {
+                      final employee =
+                          await Navigator.push<Map<String, dynamic>>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const EmployeePickerScreen(),
+                            ),
+                          );
+                      if (employee != null && mounted) {
+                        setState(() {
+                          _person = employee['id'];
+                          _personName = employee['name'];
+                        });
+                      }
+                    },
+              icon: const Icon(Icons.person_search_outlined),
+              label: Text(
+                _personName.isEmpty
+                    ? 'Assign a verified delivery employee'
+                    : 'Assigned: $_personName',
+              ),
             ),
             const SizedBox(height: 14),
             TextField(
@@ -1165,26 +1160,53 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
             const SizedBox(height: 12),
             if (_order.nextStatus != null)
               FilledButton(
-                onPressed: _busy
-                    ? null
-                    : () => _update(next: _order.nextStatus),
+                onPressed: _busy ? null : _advance,
                 child: Text(
-                  _busy ? 'Updating...' : 'Mark ${_order.nextStatus}',
+                  _busy
+                      ? 'Updating...'
+                      : _order.nextStatus == 'Delivered' &&
+                            _order.paymentStatus == 'cod'
+                      ? 'Confirm cash & complete delivery'
+                      : _order.status == 'Delivery Attempted'
+                      ? 'Retry delivery'
+                      : 'Mark ${_order.nextStatus}',
                 ),
               ),
+            if (_order.status == 'Out for Delivery') ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _recordAttempt,
+                icon: const Icon(Icons.report_outlined),
+                label: const Text('Delivery could not be completed'),
+              ),
+            ],
+            if ([
+                  'New',
+                  'Preparing',
+                  'Packed',
+                  'Delivery Attempted',
+                ].contains(_order.status) &&
+                _order.paymentStatus == 'cod') ...[
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: _busy ? null : _cancelOrder,
+                icon: const Icon(Icons.cancel_outlined),
+                label: const Text('Cancel order & restore stock'),
+              ),
+            ],
           ],
           if (_order.paymentStatus == 'pending')
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 20),
               child: Text(
-                'Awaiting customer payment. Fulfillment becomes available only after payment is verified.',
+                'This is a previous incomplete online checkout. It can be cancelled; new orders use cash on delivery.',
               ),
             ),
           if (_order.paymentStatus == 'review')
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 20),
               child: Text(
-                'A late payment needs review. Stock was released. Resolve fulfillment or refund in Razorpay before proceeding.',
+                'A previous online payment needs manual store review. Check the original payment records before fulfillment.',
               ),
             ),
           const SizedBox(height: 24),

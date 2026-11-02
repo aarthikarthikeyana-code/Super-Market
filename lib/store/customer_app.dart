@@ -1,16 +1,16 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import 'api.dart';
 import 'customer_account.dart';
 import 'models.dart';
 import 'state.dart';
 import 'widgets.dart';
+import 'paged_feed.dart';
+import 'loading.dart';
 
 class StorefrontScreen extends ConsumerStatefulWidget {
   const StorefrontScreen({super.key});
@@ -21,7 +21,9 @@ class StorefrontScreen extends ConsumerStatefulWidget {
 class _StorefrontState extends ConsumerState<StorefrontScreen> {
   int _tab = 0;
   String _search = '', _category = 'All';
-  Timer? _poll;
+  Timer? _poll, _searchDebounce;
+  final _searchInput = TextEditingController();
+  List<String> _categories = ['All'];
   bool _accountActionBusy = false;
   final Set<String> _savingWishlist = {};
 
@@ -43,10 +45,11 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
     setState(() => _savingWishlist.add(product.id));
     try {
       if (!await ensureCustomerAccount(context, ref) || !mounted) return;
-      final saved = await ref.read(wishlistProvider.future);
-      final exists = saved.any((p) => p.id == product.id);
+      final saved = await ref.read(wishlistIdsProvider.future);
+      final exists = saved.contains(product.id);
       await ref.read(storeApiProvider).setWishlist(product.id, !exists);
       ref.invalidate(wishlistProvider);
+      ref.invalidate(wishlistIdsProvider);
     } catch (e) {
       if (mounted) showStoreError(context, e);
     } finally {
@@ -59,13 +62,18 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
   void initState() {
     super.initState();
     _poll = Timer.periodic(const Duration(seconds: 20), (_) {
-      if (_tab == 2) ref.invalidate(myOrdersProvider);
+      if (_tab == 2) {
+        ref.invalidate(myOrdersProvider);
+        ref.read(storeApiProvider).feedChanges.value++;
+      }
     });
   }
 
   @override
   void dispose() {
     _poll?.cancel();
+    _searchDebounce?.cancel();
+    _searchInput.dispose();
     super.dispose();
   }
 
@@ -99,13 +107,29 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
             ],
           ),
           actions: [
-            TextButton.icon(
-              onPressed: () async {
-                await context.push('/admin');
+            PopupMenuButton<String>(
+              tooltip: 'Staff sign in',
+              onSelected: (role) async {
+                await context.push(role == 'delivery' ? '/delivery' : '/admin');
                 ref.invalidate(catalogProvider);
               },
-              icon: const Icon(Icons.lock_outline, size: 17),
-              label: const Text('Login'),
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'admin', child: Text('Admin login')),
+                PopupMenuItem(
+                  value: 'delivery',
+                  child: Text('Delivery employee login'),
+                ),
+              ],
+              child: const Padding(
+                padding: EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Icon(Icons.badge_outlined, size: 19),
+                    SizedBox(width: 6),
+                    Text('Staff login'),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(width: 8),
           ],
@@ -113,6 +137,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
         body: switch (_tab) {
           0 => _shop(),
           1 => DataView(
+            retainOnRefresh: false,
             value: ref.watch(customerAccountProvider),
             onRetry: () => ref.invalidate(customerAccountProvider),
             builder: (account) => account == null
@@ -122,6 +147,17 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                     message: 'Use your mobile number to add products and place an order.',
                     action: 'Sign in',
                     onAction: () => ensureCustomerAccount(context, ref),
+                  )
+                : ref.watch(cartLoadingProvider)
+                ? const SingleChildScrollView(child: AppSkeleton())
+                : cart.isEmpty &&
+                      ref.read(storeCartProvider.notifier).restoreError != null
+                ? EmptyPanel(
+                    icon: Icons.wifi_off_outlined,
+                    title: 'Could not restore your cart',
+                    message: ref.read(storeCartProvider.notifier).restoreError!,
+                    action: 'Retry',
+                    onAction: () => ref.invalidate(storeCartProvider),
                   )
                 : _cart(cart),
           ),
@@ -163,160 +199,100 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
     );
   }
 
-  Widget _shop() => DataView(
-    value: ref.watch(catalogProvider),
-    onRetry: () => ref.invalidate(catalogProvider),
-    builder: (products) {
-      final categories = [
-        'All',
-        ...products.map((p) => p.category).toSet().toList()..sort(),
-      ];
-      final selected = categories.contains(_category) ? _category : 'All';
-      final filtered = products
-          .where(
-            (p) =>
-                (selected == 'All' || p.category == selected) &&
-                '${p.name} ${p.tamilName} ${p.brand}'.toLowerCase().contains(
-                  _search.toLowerCase(),
-                ),
-          )
-          .toList();
-      return RefreshIndicator(
-        onRefresh: () async {
-          await ref.refresh(catalogProvider.future).then((_) {});
+  Widget _shop() => LayoutBuilder(
+    builder: (context, constraints) {
+      final api = ref.watch(storeApiProvider);
+      return PagedFeed<StoreProduct>(
+        beforeRefresh: api.clearPublicCache,
+        queryKey: (_search, _category),
+        changes: api.feedChanges,
+        load: (cursor) => api.productPage(
+          cursor: cursor,
+          search: _search,
+          category: _category,
+        ),
+        identity: (p) => p.id,
+        onMetadata: (data) {
+          if (!mounted) return;
+          setState(() {
+            _categories = [
+              'All',
+              ...(data['categories'] as List? ?? [])
+                  .map((c) => '$c')
+                  .where((c) => c.isNotEmpty && c != 'All'),
+            ];
+            if (!_categories.contains(_category)) _category = 'All';
+          });
         },
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        header: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const StoreHero(),
+              const SizedBox(height: 10),
+              const StoreServiceStrip(),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _searchInput,
+                maxLength: 100,
+                decoration: const InputDecoration(
+                  hintText: 'Search products or brands',
+                  prefixIcon: Icon(Icons.search),
+                  counterText: '',
+                ),
+                onChanged: (text) {
+                  _searchDebounce?.cancel();
+                  _searchDebounce = Timer(
+                    const Duration(milliseconds: 350),
+                    () {
+                      if (mounted) setState(() => _search = text.trim());
+                    },
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
                   children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: storeGreen,
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: const Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Your everyday essentials,\nfrom your neighbourhood store.',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w800,
-                                    height: 1.2,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                SizedBox(height: 12),
-                                Text(
-                                  'Shop groceries. Track every delivery.',
-                                  style: TextStyle(
-                                    color: Color(0xFFD0E6D9),
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(width: 12),
-                          Icon(
-                            Icons.shopping_basket_outlined,
-                            size: 48,
-                            color: Color(0xFFDAEDC9),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    TextField(
-                      onChanged: (s) => setState(() => _search = s),
-                      decoration: const InputDecoration(
-                        hintText: 'Search products or brands',
-                        prefixIcon: Icon(Icons.search),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          for (final c in categories)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: ChoiceChip(
-                                label: Text(c),
-                                selected: selected == c,
-                                onSelected: (_) =>
-                                    setState(() => _category = c),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            'Shop the essentials',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
+                    for (final category in _categories)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(category),
+                          selected: _category == category,
+                          onSelected: (_) =>
+                              setState(() => _category = category),
                         ),
-                        Text(
-                          '${filtered.length} products',
-                          style: const TextStyle(color: Colors.black54),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
+                      ),
                   ],
                 ),
               ),
-            ),
-            if (filtered.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: EmptyPanel(
-                  icon: Icons.inventory_2_outlined,
-                  title: products.isEmpty
-                      ? 'Our shelves are getting ready'
-                      : 'No matching products',
-                  message: products.isEmpty
-                      ? 'Products added by the store will appear here. Pull down to refresh.'
-                      : 'Try another search or category.',
-                ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                sliver: SliverLayoutBuilder(
-                  builder: (context, constraints) => SliverGrid(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: constraints.crossAxisExtent > 700 ? 4 : 2,
-                      mainAxisExtent: 304,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, i) => _productCard(filtered[i]),
-                      childCount: filtered.length,
-                    ),
-                  ),
-                ),
+              const SizedBox(height: 24),
+              const Text(
+                'Shop the essentials',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
               ),
-          ],
+            ],
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: constraints.maxWidth > 700 ? 4 : 2,
+          mainAxisExtent: 320,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+        ),
+        itemBuilder: (_, product, _) => _productCard(product),
+        emptyTitle: _search.isEmpty && _category == 'All'
+            ? 'Our shelves are getting ready'
+            : 'No matching products',
+        emptyMessage:
+            'Try another search or category, or pull down to refresh.',
+        endContent: const Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 28),
+          child: DeliveryStoryCard(),
         ),
       );
     },
@@ -330,7 +306,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
           children: [
             InkWell(
               onTap: () => _showProduct(p),
-              child: ProductPhoto(p.imageUrl, height: 126),
+              child: ProductPhoto(p.imageUrl, height: 142),
             ),
             Positioned(
               top: 4,
@@ -341,8 +317,8 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                     ? null
                     : () => _toggleWishlist(p),
                 icon: Icon(
-                  (ref.watch(wishlistProvider).asData?.value ?? []).any(
-                        (item) => item.id == p.id,
+                  (ref.watch(wishlistIdsProvider).asData?.value ?? []).contains(
+                        p.id,
                       )
                       ? Icons.favorite
                       : Icons.favorite_border,
@@ -621,9 +597,14 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                       if (!await ensureCustomerAccount(context, ref)) return;
                       if (!mounted) return;
                       try {
-                        final products = await ref.refresh(
-                          catalogProvider.future,
-                        );
+                        final products = await ref
+                            .read(storeApiProvider)
+                            .productsByIds(
+                              ref
+                                  .read(storeCartProvider)
+                                  .map((line) => line.product.id)
+                                  .toList(),
+                            );
                         if (!mounted) return;
                         ref
                             .read(storeCartProvider.notifier)
@@ -635,13 +616,22 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                       if (!mounted || ref.read(storeCartProvider).isEmpty) {
                         return;
                       }
-                      final success = await Navigator.push<bool>(
+                      final placed = await Navigator.push<StoreOrder>(
                         context,
                         MaterialPageRoute(
                           builder: (_) => const CheckoutScreen(),
                         ),
                       );
-                      if (success == true && mounted) setState(() => _tab = 2);
+                      if (placed != null && mounted) {
+                        setState(() => _tab = 2);
+                        final browse = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => OrderPlacedScreen(order: placed),
+                          ),
+                        );
+                        if (browse == true && mounted) setState(() => _tab = 0);
+                      }
                     },
                     icon: const Icon(Icons.arrow_forward),
                     label: const Text('Continue to checkout'),
@@ -656,6 +646,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
   }
 
   Widget _orders() => DataView(
+    retainOnRefresh: false,
     value: ref.watch(customerAccountProvider),
     onRetry: () => ref.invalidate(customerAccountProvider),
     builder: (account) => account == null
@@ -669,110 +660,26 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
         : _signedInOrders(),
   );
 
-  Widget _signedInOrders() => DataView(
-    value: ref.watch(myOrdersProvider),
-    onRetry: () => ref.invalidate(myOrdersProvider),
-    builder: (orders) {
-      if (orders.isEmpty) {
-        return const EmptyPanel(
-          icon: Icons.local_shipping_outlined,
-          title: 'Your orders will appear here',
-          message: 'Once you place an order, follow its progress right here.',
-        );
-      }
-      return RefreshIndicator(
-        onRefresh: () async {
-          await ref.refresh(myOrdersProvider.future).then((_) {});
-        },
-        child: ListView.separated(
-          padding: const EdgeInsets.all(20),
-          physics: const AlwaysScrollableScrollPhysics(),
-          itemCount: orders.length,
-          separatorBuilder: (_, i) => const SizedBox(height: 14),
-          itemBuilder: (_, i) => OrderSummaryCard(
-            order: orders[i],
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => OrderTrackingScreen(orderId: orders[i].id),
-              ),
-            ),
+  Widget _signedInOrders() {
+    final api = ref.watch(storeApiProvider);
+    final phone = ref.watch(customerAccountProvider).asData?.value?['phone'];
+    return PagedFeed<StoreOrder>(
+      queryKey: ('customer', phone),
+      changes: api.feedChanges,
+      load: (cursor) => api.orderPage(cursor: cursor),
+      identity: (o) => o.id,
+      emptyTitle: 'Your orders will appear here',
+      emptyMessage: 'Once you place an order, follow its progress right here.',
+      itemBuilder: (_, order, _) => OrderSummaryCard(
+        order: order,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OrderTrackingScreen(orderId: order.id),
           ),
         ),
-      );
-    },
-  );
-}
-
-Future<StoreOrder?> openRazorpay(
-  BuildContext context,
-  WidgetRef ref,
-  Map<String, dynamic> orderData,
-  Map<String, dynamic> checkout,
-) async {
-  if (kIsWeb ||
-      ![
-        TargetPlatform.android,
-        TargetPlatform.iOS,
-      ].contains(defaultTargetPlatform)) {
-    throw StoreException(
-      'Online payment is available in our Android and iOS app. You can choose cash on delivery here.',
+      ),
     );
-  }
-  final api = ref.read(storeApiProvider);
-  final result = Completer<StoreOrder?>();
-  final razorpay = Razorpay();
-  razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, (
-    PaymentSuccessResponse response,
-  ) async {
-    try {
-      final order = await api.verifyPayment(
-        orderData['order_id'],
-        response.paymentId ?? '',
-        response.signature ?? '',
-      );
-      if (!result.isCompleted) result.complete(order);
-    } catch (e) {
-      if (!result.isCompleted) result.completeError(e);
-    }
-  });
-  razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, (PaymentFailureResponse response) {
-    if (!result.isCompleted) {
-      result.completeError(
-        StoreException(
-          'Payment was not completed. You can retry from My orders.',
-        ),
-      );
-    }
-  });
-  razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, (
-    ExternalWalletResponse response,
-  ) {
-    if (!result.isCompleted) {
-      result.completeError(
-        StoreException(
-          'Payment is awaiting confirmation. Check My orders before trying again.',
-        ),
-      );
-    }
-  });
-  try {
-    razorpay.open({
-      'key': checkout['key_id'],
-      'amount': checkout['amount'],
-      'currency': 'INR',
-      'order_id': checkout['razorpay_order_id'],
-      'name': 'Agaram Supermarket',
-      'description': 'Groceries / ${orderData['order_id']}',
-      'prefill': {
-        'name': orderData['customer_name'],
-        'contact': orderData['customer_phone'],
-      },
-      'theme': {'color': '#075E40'},
-    });
-    return await result.future;
-  } finally {
-    razorpay.clear();
   }
 }
 
@@ -788,7 +695,6 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
       _phone = TextEditingController(),
       _address = TextEditingController(),
       _notes = TextEditingController();
-  String _method = 'cod';
   bool _busy = false;
   @override
   void initState() {
@@ -853,7 +759,7 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
         'customer_phone': _phone.text.trim(),
         'delivery_address': _address.text.trim(),
         'delivery_instructions': _notes.text.trim(),
-        'payment_method': _method,
+        'payment_method': 'cod',
         'expected_total':
             (lines.fold(0.0, (sum, line) => sum + line.total) +
                     amount(
@@ -865,18 +771,7 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
             {'product_id': l.product.id, 'quantity': l.quantity},
         ],
       });
-      var order = StoreOrder(Map<String, dynamic>.from(response['order']));
-      if (order.awaitingPayment) {
-        if (!mounted) return;
-        final paid = await openRazorpay(
-          context,
-          ref,
-          order.data,
-          Map<String, dynamic>.from(response['checkout']),
-        );
-        if (paid == null) return;
-        order = paid;
-      }
+      final order = StoreOrder(Map<String, dynamic>.from(response['order']));
       if (!['paid', 'cod'].contains(order.paymentStatus)) {
         throw StoreException(
           'This order needs attention. Open My orders for its latest status.',
@@ -886,14 +781,7 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
       ref.read(storeCartProvider.notifier).clear();
       refreshCommerce(ref);
       if (mounted) {
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Order ${order.id} confirmed. Track it in My orders.',
-            ),
-          ),
-        );
+        Navigator.pop(context, order);
       }
     } catch (e) {
       if (mounted) showStoreError(context, e);
@@ -999,31 +887,7 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
                     style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 12),
-                  if (config['online_payments_enabled'] == true) ...[
-                    _paymentOption(
-                      'razorpay',
-                      'Pay online',
-                      'UPI, cards and netbanking',
-                      Icons.account_balance_wallet_outlined,
-                    ),
-                    if (config['test_mode'] == true)
-                      const Padding(
-                        padding: EdgeInsets.all(10),
-                        child: Text(
-                          'Razorpay test mode: no real money will be charged.',
-                          style: TextStyle(
-                            color: Color(0xFF9B5B13),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                  ],
-                  _paymentOption(
-                    'cod',
-                    'Cash on delivery',
-                    'Pay when your groceries arrive',
-                    Icons.payments_outlined,
-                  ),
+                  const CodPaymentCard(),
                   const SizedBox(height: 22),
                   Card(
                     child: Padding(
@@ -1090,11 +954,7 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
                             width: 22,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(
-                            _method == 'razorpay'
-                                ? 'Continue to secure payment'
-                                : 'Place order',
-                          ),
+                        : Text('Place COD order'),
                   ),
                   const SizedBox(height: 24),
                 ],
@@ -1105,23 +965,97 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
       ),
     );
   }
+}
 
-  Widget _paymentOption(
-    String value,
-    String title,
-    String subtitle,
-    IconData icon,
-  ) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: Card(
-      child: ListTile(
-        onTap: _busy ? null : () => setState(() => _method = value),
-        leading: Icon(icon, color: storeGreen),
-        title: Text(title),
-        subtitle: Text(subtitle),
-        trailing: Icon(
-          _method == value ? Icons.check_circle : Icons.radio_button_unchecked,
-          color: storeGreen,
+class OrderPlacedScreen extends StatelessWidget {
+  final StoreOrder order;
+  const OrderPlacedScreen({super.key, required this.order});
+  @override
+  Widget build(BuildContext context) => Theme(
+    data: storeTheme(),
+    child: Scaffold(
+      appBar: AppBar(title: const Text('Order confirmed')),
+      body: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(26),
+            child: Image.asset(
+              'assets/images/delivery-handover.png',
+              height: 200,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: Color(0xFFE4EEDF),
+                child: Icon(Icons.check, color: storeGreen),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Your order is placed.',
+                  style: TextStyle(
+                    fontSize: 27,
+                    fontWeight: FontWeight.w800,
+                    color: storeGreen,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Your store will prepare your groceries and assign a delivery person. We will keep you updated as your order moves.',
+            style: TextStyle(height: 1.6, color: Colors.black54),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            order.id,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 16),
+          CodPaymentCard(order: order),
+          const SizedBox(height: 20),
+          const Text(
+            'Delivering to',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${order.data['customer_name']}\n${order.data['delivery_address']}',
+            style: const TextStyle(height: 1.6),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              FilledButton.icon(
+                onPressed: () => Navigator.pushReplacement<bool, bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => OrderTrackingScreen(orderId: order.id),
+                  ),
+                ),
+                icon: const Icon(Icons.local_shipping_outlined),
+                label: const Text('Track my order'),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Continue shopping'),
+              ),
+            ],
+          ),
         ),
       ),
     ),
@@ -1151,7 +1085,11 @@ class _TrackingState extends ConsumerState<OrderTrackingScreen> {
   Future<Map<String, dynamic>> _fetch() =>
       ref.read(storeApiProvider).order(widget.orderId);
   void _reload() {
-    if (mounted) setState(() => _future = _fetch());
+    if (mounted) {
+      setState(() {
+        _future = _fetch();
+      });
+    }
   }
 
   @override
@@ -1160,46 +1098,22 @@ class _TrackingState extends ConsumerState<OrderTrackingScreen> {
     super.dispose();
   }
 
-  Future<void> _retry(Map<String, dynamic> data) async {
-    setState(() => _paying = true);
-    try {
-      final result = await openRazorpay(
-        context,
-        ref,
-        Map<String, dynamic>.from(data['order']),
-        Map<String, dynamic>.from(data['checkout']),
-      );
-      if (result?.paymentStatus == 'paid') {
-        await ref.read(storeApiProvider).finishCheckout();
-        ref.read(storeCartProvider.notifier).clear();
-        refreshCommerce(ref);
-      }
-    } catch (e) {
-      if (mounted) showStoreError(context, e);
-    } finally {
-      if (mounted) {
-        setState(() => _paying = false);
-        _reload();
-      }
-    }
-  }
-
   Future<void> _cancelCheckout() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Cancel unpaid checkout?'),
+        title: const Text('Cancel this order?'),
         content: const Text(
-          'Your reserved items will be released. You can place a new order whenever you are ready.',
+          'Your order will be cancelled and no payment is due. You can place a new order whenever you are ready.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Keep checkout'),
+            child: const Text('Keep order'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Cancel checkout'),
+            child: const Text('Cancel order'),
           ),
         ],
       ),
@@ -1242,12 +1156,13 @@ class _TrackingState extends ConsumerState<OrderTrackingScreen> {
             );
           }
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return const SingleChildScrollView(
+              child: AppSkeleton(kind: SkeletonKind.detail),
+            );
           }
-          final data = snapshot.data!,
-              order = StoreOrder(
-                Map<String, dynamic>.from(snapshot.data!['order']),
-              );
+          final order = StoreOrder(
+            Map<String, dynamic>.from(snapshot.data!['order']),
+          );
           final person = order.data['assigned_to_details'] as Map?;
           final eta = DateTime.tryParse(
             '${order.data['estimated_delivery_at']}',
@@ -1277,25 +1192,28 @@ class _TrackingState extends ConsumerState<OrderTrackingScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                if (order.awaitingPayment && data['checkout'] != null)
-                  FilledButton(
-                    onPressed: _paying ? null : () => _retry(data),
+                OrderJourney(order: order),
+                const SizedBox(height: 16),
+                CodPaymentCard(order: order),
+                const SizedBox(height: 16),
+                if (order.canCancel)
+                  OutlinedButton.icon(
+                    onPressed: _paying ? null : _cancelCheckout,
+                    icon: const Icon(Icons.close),
+                    label: const Text('Cancel order before preparation'),
+                  ),
+                if (order.status == 'Delivery Attempted')
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
                     child: Text(
-                      _paying ? 'Verifying payment...' : 'Complete payment',
+                      'Your delivery needs attention. Your store will contact you to arrange another attempt.',
                     ),
                   ),
-                if (order.awaitingPayment)
-                  TextButton(
-                    onPressed: _paying ? null : _cancelCheckout,
-                    child: const Text('Cancel unpaid checkout'),
-                  ),
-                if (order.paymentStatus == 'review')
-                  const Card(
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Text(
-                        'Your payment needs a store review. Contact the store with this order ID. Please do not pay again.',
-                      ),
+                if (order.status == 'Cancelled')
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      'Reason: ${order.data['cancellation_reason'] ?? 'Order cancelled'}',
                     ),
                   ),
                 if (person != null)

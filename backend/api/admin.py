@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Product, ProductImage, Order, OrderItem, DeliveryPersonnel, OrderEvent
+from .models import Product, ProductImage, Order, OrderItem, DeliveryPersonnel, OrderEvent, EmployeeDocument, CashHandover
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
@@ -23,4 +23,20 @@ class OrderAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
-admin.site.register(DeliveryPersonnel)
+@admin.register(DeliveryPersonnel)
+class DeliveryPersonnelAdmin(admin.ModelAdmin):
+    list_display = ['employee_code', 'name', 'phone', 'is_active', 'documents_verified']
+    readonly_fields = [f.name for f in DeliveryPersonnel._meta.fields]
+    def has_add_permission(self, request):
+        return False
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+@admin.register(CashHandover)
+class CashHandoverAdmin(admin.ModelAdmin):
+    list_display = ['employee', 'amount', 'received_at', 'received_by']
+    readonly_fields = [f.name for f in CashHandover._meta.fields]
+    def has_add_permission(self, request):
+        return False
+    def has_delete_permission(self, request, obj=None):
+        return False

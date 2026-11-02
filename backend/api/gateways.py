@@ -1,20 +1,5 @@
-import requests
 from django.conf import settings
 from .errors import ServiceUnavailable
-
-
-def razorpay_request(method, path, data=None):
-    if not settings.PAYMENT_GATEWAY_ENABLED or not settings.RAZORPAY_KEY_ID or not settings.RAZORPAY_KEY_SECRET:
-        raise ServiceUnavailable('Online payments are currently unavailable. Choose cash on delivery or try later.')
-    try:
-        response = requests.request(
-            method, 'https://api.razorpay.com/v1/' + path,
-            auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET), json=data, timeout=(5, 20),
-        )
-        response.raise_for_status()
-        return response.json()
-    except (requests.RequestException, ValueError):
-        raise ServiceUnavailable('Payment provider is unavailable. No payment has been confirmed. Please retry.') from None
 
 
 def upload_image(file):
@@ -41,3 +26,56 @@ def upload_image(file):
                                          unique_filename=True, overwrite=False, allowed_formats=['jpg', 'png', 'webp'])
     except Exception:
         raise ServiceUnavailable('Product photo upload failed. Please try again.') from None
+
+
+def _employee_cloud():
+    import cloudinary
+    if not all([settings.CLOUDINARY_CLOUD_NAME, settings.CLOUDINARY_API_KEY, settings.CLOUDINARY_API_SECRET]):
+        raise ServiceUnavailable('Private employee document storage is not configured.')
+    cloudinary.config(cloud_name=settings.CLOUDINARY_CLOUD_NAME, api_key=settings.CLOUDINARY_API_KEY,
+                      api_secret=settings.CLOUDINARY_API_SECRET, secure=True)
+
+
+def upload_employee_document(file):
+    import uuid
+    import cloudinary.uploader
+    from PIL import Image, UnidentifiedImageError
+    from rest_framework.exceptions import ValidationError
+    if file.size > 8 * 1024 * 1024:
+        raise ValidationError({'document': 'Use a document photo smaller than 8 MB.'})
+    try:
+        image = Image.open(file)
+        if image.format not in ['JPEG', 'PNG', 'WEBP'] or image.width * image.height > 25_000_000:
+            raise ValidationError({'document': 'Use a JPEG, PNG or WebP photo up to 25 megapixels.'})
+        image.verify()
+        file.seek(0)
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+        raise ValidationError({'document': 'Choose a valid document photo.'}) from None
+    _employee_cloud()
+    try:
+        result = cloudinary.uploader.upload(file, public_id='agaram/private-employees/' + uuid.uuid4().hex,
+                                            resource_type='image', type='authenticated', overwrite=False, allowed_formats=['jpg', 'png', 'webp'])
+        if result.get('type') != 'authenticated':
+            raise ValueError('Private storage was not confirmed')
+        return result
+    except Exception:
+        raise ServiceUnavailable('Private document upload failed. Check Cloudinary upload permissions. No public upload is used.') from None
+
+
+def employee_document_url(document):
+    import time
+    import cloudinary.utils
+    _employee_cloud()
+    return cloudinary.utils.private_download_url(document.public_id, document.format, resource_type='image',
+                                                 type='authenticated', expires_at=int(time.time()) + 60, attachment=False)
+
+
+def delete_employee_document(document):
+    import cloudinary.uploader
+    _employee_cloud()
+    try:
+        result = cloudinary.uploader.destroy(document.public_id, resource_type='image', type='authenticated', invalidate=True)
+        if result.get('result') not in ['ok', 'not found']:
+            raise ValueError('Delete was not confirmed')
+    except Exception:
+        raise ServiceUnavailable('Private document could not be deleted. Please try again.') from None

@@ -1,26 +1,13 @@
-import hashlib
-import hmac
 import uuid
 from datetime import timedelta
 from decimal import Decimal
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Sum
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
-from .gateways import razorpay_request
 from .models import Product, Order, OrderItem, OrderEvent, DeliveryPersonnel
-
-
-def checkout_data(order):
-    return {
-        'key_id': settings.RAZORPAY_KEY_ID,
-        'razorpay_order_id': order.razorpay_order_id,
-        'amount': int(order.total_amount * 100),
-        'currency': 'INR',
-        'test_mode': settings.RAZORPAY_KEY_ID.startswith('rzp_test_'),
-    } if order.razorpay_order_id and order.payment_status == 'pending' else None
 
 
 def release_stock(order):
@@ -64,14 +51,14 @@ def create_order(customer, data):
         raise ValidationError({'detail': 'Prices or delivery charges changed. Go back to your cart and review checkout again.'})
     if total <= 0 or total > Decimal('500000.00'):
         raise ValidationError({'items': 'Order total must be between INR 0.01 and INR 500,000.'})
-    online = data['payment_method'] == 'razorpay'
+    if data.get('payment_method', 'cod') != 'cod':
+        raise ValidationError({'payment_method': 'This store accepts cash on delivery only.'})
     order = Order.objects.create(
         customer=customer, idempotency_key=data['idempotency_key'], order_id='AG' + uuid.uuid4().hex[:20].upper(),
         customer_name=data['customer_name'], customer_phone=data['customer_phone'],
         delivery_address=data['delivery_address'], delivery_instructions=data['delivery_instructions'],
         subtotal=subtotal, delivery_charge=charge, total_amount=total,
-        payment_method='razorpay' if online else 'cod', payment_status='pending' if online else 'cod',
-        status='Payment Pending' if online else 'New',
+        payment_method='cod', payment_status='cod', status='New',
     )
     for item in data['items']:
         p = products[item['product_id']]
@@ -79,54 +66,8 @@ def create_order(customer, data):
                                  quantity=item['quantity'], unit=p.unit, unit_price=p.price, total_price=p.price * item['quantity'])
         p.stock_kg -= item['quantity']
         p.save(update_fields=['stock_kg', 'updated_at'])
-    if online:
-        result = razorpay_request('POST', 'orders', {'amount': int(total * 100), 'currency': 'INR', 'receipt': order.order_id,
-                                                   'notes': {'agaram_order_id': order.order_id}})
-        if not result.get('id'):
-            from .errors import ServiceUnavailable
-            raise ServiceUnavailable('Payment order could not be created. Please retry.')
-        order.razorpay_order_id = result['id']
-        order.save(update_fields=['razorpay_order_id', 'updated_at'])
-    OrderEvent.objects.create(order=order, status=order.status, note='Order created.')
+    OrderEvent.objects.create(order=order, status=order.status, note='Order placed. Pay cash when your groceries arrive.')
     return order
-
-
-def verify_signature(order, payment_id, signature):
-    message = f'{order.razorpay_order_id}|{payment_id}'.encode()
-    expected = hmac.new(settings.RAZORPAY_KEY_SECRET.encode(), message, hashlib.sha256).hexdigest()
-    if not signature or not hmac.compare_digest(expected, signature):
-        raise ValidationError({'detail': 'Payment signature verification failed.'})
-
-
-def confirm_payment(order, payment_id):
-    payment = razorpay_request('GET', f'payments/{payment_id}')
-    if (payment.get('order_id') != order.razorpay_order_id or payment.get('currency') != 'INR'
-            or payment.get('amount') != int(order.total_amount * 100)):
-        raise ValidationError({'detail': 'Payment does not match this order.'})
-    if payment.get('status') == 'authorized':
-        if order.status == 'Cancelled' or order.stock_released:
-            raise ValidationError({'detail': 'This checkout has expired. The payment will not be captured. Place a new order.'})
-        payment = razorpay_request('POST', f'payments/{payment_id}/capture', {'amount': int(order.total_amount * 100), 'currency': 'INR'})
-    if payment.get('status') != 'captured':
-        raise ValidationError({'detail': 'Payment is not captured yet. Refresh this order shortly.'})
-    with transaction.atomic():
-        locked = Order.objects.select_for_update().get(pk=order.pk)
-        if locked.payment_status == 'paid':
-            if locked.razorpay_payment_id != payment_id:
-                raise ValidationError({'detail': 'A different payment has already been recorded.'})
-            return locked
-        if Order.objects.exclude(pk=locked.pk).filter(razorpay_payment_id=payment_id).exists():
-            raise ValidationError({'detail': 'This payment is already attached to another order.'})
-        locked.razorpay_payment_id = payment_id
-        if locked.stock_released or locked.status == 'Cancelled':
-            locked.payment_status = 'review'
-            OrderEvent.objects.create(order=locked, status=locked.status, note='Late payment received; contact the store for refund or fulfillment review.')
-        else:
-            locked.payment_status = 'paid'
-            locked.status = 'New'
-            OrderEvent.objects.create(order=locked, status='New', note='Payment verified and captured.')
-        locked.save()
-        return locked
 
 
 def refresh_personnel_status(person_id):
@@ -136,38 +77,98 @@ def refresh_personnel_status(person_id):
 
 
 @transaction.atomic
-def transition_order(order_id, next_status, note='', person_id=None, eta=None):
+def cancel_order(order_id, *, customer=None, reason='', stock_returned=False):
     order = Order.objects.select_for_update().get(order_id=order_id, customer__isnull=False)
-    valid = {'New': 'Preparing', 'Preparing': 'Packed', 'Packed': 'Out for Delivery', 'Out for Delivery': 'Delivered'}
+    if customer is not None and order.customer_id != customer.pk:
+        raise ValidationError({'detail': 'This order belongs to another account.'})
+    if order.status == 'Cancelled':
+        return order
+    if customer is not None:
+        allowed = ['New', 'Payment Pending']
+    else:
+        allowed = ['New', 'Preparing', 'Packed', 'Delivery Attempted', 'Payment Pending']
+        if not reason.strip():
+            raise ValidationError({'cancellation_reason': 'Enter a reason for cancelling the order.'})
+    if order.status not in allowed or order.payment_status not in ['cod', 'pending']:
+        raise ValidationError({'detail': 'This order cannot be cancelled here. Contact the store for assistance.'})
+    if customer is None and order.status not in ['New', 'Payment Pending'] and not stock_returned:
+        raise ValidationError({'stock_returned': 'Confirm that the undelivered items are back in store before restoring stock.'})
+    release_stock(order)
+    order.status = 'Cancelled'
+    order.payment_status = 'cancelled'
+    order.cancellation_reason = reason.strip() or 'Cancelled by customer before preparation.'
+    order.save()
+    OrderEvent.objects.create(order=order, status='Cancelled', note=order.cancellation_reason)
+    refresh_personnel_status(order.assigned_to_id)
+    return order
+
+
+@transaction.atomic
+def transition_order(order_id, next_status, note='', person_id=None, eta=None,
+                     *, cash_collected=False, cash_amount=None, actor=None):
+    order = Order.objects.select_for_update().get(order_id=order_id, customer__isnull=False)
+    employee_actor = bool(actor and not actor.is_staff and order.assigned_to_id and order.assigned_to.user_id == actor.pk and order.assigned_to.ready_for_deliveries)
+    if actor and not actor.is_staff:
+        if not employee_actor or person_id is not None or next_status not in ['Out for Delivery', 'Delivery Attempted', 'Delivered'] or order.status not in ['Packed', 'Out for Delivery', 'Delivery Attempted', 'Delivered']:
+            raise ValidationError({'detail': 'You can only deliver orders currently assigned to your active, verified employee account.'})
+    if order.status == 'Delivered' and next_status == 'Delivered' and order.payment_status == 'collected' and cash_collected and cash_amount == order.cash_collected_amount:
+        return order
+    if order.status in ['Delivered', 'Cancelled']:
+        raise ValidationError({'detail': 'Completed orders cannot be changed.'})
+    valid = {'New': ['Preparing'], 'Preparing': ['Packed'], 'Packed': ['Out for Delivery'],
+             'Out for Delivery': ['Delivered', 'Delivery Attempted'], 'Delivery Attempted': ['Out for Delivery']}
     if order.payment_status not in ['paid', 'cod']:
-        raise ValidationError({'detail': 'Only paid or cash-on-delivery orders can be fulfilled.'})
-    if next_status and next_status != order.status and valid.get(order.status) != next_status:
-        raise ValidationError({'status': 'This order cannot move to that status. Follow the delivery sequence.'})
+        raise ValidationError({'detail': 'This historical payment needs store review before fulfillment.'})
+    if next_status and next_status != order.status and next_status not in valid.get(order.status, []):
+        raise ValidationError({'status': 'Follow the order preparation and delivery sequence.'})
+    if (cash_collected or cash_amount is not None) and next_status != 'Delivered':
+        raise ValidationError({'cash_collected': 'Record cash only when completing a delivery.'})
+    if next_status == 'Delivery Attempted' and not note.strip():
+        raise ValidationError({'delivery_note': 'Enter why delivery could not be completed.'})
     old_person = order.assigned_to_id
     if person_id is not None:
-        if order.status in ['Delivered', 'Cancelled']:
-            raise ValidationError({'detail': 'Completed orders cannot be reassigned.'})
-        person = DeliveryPersonnel.objects.filter(pk=person_id, is_active=True).first()
-        if not person:
-            raise ValidationError({'assigned_to': 'Choose an active delivery person.'})
+        person = DeliveryPersonnel.objects.select_for_update().filter(pk=person_id, is_active=True).first()
+        if not person or not person.ready_for_deliveries:
+            raise ValidationError({'assigned_to': 'Choose an active employee with login, verified documents and a valid driving licence where applicable.'})
         order.assigned_to = person
-    if next_status == 'Out for Delivery' and not order.assigned_to_id:
-        raise ValidationError({'assigned_to': 'Assign a delivery person before dispatching.'})
+    if next_status in ['Out for Delivery', 'Delivered', 'Delivery Attempted']:
+        person = DeliveryPersonnel.objects.select_for_update().filter(pk=order.assigned_to_id, is_active=True).first()
+        if not person or not person.ready_for_deliveries:
+            raise ValidationError({'assigned_to': 'Assign an active, verified delivery employee before dispatching or completing delivery.'})
+    if next_status == 'Delivered' and order.payment_status == 'cod':
+        if not cash_collected or cash_amount != order.total_amount or not actor or not (actor.is_staff or employee_actor):
+            raise ValidationError({'cash_collected': 'Confirm the exact order total was collected in cash before marking delivered.'})
+        order.cash_collected_amount = cash_amount
+        order.cash_collected_at = timezone.now()
+        order.cash_collected_by = actor
+        order.cash_collected_for = order.assigned_to
+        order.payment_status = 'collected'
     if eta is not None:
         if eta <= timezone.now():
             raise ValidationError({'estimated_delivery_at': 'Estimated arrival must be in the future.'})
         order.estimated_delivery_at = eta
     if note:
         order.delivery_note = note
-    if next_status and next_status != order.status:
+    changed = next_status and next_status != order.status
+    if changed:
         order.status = next_status
         field = {'Packed': 'packed_at', 'Out for Delivery': 'dispatched_at', 'Delivered': 'delivered_at'}.get(next_status)
         if field:
             setattr(order, field, timezone.now())
         if next_status == 'Packed':
             order.items.update(is_packed=True)
+        if next_status == 'Delivery Attempted':
+            order.delivery_attempts += 1
+            order.estimated_delivery_at = None
     order.save()
-    OrderEvent.objects.create(order=order, status=order.status, note=note or ('Delivery person assigned.' if person_id else 'Order status updated.'))
+    message = note or ('Delivery person assigned.' if person_id else 'Order status updated.')
+    if changed and next_status == 'Delivered' and order.payment_status == 'collected':
+        message = f'Groceries delivered. INR {order.total_amount} collected in cash.' + (f' {note}' if note else '')
+    OrderEvent.objects.create(order=order, status=order.status, note=message[:255])
     refresh_personnel_status(old_person)
     refresh_personnel_status(order.assigned_to_id)
     return order
+
+
+def cash_total(queryset):
+    return queryset.aggregate(total=Sum('cash_collected_amount'))['total'] or Decimal('0.00')

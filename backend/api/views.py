@@ -1,6 +1,3 @@
-import hashlib
-import hmac
-import json
 import secrets
 import uuid
 from datetime import timedelta
@@ -17,12 +14,34 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes, throttle_classes, authentication_classes
 from rest_framework.exceptions import ValidationError
-from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser, BasePermission
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.throttling import ScopedRateThrottle, UserRateThrottle
 from . import commerce, gateways
-from .models import Product, ProductImage, DeliveryPersonnel, Order, OrderEvent, CustomerProfile, CustomerLoginChallenge
+from .commerce import cash_total
+from .serializers import EmployeeSerializer, DeliveryActionSerializer, CashReceiptSerializer, CashDueSerializer, CashHandoverSerializer
+from rest_framework.pagination import CursorPagination
+from .models import Product, ProductImage, DeliveryPersonnel, Order, OrderEvent, CustomerProfile, CustomerLoginChallenge, CashHandover, EmployeeDocument
 from .serializers import ProductSerializer, DeliveryPersonnelSerializer, OrderSerializer, CheckoutSerializer, CustomerPhoneSerializer, CustomerProfileSerializer, normalize_customer_phone
+
+
+class StoreCursorPagination(CursorPagination):
+    page_size = 24
+    page_size_query_param = 'page_size'
+    max_page_size = 48
+
+
+def collection_response(request, queryset, serializer, ordering, extra=None):
+    """Opt-in pagination keeps existing bounded/internal list clients compatible."""
+    if request.query_params.get('paginate') != 'true':
+        return Response(serializer(queryset, many=True).data)
+    paginator = StoreCursorPagination()
+    paginator.ordering = ordering
+    page = paginator.paginate_queryset(queryset, request)
+    response = paginator.get_paginated_response(serializer(page, many=True).data)
+    if extra:
+        response.data.update(extra)
+    return response
 
 
 class LoginThrottle(ScopedRateThrottle):
@@ -45,16 +64,15 @@ def orders_queryset():
 @permission_classes([AllowAny])
 @throttle_classes([])
 def health(request):
-    return Response({'status': 'ok', 'service': 'Agaram Supermarket', 'api_version': 2})
+    return Response({'status': 'ok', 'service': 'Agaram Supermarket', 'api_version': 5})
 
 
 @api_view(['GET'])
 @authentication_classes([])
 @permission_classes([AllowAny])
 def store_config(request):
-    return Response({'api_version': 2, 'store_name': 'Agaram Supermarket', 'currency': 'INR', 'delivery_charge': settings.DELIVERY_CHARGE,
-                     'online_payments_enabled': settings.PAYMENT_GATEWAY_ENABLED and bool(settings.RAZORPAY_KEY_ID),
-                     'test_mode': settings.RAZORPAY_KEY_ID.startswith('rzp_test_'), 'delivery_mode': 'on_demand', 'customer_login_mode': 'otp' if settings.CUSTOMER_OTP_ENABLED else 'demo_code'})
+    return Response({'api_version': 5, 'store_name': 'Agaram Supermarket', 'currency': 'INR', 'delivery_charge': settings.DELIVERY_CHARGE,
+                     'online_payments_enabled': False, 'payment_methods': ['cod'], 'cash_on_delivery_enabled': True, 'delivery_mode': 'on_demand', 'customer_login_mode': 'otp' if settings.CUSTOMER_OTP_ENABLED else 'demo_code'})
 
 
 @api_view(['POST'])
@@ -122,7 +140,10 @@ def customer_profile(request):
 @permission_classes([IsAuthenticated])
 def customer_wishlist(request):
     profile = get_object_or_404(CustomerProfile, user=request.user)
-    return Response(ProductSerializer(profile.wishlist.filter(is_active=True).select_related('image').order_by('english_name'), many=True).data)
+    products = profile.wishlist.filter(is_active=True).select_related('image')
+    if request.query_params.get('ids_only') == 'true':
+        return Response(list(products.values_list('id', flat=True)))
+    return collection_response(request, products, ProductSerializer, ('english_name', 'pk'))
 
 
 @api_view(['POST', 'DELETE'])
@@ -167,12 +188,17 @@ def admin_logout(request):
 @permission_classes([AllowAny])
 def get_products(request):
     products = Product.objects.filter(is_active=True).select_related('image').order_by('english_name')
+    if request.query_params.get('ids'):
+        ids = request.query_params['ids'].split(',')
+        if len(ids) > 100 or any(len(pk) > 64 for pk in ids):
+            raise ValidationError({'ids': 'Request at most 100 product IDs at a time.'})
+        products = products.filter(pk__in=ids)
     if request.query_params.get('category'):
         products = products.filter(category=request.query_params['category'])
     if request.query_params.get('search'):
         query = request.query_params['search'][:100]
         products = products.filter(Q(english_name__icontains=query) | Q(tamil_name__icontains=query) | Q(brand__icontains=query))
-    return Response(ProductSerializer(products, many=True).data)
+    return collection_response(request, products, ProductSerializer, ('english_name', 'pk'), {'categories': list(Product.objects.filter(is_active=True).order_by('category').values_list('category', flat=True).distinct())})
 
 
 @api_view(['GET'])
@@ -187,7 +213,9 @@ def get_product_detail(request, pk):
 def admin_products(request):
     if request.method == 'GET':
         products = Product.objects.filter(is_active=True).select_related('image').order_by('english_name')
-        return Response(ProductSerializer(products, many=True).data)
+        if request.query_params.get('search'):
+            products = products.filter(Q(english_name__icontains=request.query_params['search'][:100]) | Q(tamil_name__icontains=request.query_params['search'][:100]) | Q(brand__icontains=request.query_params['search'][:100]))
+        return collection_response(request, products, ProductSerializer, ('english_name', 'pk'))
     serializer = ProductSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     product = serializer.save(id='P' + uuid.uuid4().hex, is_active=True)
@@ -224,7 +252,7 @@ def upload_product_image(request):
 @permission_classes([IsAuthenticated])
 def customer_orders(request):
     if request.method == 'GET':
-        return Response(OrderSerializer(orders_queryset().filter(customer=request.user), many=True).data)
+        return collection_response(request, orders_queryset().filter(customer=request.user), OrderSerializer, ('-created_at', '-pk'))
     profile = get_object_or_404(CustomerProfile, user=request.user)
     serializer = CheckoutSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -233,78 +261,40 @@ def customer_orders(request):
     serializer.validated_data['customer_phone'] = profile.phone
     commerce.expire_pending_orders()
     order = commerce.create_order(request.user, serializer.validated_data)
-    return Response({'order': OrderSerializer(order).data, 'checkout': commerce.checkout_data(order)}, status=201)
+    return Response({'order': OrderSerializer(order).data, 'checkout': None}, status=201)
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def customer_order_detail(request, order_id):
     order = get_object_or_404(orders_queryset(), order_id=order_id, customer=request.user)
-    return Response({'order': OrderSerializer(order).data, 'checkout': commerce.checkout_data(order)})
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def verify_payment(request, order_id):
-    order = get_object_or_404(orders_queryset(), order_id=order_id, customer=request.user)
-    payment_id = str(request.data.get('razorpay_payment_id', ''))
-    if not payment_id.startswith('pay_') or len(payment_id) > 100 or not order.razorpay_order_id:
-        raise ValidationError({'detail': 'Invalid payment reference.'})
-    commerce.verify_signature(order, payment_id, str(request.data.get('razorpay_signature', '')))
-    order = commerce.confirm_payment(order, payment_id)
-    return Response(OrderSerializer(order).data)
+    return Response({'order': OrderSerializer(order).data, 'checkout': None})
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def cancel_checkout(request, order_id):
-    with transaction.atomic():
-        order = get_object_or_404(Order.objects.select_for_update(), order_id=order_id, customer=request.user)
-        if order.status == 'Cancelled' and order.payment_status in ['expired', 'cancelled']:
-            return Response(OrderSerializer(order).data)
-        if order.status != 'Payment Pending' or order.payment_status != 'pending':
-            raise ValidationError({'detail': 'Only an unpaid checkout can be cancelled here. Contact the store for other orders.'})
-        commerce.release_stock(order)
-        order.status = 'Cancelled'
-        order.payment_status = 'cancelled'
-        order.save()
-        OrderEvent.objects.create(order=order, status='Cancelled', note='Unpaid checkout cancelled by customer.')
+    get_object_or_404(Order, order_id=order_id, customer=request.user)
+    order = commerce.cancel_order(order_id, customer=request.user)
     return Response(OrderSerializer(order).data)
-
-
-@api_view(['POST'])
-@authentication_classes([])
-@permission_classes([AllowAny])
-@throttle_classes([])
-def razorpay_webhook(request):
-    if not settings.RAZORPAY_WEBHOOK_SECRET:
-        return Response({'detail': 'Webhook is not configured.'}, status=503)
-    expected = hmac.new(settings.RAZORPAY_WEBHOOK_SECRET.encode(), request.body, hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(expected, request.headers.get('X-Razorpay-Signature', '')):
-        return Response({'detail': 'Invalid webhook signature.'}, status=400)
-    try:
-        data = json.loads(request.body)
-        if data.get('event') not in ['payment.captured', 'order.paid']:
-            return Response({'received': True})
-        payment = data['payload']['payment']['entity']
-        order = Order.objects.filter(razorpay_order_id=payment['order_id']).first()
-        if order:
-            commerce.confirm_payment(order, payment['id'])
-    except (KeyError, ValueError, TypeError):
-        return Response({'detail': 'Invalid webhook payload.'}, status=400)
-    return Response({'received': True})
 
 
 @api_view(['GET'])
 @permission_classes([IsAdminUser])
 def admin_dashboard(request):
     orders = orders_queryset()
-    fulfilled = orders.filter(payment_status__in=['paid', 'cod']).exclude(status='Cancelled')
+    fulfilled = orders.filter(payment_status__in=['paid', 'cod', 'collected']).exclude(status='Cancelled')
     return Response({'total_products': Product.objects.filter(is_active=True).count(),
                      'total_orders': fulfilled.count(), 'awaiting_payment': orders.filter(payment_status='pending').count(),
                      'active_deliveries': fulfilled.filter(status='Out for Delivery').count(),
                      'new_orders': fulfilled.filter(status='New').count(),
-                     'revenue': str(fulfilled.filter(payment_status='paid').aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')),
+                     'revenue': str(fulfilled.filter(payment_status__in=['paid', 'collected']).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')),
+                     'cash_collected': str(orders.filter(payment_status='collected').aggregate(total=Sum('cash_collected_amount'))['total'] or Decimal('0.00')),
+                     'cash_received_by_store': str(CashHandover.objects.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')),
+                     'cash_with_employees': str(orders.filter(payment_status='collected', cash_collected_for__isnull=False, cash_handover__isnull=True).aggregate(total=Sum('cash_collected_amount'))['total'] or Decimal('0.00')),
+                     'cash_due': str(orders.filter(payment_status='cod').exclude(status='Cancelled').aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')),
+                     'delivery_attempted': fulfilled.filter(status='Delivery Attempted').count(),
+                     'packed': fulfilled.filter(status='Packed').count(),
                      'delivered': fulfilled.filter(status='Delivered').count(),
                      'low_stock': Product.objects.filter(is_active=True, stock_kg__lte=5).count(),
                      'recent_orders': OrderSerializer(orders[:10], many=True).data})
@@ -316,7 +306,7 @@ def admin_orders(request):
     orders = orders_queryset()
     if request.query_params.get('status'):
         orders = orders.filter(status=request.query_params['status'])
-    return Response(OrderSerializer(orders, many=True).data)
+    return collection_response(request, orders, OrderSerializer, ('-created_at', '-pk'))
 
 
 @api_view(['PATCH'])
@@ -337,7 +327,21 @@ def admin_order_update(request, order_id):
             person_id = int(person_id)
         except (ValueError, TypeError):
             raise ValidationError({'assigned_to': 'Choose a valid delivery person.'}) from None
-    order = commerce.transition_order(order_id, request.data.get('status'), note, person_id, eta)
+    for field in ['cash_collected', 'stock_returned']:
+        if field in request.data and type(request.data[field]) is not bool:
+            raise ValidationError({field: 'Use true or false.'})
+    if request.data.get('status') == 'Cancelled':
+        reason = str(request.data.get('cancellation_reason', '')).strip()
+        if len(reason) > 255:
+            raise ValidationError({'cancellation_reason': 'Use at most 255 characters.'})
+        order = commerce.cancel_order(order_id, reason=reason, stock_returned=request.data.get('stock_returned', False))
+    else:
+        from rest_framework import serializers
+        cash_amount = None
+        if request.data.get('cash_collected_amount') is not None:
+            cash_amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01')).run_validation(request.data['cash_collected_amount'])
+        order = commerce.transition_order(order_id, request.data.get('status'), note, person_id, eta,
+                                          cash_collected=request.data.get('cash_collected', False), cash_amount=cash_amount, actor=request.user)
     return Response(OrderSerializer(order).data)
 
 
@@ -345,20 +349,183 @@ def admin_order_update(request, order_id):
 @permission_classes([IsAdminUser])
 def admin_delivery_personnel(request):
     if request.method == 'GET':
-        return Response(DeliveryPersonnelSerializer(DeliveryPersonnel.objects.filter(is_active=True).order_by('name'), many=True).data)
-    serializer = DeliveryPersonnelSerializer(data=request.data)
+        people = DeliveryPersonnel.objects.select_related('user').prefetch_related('documents')
+        if request.query_params.get('search'):
+            query = request.query_params['search'][:100]
+            people = people.filter(Q(name__icontains=query) | Q(phone__icontains=query) | Q(employee_code__icontains=query))
+        if request.query_params.get('ready') == 'true':
+            people = people.filter(is_active=True, documents_verified=True, user__is_active=True, user__is_staff=False).filter(Q(vehicle_type__in=['walking', 'bicycle']) | Q(licence_expiry__gte=timezone.localdate()))
+        return collection_response(request, people, EmployeeSerializer, ('name', 'pk'))
+    serializer = EmployeeSerializer(data=request.data, context={'request': request})
     serializer.is_valid(raise_exception=True)
     serializer.save()
     return Response(serializer.data, status=201)
 
 
-@api_view(['PATCH'])
+@api_view(['GET', 'PATCH'])
 @permission_classes([IsAdminUser])
+@transaction.atomic
 def admin_delivery_person_detail(request, pk):
-    person = get_object_or_404(DeliveryPersonnel, pk=pk)
+    person = get_object_or_404(DeliveryPersonnel.objects.select_for_update(), pk=pk)
+    if request.method == 'GET':
+        return Response(EmployeeSerializer(person).data)
     if request.data.get('is_active') is False and person.assigned_orders.exclude(status__in=['Delivered', 'Cancelled']).exists():
-        raise ValidationError({'detail': 'Reassign this person?s active orders before deactivating.'})
-    serializer = DeliveryPersonnelSerializer(person, data=request.data, partial=True)
+        raise ValidationError({'detail': 'Reassign active orders before deactivating this delivery person.'})
+    serializer = EmployeeSerializer(person, data=request.data, partial=True, context={'request': request})
     serializer.is_valid(raise_exception=True)
     serializer.save()
     return Response(serializer.data)
+
+
+# Delivery employee access, assigned orders, private documents and cash receipts.
+class IsDeliveryEmployee(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(user and user.is_authenticated and user.is_active and not user.is_staff
+                    and DeliveryPersonnel.objects.filter(user=user, is_active=True).exists())
+
+
+class DeliveryLoginThrottle(UserRateThrottle):
+    scope = 'login'
+
+
+def employee_info(person):
+    return {key: getattr(person, key) for key in ['id', 'employee_code', 'name', 'phone', 'vehicle_type', 'vehicle_number', 'documents_verified']}
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+@throttle_classes([DeliveryLoginThrottle])
+def employee_login(request):
+    code = str(request.data.get('employee_code', '')).strip().upper()
+    password = request.data.get('password', '')
+    person = DeliveryPersonnel.objects.select_related('user').filter(employee_code=code, is_active=True).first()
+    if not person or not person.user_id or not isinstance(password, str):
+        raise ValidationError({'detail': 'Invalid employee ID or password.'})
+    user = authenticate(request, username=person.user.username, password=password)
+    if not user or user.is_staff:
+        raise ValidationError({'detail': 'Invalid employee ID or password.'})
+    token, _ = Token.objects.get_or_create(user=user)
+    return Response({'token': token.key, 'employee': employee_info(person)})
+
+
+@api_view(['POST'])
+@permission_classes([IsDeliveryEmployee])
+def employee_logout(request):
+    request.auth.delete()
+    return Response(status=204)
+
+
+@api_view(['GET'])
+@permission_classes([IsDeliveryEmployee])
+def employee_dashboard(request):
+    person = request.user.delivery_employee
+    orders = Order.objects.filter(assigned_to=person, customer__isnull=False)
+    cash = person.cash_orders.filter(payment_status='collected')
+    return Response({'employee': employee_info(person), 'assigned': orders.exclude(status__in=['Delivered', 'Cancelled']).count(),
+                     'delivered': orders.filter(status='Delivered').count(),
+                     'cash_to_collect': str(orders.filter(payment_status='cod').exclude(status='Cancelled').aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')),
+                     'cash_collected': str(cash_total(cash)), 'cash_to_handover': str(cash_total(cash.filter(cash_handover__isnull=True))),
+                     'handovers': [{'id': str(h.pk), 'amount': str(h.amount), 'received_at': h.received_at} for h in person.cash_handovers.all()[:20]]})
+
+
+def own_orders(user):
+    return Order.objects.filter(customer__isnull=False, assigned_to__user=user).select_related('assigned_to').prefetch_related('items__product__image', 'events')
+
+
+@api_view(['GET'])
+@permission_classes([IsDeliveryEmployee])
+def employee_orders(request):
+    orders = own_orders(request.user)
+    if request.query_params.get('scope') == 'active':
+        orders = orders.exclude(status__in=['Delivered', 'Cancelled'])
+    elif request.query_params.get('scope') == 'completed':
+        orders = orders.filter(status__in=['Delivered', 'Cancelled'])
+    return collection_response(request, orders, OrderSerializer, ('-created_at', '-pk'))
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsDeliveryEmployee])
+def employee_order(request, order_id):
+    order = get_object_or_404(own_orders(request.user), order_id=order_id)
+    if request.method == 'PATCH':
+        serializer = DeliveryActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        order = commerce.transition_order(order_id, data['status'], data['delivery_note'],
+                                          cash_collected=data['cash_collected'], cash_amount=data.get('cash_collected_amount'), actor=request.user)
+    return Response(OrderSerializer(order).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def employee_document_upload(request, pk):
+    person = get_object_or_404(DeliveryPersonnel, pk=pk)
+    if not person.document_consent:
+        raise ValidationError({'detail': 'Record employee consent before uploading onboarding documents.'})
+    kind = request.data.get('kind')
+    if kind not in dict(EmployeeDocument._meta.get_field('kind').choices):
+        raise ValidationError({'kind': 'Choose a valid document type.'})
+    file = request.FILES.get('document')
+    if not file:
+        raise ValidationError({'document': 'Choose a JPEG, PNG or WebP document photo.'})
+    result = gateways.upload_employee_document(file)
+    document = EmployeeDocument.objects.create(employee=person, kind=kind, public_id=result['public_id'], format=result['format'], uploaded_by=request.user)
+    if kind != 'photo':
+        DeliveryPersonnel.objects.filter(pk=pk).update(documents_verified=False, verified_at=None, verified_by=None)
+    return Response({'id': str(document.pk), 'kind': document.kind}, status=201)
+
+
+@api_view(['GET', 'DELETE'])
+@permission_classes([IsAdminUser])
+def employee_document(request, pk, document_id):
+    document = get_object_or_404(EmployeeDocument, pk=document_id, employee_id=pk)
+    if request.method == 'DELETE':
+        gateways.delete_employee_document(document)
+        document.delete()
+        DeliveryPersonnel.objects.filter(pk=pk).update(documents_verified=False, verified_at=None, verified_by=None)
+        return Response(status=204)
+    return Response({'url': gateways.employee_document_url(document), 'expires_in': 60})
+
+
+@api_view(['GET'])
+@permission_classes([IsDeliveryEmployee])
+def employee_receipts(request):
+    return collection_response(request, request.user.delivery_employee.cash_handovers.all(), CashReceiptSerializer, ('-received_at', '-pk'))
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_employee_receipts(request, pk):
+    person = get_object_or_404(DeliveryPersonnel, pk=pk)
+    return collection_response(request, person.cash_handovers.all(), CashReceiptSerializer, ('-received_at', '-pk'))
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAdminUser])
+def employee_cash_handover(request, pk):
+    person = get_object_or_404(DeliveryPersonnel, pk=pk)
+    due = person.cash_orders.filter(payment_status='collected', cash_handover__isnull=True).order_by('cash_collected_at')
+    if request.method == 'GET':
+        if request.query_params.get('paginate') == 'true':
+            return collection_response(request, due, CashDueSerializer, ('cash_collected_at', 'pk'), {'cash_to_handover': str(cash_total(due))})
+        return Response({'cash_to_handover': str(cash_total(due)),
+                         'orders': [{'order_id': o.order_id, 'amount': str(o.cash_collected_amount), 'collected_at': o.cash_collected_at} for o in due],
+                         'receipts': [{'id': str(h.pk), 'amount': str(h.amount), 'received_at': h.received_at} for h in person.cash_handovers.all()[:20]]})
+    serializer = CashHandoverSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+    with transaction.atomic():
+        orders = list(Order.objects.select_for_update().filter(order_id__in=data['order_ids'], cash_collected_for=person, payment_status='collected').order_by('pk'))
+        DeliveryPersonnel.objects.select_for_update().get(pk=pk)
+        existing = CashHandover.objects.filter(idempotency_key=data['idempotency_key']).first()
+        if existing:
+            if existing.employee_id != pk or existing.amount != data['amount'] or set(existing.orders.values_list('order_id', flat=True)) != set(data['order_ids']):
+                raise ValidationError({'detail': 'This cash receipt reference was already used for another handover.'})
+            return Response({'id': str(existing.pk), 'amount': str(existing.amount), 'received_at': existing.received_at})
+        if len(orders) != len(data['order_ids']) or any(o.cash_handover_id for o in orders) or sum((o.cash_collected_amount for o in orders), Decimal('0.00')) != data['amount']:
+            raise ValidationError({'detail': 'Cash due changed or the amount does not match the selected orders. Refresh and check again.'})
+        receipt = CashHandover.objects.create(employee=person, idempotency_key=data['idempotency_key'], amount=data['amount'], received_by=request.user)
+        Order.objects.filter(pk__in=[o.pk for o in orders]).update(cash_handover=receipt)
+    return Response({'id': str(receipt.pk), 'amount': str(receipt.amount), 'received_at': receipt.received_at}, status=201)

@@ -95,10 +95,24 @@ class StoreOrder {
   bool get canFulfill =>
       ['paid', 'cod'].contains(paymentStatus) &&
       !['Delivered', 'Cancelled'].contains(status);
+  bool get canCancel =>
+      status == 'New' && paymentStatus == 'cod' || awaitingPayment;
   String? get nextStatus => {
     'New': 'Preparing',
     'Preparing': 'Packed',
     'Packed': 'Out for Delivery',
     'Out for Delivery': 'Delivered',
+    'Delivery Attempted': 'Out for Delivery',
   }[status];
+}
+
+class StorePage<T> {
+  final List<T> items;
+  final String? nextCursor;
+  final Map<String, dynamic> metadata;
+  const StorePage({
+    required this.items,
+    this.nextCursor,
+    this.metadata = const {},
+  });
 }
