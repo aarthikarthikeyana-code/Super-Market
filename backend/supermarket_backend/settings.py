@@ -126,3 +126,5 @@ STORAGES = {
 
 # Temporary on-screen demo codes do not verify phone ownership.
 CUSTOMER_OTP_ENABLED = os.getenv('CUSTOMER_OTP_ENABLED', 'false').lower() == 'true'
+# Temporary demo login. ID + phone does not verify phone ownership.
+DELIVERY_PHONE_LOGIN_ENABLED = os.getenv('DELIVERY_PHONE_LOGIN_ENABLED', 'true').lower() == 'true'

@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'store/widgets.dart';
+import 'store/api.dart';
+import 'store/state.dart';
 import 'router/app_router.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   LicenseRegistry.addLicense(() async* {
     final license = await rootBundle.loadString('assets/fonts/OFL.txt');
@@ -18,11 +21,21 @@ void main() {
       statusBarIconBrightness: Brightness.dark,
     ),
   );
-  runApp(const ProviderScope(child: AgaramSupermarketApp()));
+  final api = StoreApi();
+  await api.restoreStaffSession();
+  runApp(
+    ProviderScope(
+      overrides: [storeApiProvider.overrideWithValue(api)],
+      child: AgaramSupermarketApp(
+        router: createAppRouter(initialLocation: api.staffWorkspace),
+      ),
+    ),
+  );
 }
 
 class AgaramSupermarketApp extends StatelessWidget {
-  const AgaramSupermarketApp({super.key});
+  final GoRouter? router;
+  const AgaramSupermarketApp({super.key, this.router});
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +43,7 @@ class AgaramSupermarketApp extends StatelessWidget {
       title: 'AGARAM Supermarket',
       debugShowCheckedModeBanner: false,
       theme: storeTheme(),
-      routerConfig: appRouter,
+      routerConfig: router ?? appRouter,
     );
   }
 }

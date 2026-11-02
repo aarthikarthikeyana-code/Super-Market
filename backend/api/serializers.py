@@ -1,15 +1,25 @@
-import uuid
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.conf import settings
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError
 from .commerce import cash_total
 from decimal import Decimal
 from rest_framework import serializers
-from .models import Product, ProductImage, DeliveryPersonnel, Order, OrderItem, OrderEvent, CustomerProfile, CashHandover
+from .models import Product, ProductImage, DeliveryPersonnel, EmployeeCodeSequence, Order, OrderItem, OrderEvent, CustomerProfile, CashHandover
+
+
+@transaction.atomic
+def next_employee_code():
+    year = timezone.localdate().year
+    EmployeeCodeSequence.objects.get_or_create(year=year)
+    sequence = EmployeeCodeSequence.objects.select_for_update().get(year=year)
+    sequence.last_number += 1
+    sequence.save(update_fields=['last_number'])
+    return f'BB{year}{sequence.last_number:03d}'
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -213,7 +223,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
                     raise ValidationError({key: 'Required for motor vehicle delivery.'})
             if value('licence_expiry') < timezone.localdate() and value('documents_verified', False) and value('is_active', False):
                 raise ValidationError({'licence_expiry': 'Renew the driving licence before assigning deliveries.'})
-        if not self.instance or not self.instance.user_id:
+        if not settings.DELIVERY_PHONE_LOGIN_ENABLED and (not self.instance or not self.instance.user_id):
             if not attrs.get('password'):
                 raise ValidationError({'password': 'Set a password for the employee login.'})
         if value('documents_verified', False) and (not value('document_consent', False) or not value('id_proof_type')):
@@ -227,8 +237,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, attrs):
-        password = attrs.pop('password')
-        code = 'DEL' + uuid.uuid4().hex[:8].upper()
+        password = attrs.pop('password', None)
+        code = next_employee_code()
         user = get_user_model().objects.create_user(username='delivery_' + code.lower(), password=password, is_active=attrs.get('is_active', False))
         person = DeliveryPersonnel.objects.create(user=user, employee_code=code, **attrs)
         self._record_check(person)
@@ -237,9 +247,10 @@ class EmployeeSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def update(self, person, attrs):
         password = attrs.pop('password', None)
+        phone_changed = 'phone' in attrs and attrs['phone'] != person.phone
         record_check = 'documents_verified' in attrs
         if not person.user_id:
-            person.employee_code = person.employee_code or 'DEL' + uuid.uuid4().hex[:8].upper()
+            person.employee_code = person.employee_code or next_employee_code()
             person.user = get_user_model().objects.create_user(username='delivery_' + person.employee_code.lower(), password=password)
         for key, value in attrs.items():
             setattr(person, key, value)
@@ -247,7 +258,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
         if password:
             person.user.set_password(password)
         person.user.save()
-        if password or not person.is_active:
+        if password or phone_changed or not person.is_active:
             Token.objects.filter(user=person.user).delete()
         person.save()
         if record_check:

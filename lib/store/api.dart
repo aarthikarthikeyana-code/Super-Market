@@ -31,6 +31,47 @@ class StoreApi {
 
   String? adminToken;
   String? deliveryToken;
+  String staffWorkspace = '/';
+  final staffChanges = ValueNotifier<int>(0);
+
+  Future<void> restoreStaffSession() async {
+    try {
+      final saved = await storage.read(key: 'agaram_staff_session');
+      if (saved == null) return;
+      final data = jsonDecode(saved);
+      if (data is! Map) return;
+      adminToken = data['admin_token'] is String ? data['admin_token'] : null;
+      deliveryToken = data['delivery_token'] is String
+          ? data['delivery_token']
+          : null;
+      final workspace = data['workspace'];
+      staffWorkspace = workspace == '/admin' || workspace == '/delivery'
+          ? workspace as String
+          : '/';
+    } catch (_) {
+      // An unreadable local session requires sign-in; no private data is restored.
+      adminToken = null;
+      deliveryToken = null;
+      staffWorkspace = '/';
+    }
+  }
+
+  Future<void> _saveStaffSession() async {
+    await storage.write(
+      key: 'agaram_staff_session',
+      value: jsonEncode({
+        'admin_token': adminToken,
+        'delivery_token': deliveryToken,
+        'workspace': staffWorkspace,
+      }),
+    );
+  }
+
+  Future<void> useAdminWorkspace() async {
+    staffWorkspace = '/admin';
+    await _saveStaffSession();
+  }
+
   String? _customerToken;
   Map<String, dynamic>? _customerAccount;
   Future<Map<String, dynamic>?>? _restoringCustomer;
@@ -112,8 +153,12 @@ class StoreApi {
       }
       return response.data;
     } on DioException catch (e) {
-      if (e.response?.statusCode == 401 && admin) adminToken = null;
-      if (e.response?.statusCode == 401 && employee) deliveryToken = null;
+      if (e.response?.statusCode == 401 && (admin || employee)) {
+        if (admin) adminToken = null;
+        if (employee) deliveryToken = null;
+        staffChanges.value++;
+        await _saveStaffSession();
+      }
       final body = e.response?.data;
       if (body is Map) {
         final detail = body['detail'];
@@ -272,6 +317,9 @@ class StoreApi {
       data: {'admin_id': email.trim(), 'password': password},
     );
     adminToken = data['token'] as String;
+    staffWorkspace = '/admin';
+    await _saveStaffSession();
+    staffChanges.value++;
   }
 
   Future<void> logout() async {
@@ -281,6 +329,9 @@ class StoreApi {
       }
     } finally {
       adminToken = null;
+      staffWorkspace = '/';
+      await _saveStaffSession();
+      staffChanges.value++;
     }
   }
 
@@ -612,14 +663,21 @@ class StoreApi {
     ),
   );
 
-  Future<void> deliveryLogin(String code, String password) async {
-    await config();
+  Future<void> deliveryLogin(String code, String credential) async {
+    final configuration = await config();
+    final phoneLogin = configuration['delivery_login_mode'] == 'phone_demo';
     final result = await request(
       'POST',
       '/delivery/login/',
-      data: {'employee_code': code.trim(), 'password': password},
+      data: {
+        'employee_code': code.trim(),
+        if (phoneLogin) 'phone': credential.trim() else 'password': credential,
+      },
     );
     deliveryToken = result['token'];
+    staffWorkspace = '/delivery';
+    await _saveStaffSession();
+    staffChanges.value++;
   }
 
   Future<void> deliveryLogout() async {
@@ -629,6 +687,9 @@ class StoreApi {
       }
     } finally {
       deliveryToken = null;
+      if (staffWorkspace == '/delivery') staffWorkspace = '/';
+      await _saveStaffSession();
+      staffChanges.value++;
     }
   }
 

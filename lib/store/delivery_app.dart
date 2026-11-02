@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'state.dart';
+import 'api.dart';
 import 'models.dart';
 import 'widgets.dart';
 import 'paged_feed.dart';
@@ -33,6 +34,8 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
   final _code = TextEditingController(), _password = TextEditingController();
   final _form = GlobalKey<FormState>();
   bool _signedIn = false, _busy = false, _history = false;
+  bool _phoneLogin = false, _loadingLoginMode = true;
+  late final StoreApi _api;
   int _tab = 0;
   String? _error;
   Timer? _poll;
@@ -40,8 +43,12 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
   void initState() {
     super.initState();
     _code.text = widget.initialEmployeeCode ?? '';
-    // A fresh staff route authenticates before revealing any cached identity.
-    _signedIn = false;
+    _api = ref.read(storeApiProvider);
+    // An admin preview must sign in as the selected employee explicitly.
+    _signedIn =
+        widget.initialEmployeeCode == null && _api.deliveryToken != null;
+    _api.staffChanges.addListener(_staffChanged);
+    _loadLoginMode();
     _poll = Timer.periodic(const Duration(seconds: 15), (_) {
       if (_signedIn) refreshDelivery(ref);
     });
@@ -49,14 +56,37 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
 
   @override
   void dispose() {
+    _api.staffChanges.removeListener(_staffChanged);
     _poll?.cancel();
     _code.dispose();
     _password.dispose();
     super.dispose();
   }
 
+  void _staffChanged() {
+    if (mounted && _api.deliveryToken == null) {
+      setState(() => _signedIn = false);
+    }
+  }
+
+  Future<void> _loadLoginMode() async {
+    try {
+      final configuration = await _api.config();
+      if (mounted) {
+        setState(
+          () => _phoneLogin =
+              configuration['delivery_login_mode'] == 'phone_demo',
+        );
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loadingLoginMode = false);
+    }
+  }
+
   Future<void> _login() async {
-    if (_busy || !_form.currentState!.validate()) return;
+    if (_busy || _loadingLoginMode || !_form.currentState!.validate()) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -73,7 +103,6 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
       setState(() => _signedIn = true);
     } catch (e) {
       if (mounted) {
-        ref.read(storeApiProvider).deliveryToken = null;
         setState(() => _error = e.toString());
       }
     } finally {
@@ -94,142 +123,165 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Theme(
-    data: storeTheme(),
-    child: Scaffold(
-      appBar: AppBar(
-        leading: widget.onExit == null
-            ? null
-            : IconButton(
-                tooltip: 'Return to admin',
-                icon: const Icon(Icons.arrow_back),
-                onPressed: _busy
-                    ? null
-                    : () async {
-                        await _logout();
-                        if (mounted) widget.onExit?.call();
-                      },
+  Widget build(BuildContext context) => PopScope(
+    canPop: !_signedIn,
+    child: Theme(
+      data: storeTheme(),
+      child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: !_signedIn,
+          leading: widget.onExit == null
+              ? null
+              : IconButton(
+                  tooltip: 'Return to admin',
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: _busy
+                      ? null
+                      : () async {
+                          await _logout();
+                          await _api.useAdminWorkspace();
+                          if (mounted) widget.onExit?.call();
+                        },
+                ),
+          title: Text(
+            _signedIn ? 'Agaram Delivery' : 'Delivery employee login',
+          ),
+          actions: [
+            if (_signedIn) ...[
+              IconButton(
+                tooltip: 'Refresh work',
+                onPressed: () => refreshDelivery(ref),
+                icon: const Icon(Icons.refresh),
               ),
-        title: Text(_signedIn ? 'Agaram Delivery' : 'Delivery employee login'),
-        actions: [
-          if (_signedIn) ...[
-            IconButton(
-              tooltip: 'Refresh work',
-              onPressed: () => refreshDelivery(ref),
-              icon: const Icon(Icons.refresh),
-            ),
-            IconButton(
-              tooltip: 'Sign out',
-              onPressed: _logout,
-              icon: const Icon(Icons.logout),
-            ),
+              IconButton(
+                tooltip: 'Sign out',
+                onPressed: _logout,
+                icon: const Icon(Icons.logout),
+              ),
+            ],
           ],
-        ],
-      ),
-      body: !_signedIn
-          ? Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Form(
-                    key: _form,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(
-                          Icons.delivery_dining,
-                          size: 52,
-                          color: storeGreen,
-                        ),
-                        const SizedBox(height: 20),
-                        const Text(
-                          'Your route.\nYour deliveries.',
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w800,
+        ),
+        body: !_signedIn
+            ? Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 460),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Form(
+                      key: _form,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.delivery_dining,
+                            size: 52,
                             color: storeGreen,
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Use the employee ID and password created by your store administrator.',
-                          style: TextStyle(height: 1.6),
-                        ),
-                        const SizedBox(height: 24),
-                        TextFormField(
-                          controller: _code,
-                          enabled: !_busy,
-                          textCapitalization: TextCapitalization.characters,
-                          decoration: const InputDecoration(
-                            labelText: 'Employee ID',
-                            hintText: 'DEL…',
-                          ),
-                          validator: (v) => (v?.trim().isEmpty ?? true)
-                              ? 'Enter your employee ID'
-                              : null,
-                        ),
-                        const SizedBox(height: 14),
-                        TextFormField(
-                          controller: _password,
-                          enabled: !_busy,
-                          obscureText: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Password',
-                          ),
-                          validator: (v) => (v?.isEmpty ?? true)
-                              ? 'Enter your password'
-                              : null,
-                          onFieldSubmitted: (_) => _login(),
-                        ),
-                        if (_error != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 16),
-                            child: Text(
-                              _error!,
-                              style: const TextStyle(color: Colors.red),
+                          const SizedBox(height: 20),
+                          const Text(
+                            'Your route.\nYour deliveries.',
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w800,
+                              color: storeGreen,
                             ),
                           ),
-                        const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton(
-                            onPressed: _busy ? null : _login,
-                            child: Text(
-                              _busy ? 'Signing in…' : 'Sign in to deliveries',
+                          const SizedBox(height: 12),
+                          Text(
+                            _phoneLogin
+                                ? 'Enter your employee ID and the mobile number registered by your administrator.'
+                                : 'Use the employee ID and password created by your store administrator.',
+                            style: TextStyle(height: 1.6),
+                          ),
+                          const SizedBox(height: 24),
+                          TextFormField(
+                            controller: _code,
+                            enabled: !_busy,
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: const InputDecoration(
+                              labelText: 'Employee ID',
+                              hintText: 'BB2026001',
+                            ),
+                            validator: (v) => (v?.trim().isEmpty ?? true)
+                                ? 'Enter your employee ID'
+                                : null,
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _password,
+                            enabled: !_busy,
+                            obscureText: !_phoneLogin,
+                            keyboardType: _phoneLogin
+                                ? TextInputType.phone
+                                : TextInputType.visiblePassword,
+                            decoration: InputDecoration(
+                              labelText: _phoneLogin
+                                  ? 'Registered mobile number'
+                                  : 'Password',
+                            ),
+                            validator: (v) => (v?.isEmpty ?? true)
+                                ? (_phoneLogin
+                                      ? 'Enter your registered mobile number'
+                                      : 'Enter your password')
+                                : null,
+                            onFieldSubmitted: (_) => _login(),
+                          ),
+                          if (_error != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 16),
+                              child: Text(
+                                _error!,
+                                style: const TextStyle(color: Colors.red),
+                              ),
+                            ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton(
+                              onPressed: _busy || _loadingLoginMode
+                                  ? null
+                                  : _login,
+                              child: Text(
+                                _busy ? 'Signing in…' : 'Sign in to deliveries',
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Forgot your password? Ask your store administrator to reset it.',
-                          style: TextStyle(fontSize: 12, color: Colors.black54),
-                        ),
-                      ],
+                          const SizedBox(height: 12),
+                          Text(
+                            _phoneLogin
+                                ? 'Temporary test login using ID and phone number. Ask your administrator to update an incorrect number.'
+                                : 'Forgot your password? Ask your store administrator to reset it.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
+              )
+            : _tab == 0
+            ? _work()
+            : _cash(),
+        bottomNavigationBar: !_signedIn
+            ? null
+            : NavigationBar(
+                selectedIndex: _tab,
+                onDestinationSelected: (v) => setState(() => _tab = v),
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.local_shipping_outlined),
+                    label: 'My deliveries',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.payments_outlined),
+                    label: 'My cash',
+                  ),
+                ],
               ),
-            )
-          : _tab == 0
-          ? _work()
-          : _cash(),
-      bottomNavigationBar: !_signedIn
-          ? null
-          : NavigationBar(
-              selectedIndex: _tab,
-              onDestinationSelected: (v) => setState(() => _tab = v),
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.local_shipping_outlined),
-                  label: 'My deliveries',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.payments_outlined),
-                  label: 'My cash',
-                ),
-              ],
-            ),
+      ),
     ),
   );
 

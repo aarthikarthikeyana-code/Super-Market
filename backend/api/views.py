@@ -73,7 +73,7 @@ def health(request):
 @permission_classes([AllowAny])
 def store_config(request):
     return Response({'api_version': 5, 'store_name': 'Agaram Supermarket', 'currency': 'INR', 'delivery_charge': settings.DELIVERY_CHARGE,
-                     'online_payments_enabled': False, 'payment_methods': ['cod'], 'cash_on_delivery_enabled': True, 'delivery_mode': 'on_demand', 'customer_login_mode': 'otp' if settings.CUSTOMER_OTP_ENABLED else 'demo_code'})
+                     'online_payments_enabled': False, 'payment_methods': ['cod'], 'cash_on_delivery_enabled': True, 'delivery_mode': 'on_demand', 'delivery_login_mode': 'phone_demo' if settings.DELIVERY_PHONE_LOGIN_ENABLED else 'password', 'customer_login_mode': 'otp' if settings.CUSTOMER_OTP_ENABLED else 'demo_code'})
 
 
 @api_view(['POST'])
@@ -468,11 +468,22 @@ def employee_login(request):
     code = str(request.data.get('employee_code', '')).strip().upper()
     password = request.data.get('password', '')
     person = DeliveryPersonnel.objects.select_related('user').filter(employee_code=code, is_active=True).first()
-    if not person or not person.user_id or not isinstance(password, str):
-        raise ValidationError({'detail': 'Invalid employee ID or password.'})
-    user = authenticate(request, username=person.user.username, password=password)
-    if not user or user.is_staff:
-        raise ValidationError({'detail': 'Invalid employee ID or password.'})
+    message = 'Invalid employee ID or mobile number.' if settings.DELIVERY_PHONE_LOGIN_ENABLED else 'Invalid employee ID or password.'
+    if not person or not person.user_id or not person.user.is_active or person.user.is_staff or person.user.is_superuser:
+        raise ValidationError({'detail': message})
+    if settings.DELIVERY_PHONE_LOGIN_ENABLED and 'phone' in request.data:
+        try:
+            phone = normalize_customer_phone(request.data['phone'])
+            registered = normalize_customer_phone(person.phone)
+        except (ValidationError, TypeError):
+            raise ValidationError({'detail': message}) from None
+        if not secrets.compare_digest(phone, registered):
+            raise ValidationError({'detail': message})
+        user = person.user
+    else:
+        user = authenticate(request, username=person.user.username, password=password) if isinstance(password, str) else None
+        if not user:
+            raise ValidationError({'detail': message})
     token, _ = Token.objects.get_or_create(user=user)
     return Response({'token': token.key, 'employee': employee_info(person)})
 

@@ -5,8 +5,10 @@ import '../store/admin_app.dart';
 import '../store/customer_app.dart';
 import '../store/delivery_app.dart';
 
-final GoRouter appRouter = GoRouter(
-  initialLocation: '/',
+final GoRouter appRouter = createAppRouter();
+
+GoRouter createAppRouter({String initialLocation = '/'}) => GoRouter(
+  initialLocation: initialLocation,
   routes: [
     GoRoute(
       path: '/delivery',

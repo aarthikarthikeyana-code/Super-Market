@@ -25,9 +25,14 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   int _tab = 0;
   String _orderFilter = 'All';
   Timer? _poll;
+  late final StoreApi _api;
   @override
   void initState() {
     super.initState();
+    final api = ref.read(storeApiProvider);
+    _api = api;
+    _signedIn = api.adminToken != null;
+    api.staffChanges.addListener(_staffChanged);
     _poll = Timer.periodic(const Duration(seconds: 20), (_) {
       if (_signedIn) {
         ref.read(storeApiProvider).feedChanges.value++;
@@ -40,8 +45,13 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
 
   @override
   void dispose() {
+    _api.staffChanges.removeListener(_staffChanged);
     _poll?.cancel();
     super.dispose();
+  }
+
+  void _staffChanged() {
+    if (mounted) setState(() => _signedIn = _api.adminToken != null);
   }
 
   Future<void> _logout() async {
@@ -68,144 +78,151 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     final activeEmployee = ref.watch(activeEmployeeProvider);
 
     if (_signedIn && activeRole == 'employee') {
-      return Theme(
-        data: storeTheme(),
-        child: EmployeeConsoleScreen(
-          employee: activeEmployee,
-          onSwitchToAdmin: () {
-            ref.read(activeRoleProvider.notifier).setRole('admin');
-          },
+      return PopScope(
+        canPop: false,
+        child: Theme(
+          data: storeTheme(),
+          child: EmployeeConsoleScreen(
+            employee: activeEmployee,
+            onSwitchToAdmin: () {
+              ref.read(activeRoleProvider.notifier).setRole('admin');
+            },
+          ),
         ),
       );
     }
 
-    return Theme(
-      data: storeTheme(),
-      child: !_signedIn
-          ? AdminSignInScreen(onSuccess: _loginSuccess)
-          : Scaffold(
-              appBar: AppBar(
-                toolbarHeight: 80,
-                title: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        const Text(
-                          'Agaram Workspace',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE4F0E7),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: const Color(0xFF006B3C),
-                              width: 1,
+    return PopScope(
+      canPop: !_signedIn,
+      child: Theme(
+        data: storeTheme(),
+        child: !_signedIn
+            ? AdminSignInScreen(onSuccess: _loginSuccess)
+            : Scaffold(
+                appBar: AppBar(
+                  automaticallyImplyLeading: false,
+                  toolbarHeight: 80,
+                  title: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          const Text(
+                            'Agaram Workspace',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 20,
                             ),
                           ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.admin_panel_settings,
-                                size: 13,
-                                color: Color(0xFF006B3C),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE4F0E7),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFF006B3C),
+                                width: 1,
                               ),
-                              SizedBox(width: 3),
-                              Text(
-                                'Role: Admin',
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.bold,
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.admin_panel_settings,
+                                  size: 13,
                                   color: Color(0xFF006B3C),
                                 ),
-                              ),
-                            ],
+                                SizedBox(width: 3),
+                                Text(
+                                  'Role: Admin',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF006B3C),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      [
-                        'Store overview',
-                        'Product catalog',
-                        'Order management',
-                        'Staff & Employees',
-                      ][_tab],
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.black54,
+                        ],
                       ),
+                      Text(
+                        [
+                          'Store overview',
+                          'Product catalog',
+                          'Order management',
+                          'Staff & Employees',
+                        ][_tab],
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    IconButton(
+                      tooltip: 'Refresh',
+                      onPressed: () => refreshCommerce(ref),
+                      icon: const Icon(Icons.refresh),
+                    ),
+                    IconButton(
+                      tooltip: 'Logout',
+                      onPressed: _logout,
+                      icon: const Icon(Icons.logout),
                     ),
                   ],
                 ),
-                actions: [
-                  IconButton(
-                    tooltip: 'Refresh',
-                    onPressed: () => refreshCommerce(ref),
-                    icon: const Icon(Icons.refresh),
-                  ),
-                  IconButton(
-                    tooltip: 'Logout',
-                    onPressed: _logout,
-                    icon: const Icon(Icons.logout),
-                  ),
-                ],
+                body: switch (_tab) {
+                  0 => _overview(),
+                  1 => _products(),
+                  2 => _orders(),
+                  _ => _team(),
+                },
+                floatingActionButton: _tab == 1
+                    ? FloatingActionButton.extended(
+                        onPressed: () => _editProduct(),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add product'),
+                      )
+                    : _tab == 3
+                    ? FloatingActionButton.extended(
+                        onPressed: () => _editPerson(),
+                        icon: const Icon(Icons.person_add_alt_1_rounded),
+                        label: const Text('Create Employee'),
+                      )
+                    : null,
+                bottomNavigationBar: NavigationBar(
+                  selectedIndex: _tab,
+                  onDestinationSelected: (i) => setState(() => _tab = i),
+                  destinations: const [
+                    NavigationDestination(
+                      icon: Icon(Icons.space_dashboard_outlined),
+                      label: 'Overview',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.inventory_2_outlined),
+                      label: 'Products',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.receipt_long_outlined),
+                      label: 'Orders',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.badge_outlined),
+                      label: 'Employees',
+                    ),
+                  ],
+                ),
               ),
-              body: switch (_tab) {
-                0 => _overview(),
-                1 => _products(),
-                2 => _orders(),
-                _ => _team(),
-              },
-              floatingActionButton: _tab == 1
-                  ? FloatingActionButton.extended(
-                      onPressed: () => _editProduct(),
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add product'),
-                    )
-                  : _tab == 3
-                  ? FloatingActionButton.extended(
-                      onPressed: () => _editPerson(),
-                      icon: const Icon(Icons.person_add_alt_1_rounded),
-                      label: const Text('Create Employee'),
-                    )
-                  : null,
-              bottomNavigationBar: NavigationBar(
-                selectedIndex: _tab,
-                onDestinationSelected: (i) => setState(() => _tab = i),
-                destinations: const [
-                  NavigationDestination(
-                    icon: Icon(Icons.space_dashboard_outlined),
-                    label: 'Overview',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.inventory_2_outlined),
-                    label: 'Products',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.receipt_long_outlined),
-                    label: 'Orders',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.badge_outlined),
-                    label: 'Employees',
-                  ),
-                ],
-              ),
-            ),
+      ),
     );
   }
 
@@ -353,7 +370,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       context,
       MaterialPageRoute(builder: (_) => ProductEditorScreen(product: product)),
     );
-    if (result == true) refreshCommerce(ref);
+    if (mounted && result == true) refreshCommerce(ref);
   }
 
   Widget _products() {

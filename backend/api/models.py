@@ -47,6 +47,11 @@ class DeliveryAddress(models.Model):
         return f"{self.title}: {self.address_line}, {self.city} - {self.pincode}"
 
 
+class EmployeeCodeSequence(models.Model):
+    year = models.PositiveSmallIntegerField(primary_key=True)
+    last_number = models.PositiveIntegerField(default=0)
+
+
 class DeliveryPersonnel(models.Model):
     STATUS_CHOICES = (
         ('Available', 'Available'),

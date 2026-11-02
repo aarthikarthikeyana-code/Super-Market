@@ -29,6 +29,7 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
   final Map<String, TextEditingController> _fields = {};
   Map<String, dynamic>? _person;
   bool _busy = false, _active = true, _consent = false, _verified = false;
+  bool _phoneLogin = true;
   String _vehicle = 'bicycle', _idType = '', _kind = 'identity';
   final _keys = [
     'name',
@@ -62,6 +63,20 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
     _verified = _person?['documents_verified'] ?? false;
     _vehicle = _person?['vehicle_type'] ?? 'bicycle';
     _idType = _person?['id_proof_type'] ?? '';
+    _loadLoginMode();
+  }
+
+  Future<void> _loadLoginMode() async {
+    try {
+      final config = await ref.read(storeApiProvider).config();
+      if (mounted) {
+        setState(
+          () => _phoneLogin = config['delivery_login_mode'] == 'phone_demo',
+        );
+      }
+    } catch (_) {
+      // The server still validates the required credentials when saving.
+    }
   }
 
   @override
@@ -108,7 +123,9 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Employee ${person['employee_code']} saved. Share this ID and the password you set with the employee.',
+            _phoneLogin
+                ? 'Employee ${person['employee_code']} saved. Login uses this ID and the registered mobile number.'
+                : 'Employee ${person['employee_code']} saved. Share this ID and the password you set with the employee.',
           ),
         ),
       );
@@ -285,7 +302,7 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
         final v = value?.trim() ?? '';
         if (required && v.isEmpty) return 'Enter $label';
         if (secret &&
-            (v.isNotEmpty || _person?['has_login'] != true) &&
+            (v.isNotEmpty || (!_phoneLogin && _person?['has_login'] != true)) &&
             v.length < 8) {
           return 'Use at least 8 characters';
         }
@@ -376,11 +393,15 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
               'password',
               _person?['has_login'] == true
                   ? 'New password (leave blank to keep)'
+                  : _phoneLogin
+                  ? 'Password (optional in phone test mode)'
                   : 'Create employee password',
               secret: true,
             ),
-            const Text(
-              'Password resets sign out existing employee sessions.',
+            Text(
+              _phoneLogin
+                  ? 'Temporary login: employee ID + registered mobile number. Changing the phone number signs out existing employee sessions.'
+                  : 'Password resets sign out existing employee sessions.',
               style: TextStyle(fontSize: 12, color: Colors.black54),
             ),
             _heading('Residential address'),
