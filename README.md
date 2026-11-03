@@ -106,6 +106,22 @@ The customer sees their assigned contact, optional arrival estimate, cash due/re
 
 ## Verify runtime configuration
 
+The product editor suggests Tamil names for supported English grocery names and
+common Tanglish spellings, such as `Rice` / `Arisi` → `அரிசி`, `Ponni Arisi` →
+`பொன்னி அரிசி`, and `Sakkarai` → `சர்க்கரை`. Quantities such as `Arisi 1kg`
+are supported. Review suggestions before publishing; unfamiliar names still need
+manual Tamil entry. Suggestions never overwrite a manually edited Tamil name
+unless **Suggest Tamil** is tapped.
+
+If product photo uploads report missing **create/upload permission**, the
+Cloudinary key authenticates but cannot create assets. An account administrator
+must grant the backend key permission to upload/create assets in the correct
+product environment, or supply a suitable replacement key. Configure matching
+`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET` in the
+ignored local environment and Render environment, then restart/redeploy the
+backend. Retrying or changing a valid image cannot fix a provider permission
+denial. Never add API secrets to the Flutter app or tracked files.
+
 ```powershell
 .\.venv\Scripts\python.exe backend/manage.py check
 flutter analyze

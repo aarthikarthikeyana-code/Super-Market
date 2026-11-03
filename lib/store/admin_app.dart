@@ -805,7 +805,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
   String
   _autoTamil = '',
   _nameHint =
-      'Type an English grocery name for a Tamil suggestion, or enter Tamil directly.';
+      'Type an English or Tanglish grocery name (e.g. Rice or Arisi) for a Tamil suggestion.';
   bool get _namePending =>
       _suggestingName || (_nameDebounce?.isActive ?? false);
   bool get _mayFillTamil =>
@@ -1067,7 +1067,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                 style: TextStyle(color: Colors.black54, height: 1.5),
               ),
               const SizedBox(height: 20),
-              _field(_name, 'English name (optional)'),
+              _field(_name, 'English / Tanglish name (optional)'),
               _field(_tamil, 'Tamil product name', required: true),
               if (_suggestingName) const LinearProgressIndicator(minHeight: 2),
               Row(

@@ -1,10 +1,15 @@
+import logging
+
 from django.conf import settings
 from .errors import ServiceUnavailable
+
+logger = logging.getLogger(__name__)
 
 
 def upload_image(file):
     import cloudinary
     import cloudinary.uploader
+    from cloudinary.exceptions import AuthorizationRequired, NotAllowed
     from PIL import Image, UnidentifiedImageError
     from rest_framework.exceptions import ValidationError
     if file.size > 8 * 1024 * 1024:
@@ -24,7 +29,21 @@ def upload_image(file):
     try:
         return cloudinary.uploader.upload(file, folder='agaram/products', resource_type='image',
                                          unique_filename=True, overwrite=False, allowed_formats=['jpg', 'png', 'webp'])
-    except Exception:
+    except NotAllowed:
+        logger.warning('Cloudinary rejected product upload: missing asset create permission.')
+        raise ServiceUnavailable(
+            'Photo storage denied the upload. The store administrator must enable '
+            'asset create/upload permission for the backend Cloudinary API key.'
+        ) from None
+    except AuthorizationRequired:
+        logger.warning('Cloudinary rejected product upload credentials.')
+        raise ServiceUnavailable(
+            'Photo storage authentication failed. The store administrator must check '
+            'the backend Cloudinary cloud name, API key and API secret.'
+        ) from None
+    except Exception as exc:
+        # Cloudinary exception text can contain signed parameters. Do not expose it.
+        logger.warning('Cloudinary product upload failed (%s).', type(exc).__name__)
         raise ServiceUnavailable('Product photo upload failed. Please try again.') from None
 
 

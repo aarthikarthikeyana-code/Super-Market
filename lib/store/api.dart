@@ -566,17 +566,25 @@ class StoreApi {
     await finishCheckout();
   }
 
-  Future<Map<String, dynamic>> upload(List<int> bytes, String name) async =>
-      Map<String, dynamic>.from(
-        await request(
-          'POST',
-          '/admin/images/',
-          admin: true,
-          data: FormData.fromMap({
-            'image': MultipartFile.fromBytes(bytes, filename: name),
-          }),
-        ),
-      );
+  Future<Map<String, dynamic>> upload(List<int> bytes, String name) async {
+    if (bytes.isEmpty) {
+      throw StoreException('This photo is empty. Please choose another photo.');
+    }
+    if (bytes.length > 8 * 1024 * 1024) {
+      throw StoreException('Choose an image smaller than 8 MB.');
+    }
+    return Map<String, dynamic>.from(
+      await request(
+        'POST',
+        '/admin/images/',
+        admin: true,
+        data: FormData.fromMap({
+          'image': MultipartFile.fromBytes(bytes, filename: name),
+        }),
+      ),
+    );
+  }
+
   Future<void> saveProduct(Map<String, dynamic> data, {String? id}) async {
     await request(
       id == null ? 'POST' : 'PATCH',
