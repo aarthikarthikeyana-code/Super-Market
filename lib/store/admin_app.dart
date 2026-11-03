@@ -854,6 +854,36 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
             ),
           ),
         ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
+          child: Row(
+            children: [
+              for (final stage in ['Active', 'Delivered', 'Cancelled']) ...[
+                if (stage != 'Active') const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton.tonal(
+                    onPressed: () => _showOrders(stage),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _orderFilter == stage
+                          ? opsGreen
+                          : opsMint,
+                      foregroundColor: _orderFilter == stage
+                          ? Colors.white
+                          : opsGreen,
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                    ),
+                    child: Text(
+                      stage == 'Delivered'
+                          ? 'Delivered (${_stageCounts['Delivered'] ?? 0})'
+                          : stage,
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
         if (_assignmentEmployee != null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -2257,7 +2287,7 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
                       TextButton.icon(
                         onPressed: () => openDeliveryLink(
                           context,
-                          directionsTo('${_order.data['delivery_address']}'),
+                          directionsForOrder(_order),
                         ),
                         icon: const Icon(Icons.directions_outlined),
                         label: const Text('Google Maps'),
@@ -2352,6 +2382,8 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: 'Estimated arrival in minutes (optional)',
+                helperText: '30 means about 30 minutes from saving. The customer sees the estimated arrival time in Track my order.',
+                helperMaxLines: 3,
               ),
             ),
             const SizedBox(height: 14),
@@ -2360,13 +2392,15 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
               enabled: !_busy,
               maxLength: 255,
               decoration: const InputDecoration(
-                labelText: 'Customer delivery update (optional)',
+                labelText: 'Message to customer (optional)',
+                helperText: 'A delivery update shown on the customer’s order, such as a delay or arrival note.',
+                helperMaxLines: 3,
               ),
             ),
             const SizedBox(height: 14),
             OutlinedButton(
               onPressed: _busy ? null : () => _update(),
-              child: const Text('Save delivery details'),
+              child: const Text('Save arrival time & customer message'),
             ),
             const SizedBox(height: 12),
             if (['New', 'Preparing'].contains(_order.status))
@@ -2401,7 +2435,7 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
                   ),
                   subtitle: Text(
                     _order.status == 'Packed'
-                        ? 'Employee picks up from their app. Customer receives a delivery code when the trip starts.'
+                        ? 'Employee picks up from their app. Customer can find their delivery code in Track my order.'
                         : 'Employee handles navigation, cash collection and customer code verification.',
                   ),
                 ),

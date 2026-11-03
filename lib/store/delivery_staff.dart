@@ -747,6 +747,8 @@ class _EmployeeCashState extends ConsumerState<EmployeeCashScreen> {
   String _receiptKey = newUuid();
   int _revision = 0;
   bool _busy = false;
+  int _view = 0;
+  Map<String, dynamic> _ledger = {};
   String? _cashTotal;
   Future<void> _receive() async {
     if (_busy || _selected.isEmpty) return;
@@ -799,6 +801,71 @@ class _EmployeeCashState extends ConsumerState<EmployeeCashScreen> {
     }
   }
 
+  void _showDelivered(StoreOrder order) {
+    final received =
+        order.data['cash_handover'] != null ||
+        order.data['cash_received_directly'] == true;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.sizeOf(ctx).height * .65,
+          child: ListView(
+            padding: const EdgeInsets.all(18),
+            children: [
+              Text(
+                order.shortId,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '${order.data['customer_name'] ?? ''}',
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                order.paymentStatus != 'collected'
+                    ? 'No COD cash collected for this order.'
+                    : '${money(amount(order.data['cash_collected_amount']))} collected. ${received ? 'Cash is already confirmed by the store.' : 'Cash is still with this employee.'}',
+                style: const TextStyle(height: 1.7, color: storeGreen),
+              ),
+              const Divider(height: 28),
+              for (final item in order.items)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(productLabel(item)),
+                  subtitle: Text('${item['unit']} x ${item['quantity']}'),
+                  trailing: Text(money(amount(item['total_price']))),
+                ),
+              const Divider(),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Order total'),
+                trailing: Text(
+                  money(order.total),
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+              if (order.data['cash_handover'] != null)
+                SelectableText(
+                  'Handover receipt: ${order.data['cash_handover']}',
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final api = ref.watch(storeApiProvider);
@@ -808,91 +875,226 @@ class _EmployeeCashState extends ConsumerState<EmployeeCashScreen> {
       canPop: !_busy,
       child: Scaffold(
         appBar: AppBar(title: Text('${widget.person['name']} | cash')),
-        body: PagedFeed<Map<String, dynamic>>(
-          queryKey: (widget.person['id'], api.adminToken, _revision),
-          changes: api.feedChanges,
-          load: (cursor) => api.cashDuePage(widget.person['id'], cursor),
-          identity: (o) => '${o['order_id']}',
-          onMetadata: (data) {
-            if (mounted) {
-              setState(() => _cashTotal = '${data['cash_to_handover']}');
-            }
-          },
-          header: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _cashTotal == null
-                      ? 'Cash handover'
-                      : 'Cash to receive: ${money(amount(_cashTotal))}',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: storeGreen,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Select delivered orders covered by the physical cash handover. You can select up to 200 orders across pages.',
-                  style: TextStyle(height: 1.5),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  '${_selected.length} selected | ${money(total)}',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: _busy || _selected.isEmpty ? null : _receive,
-                  child: Text(
-                    _busy ? 'Recording receipt...' : 'Receive selected cash',
-                  ),
-                ),
-                TextButton.icon(
-                  onPressed: _busy
-                      ? null
-                      : () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => CashReceiptHistoryScreen(
-                              employeeId: widget.person['id'],
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Employee cash account',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          for (final entry in <(String, String)>[
+                            ('With employee', 'cash_to_handover'),
+                            ('Received by store', 'cash_received_by_store'),
+                            ('Total collected', 'cash_collected'),
+                          ])
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 7),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        _ledger[entry.$2] == null
+                                            ? (entry.$2 == 'cash_to_handover' &&
+                                                      _cashTotal != null
+                                                  ? money(amount(_cashTotal))
+                                                  : 'Loading')
+                                            : money(amount(_ledger[entry.$2])),
+                                        style: const TextStyle(
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.w900,
+                                          color: storeGreen,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Text(
+                                      entry.$1,
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.black54,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      if (_ledger['pending_orders'] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Text(
+                            '${_ledger['pending_orders']} delivered orders awaiting handover',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.black54,
                             ),
                           ),
                         ),
-                  icon: const Icon(Icons.receipt_long_outlined),
-                  label: const Text('View all handover receipts'),
+                    ],
+                  ),
                 ),
-              ],
+              ),
             ),
-          ),
-          emptyTitle: 'No cash handover is outstanding',
-          emptyMessage:
-              'Confirmed receipts are available in cash handover history.',
-          itemBuilder: (_, order, _) => CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            value: _selected.containsKey(order['order_id']),
-            onChanged:
-                _busy ||
-                    (_selected.length >= 200 &&
-                        !_selected.containsKey(order['order_id']))
-                ? null
-                : (selected) => setState(() {
-                    if (selected == true) {
-                      _selected[order['order_id']] =
-                          (amount(order['amount']) * 100).round();
-                    } else {
-                      _selected.remove(order['order_id']);
-                    }
-                    _receiptKey = newUuid();
-                  }),
-            title: Text('${order['order_id']}'),
-            subtitle: Text(money(amount(order['amount']))),
-          ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: Row(
+                children: [
+                  for (var i = 0; i < 3; i++) ...[
+                    if (i > 0) const SizedBox(width: 6),
+                    Expanded(
+                      child: ChoiceChip(
+                        label: Text(
+                          ['To receive', 'Delivered', 'Receipts'][i],
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        selected: _view == i,
+                        onSelected: _busy
+                            ? null
+                            : (_) => setState(() => _view = i),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Expanded(
+              child: _view == 2
+                  ? CashReceiptList(employeeId: widget.person['id'] as int)
+                  : _view == 1
+                  ? PagedFeed<StoreOrder>(
+                      queryKey: (
+                        'employeeDelivered',
+                        widget.person['id'],
+                        api.adminToken,
+                        _revision,
+                      ),
+                      changes: api.feedChanges,
+                      load: (cursor) => api.orderPage(
+                        cursor: cursor,
+                        admin: true,
+                        status: 'Delivered',
+                        assigned: '${widget.person['id']}',
+                      ),
+                      identity: (order) => order.id,
+                      emptyTitle: 'No delivered orders yet',
+                      emptyMessage: 'Delivered orders assigned to this employee will appear here.',
+                      itemBuilder: (_, order, _) => OrderSummaryCard(
+                        order: order,
+                        onTap: () => _showDelivered(order),
+                      ),
+                    )
+                  : PagedFeed<Map<String, dynamic>>(
+                      queryKey: (
+                        'cashDue',
+                        widget.person['id'],
+                        api.adminToken,
+                        _revision,
+                      ),
+                      changes: api.feedChanges,
+                      load: (cursor) =>
+                          api.cashDuePage(widget.person['id'], cursor),
+                      identity: (o) => '${o['order_id']}',
+                      onMetadata: (data) {
+                        if (mounted) {
+                          setState(() {
+                            _cashTotal = '${data['cash_to_handover']}';
+                            _ledger = data;
+                          });
+                        }
+                      },
+                      header: Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Count physical cash, select the delivered orders it covers, then confirm receipt. Already received cash is excluded.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.6,
+                                color: Colors.black54,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              '${_selected.length} selected | ${money(total)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton(
+                                onPressed: _busy || _selected.isEmpty
+                                    ? null
+                                    : _receive,
+                                child: Text(
+                                  _busy
+                                      ? 'Recording receipt...'
+                                      : 'Receive selected cash',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      emptyTitle: 'No cash handover is outstanding',
+                      emptyMessage: 'Open Delivered to review orders or Receipts to check cash already received.',
+                      itemBuilder: (_, order, _) => Card(
+                        child: CheckboxListTile(
+                          controlAffinity: ListTileControlAffinity.leading,
+                          value: _selected.containsKey(order['order_id']),
+                          onChanged:
+                              _busy ||
+                                  (_selected.length >= 200 &&
+                                      !_selected.containsKey(order['order_id']))
+                              ? null
+                              : (selected) => setState(() {
+                                  if (selected == true) {
+                                    _selected[order['order_id']] =
+                                        (amount(order['amount']) * 100).round();
+                                  } else {
+                                    _selected.remove(order['order_id']);
+                                  }
+                                  _receiptKey = newUuid();
+                                }),
+                          title: Text(
+                            '${order['customer_name'] ?? ''}',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          subtitle: Text(
+                            '${order['order_id']}\n${List<Map<String, dynamic>>.from(order['items'] ?? []).map((item) => '${productLabel(item)} x ${item['quantity']}').join(', ')}',
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          secondary: Text(
+                            money(amount(order['amount'])),
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+          ],
         ),
       ),
     );

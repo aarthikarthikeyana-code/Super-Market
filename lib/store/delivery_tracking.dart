@@ -31,6 +31,17 @@ Uri directionsTo(String address) => Uri.https('www.google.com', '/maps/dir/', {
   'travelmode': 'driving',
 });
 
+Uri directionsForOrder(StoreOrder order) {
+  final address = order.data['address_details'] as Map?;
+  final lat = double.tryParse('${address?['latitude']}'),
+      lng = double.tryParse('${address?['longitude']}');
+  return directionsTo(
+    lat != null && lng != null && lat.abs() <= 90 && lng.abs() <= 180
+        ? '$lat,$lng'
+        : '${order.data['delivery_address']}',
+  );
+}
+
 final deliveryTrackerProvider = Provider<DeliveryTracker>((ref) {
   final tracker = DeliveryTracker(ref.read(storeApiProvider));
   ref.onDispose(tracker.dispose);
@@ -295,6 +306,17 @@ class _DeliveryTrackingCardState extends ConsumerState<DeliveryTrackingCard> {
         )
         .toList();
     final stale = _data?['stale'] != false || _error != null;
+    final destination = _data?['destination'] as Map?;
+    final latitude = double.tryParse('${destination?['latitude']}'),
+        longitude = double.tryParse('${destination?['longitude']}');
+    final home =
+        latitude != null &&
+            longitude != null &&
+            latitude.abs() <= 90 &&
+            longitude.abs() <= 180
+        ? LatLng(latitude, longitude)
+        : null;
+    final mapPoints = [...locations, ?home];
     final last = points.isEmpty ? null : points.last;
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -321,19 +343,19 @@ class _DeliveryTrackingCardState extends ConsumerState<DeliveryTrackingCard> {
               icon: const Icon(Icons.refresh),
             ),
           ),
-          if (locations.isNotEmpty) ...[
+          if (mapPoints.isNotEmpty) ...[
             SizedBox(
               height: 220,
               child: FlutterMap(
                 key: ValueKey(
-                  '${widget.orderId}:${locations.first}:${locations.last}',
+                  '${widget.orderId}:${mapPoints.first}:${mapPoints.last}',
                 ),
                 options: MapOptions(
-                  initialCenter: locations.last,
+                  initialCenter: locations.isNotEmpty ? locations.last : home!,
                   initialZoom: 14,
-                  initialCameraFit: locations.length > 1
+                  initialCameraFit: mapPoints.length > 1
                       ? CameraFit.bounds(
-                          bounds: LatLngBounds.fromPoints(locations),
+                          bounds: LatLngBounds.fromPoints(mapPoints),
                           padding: const EdgeInsets.all(35),
                           maxZoom: 16,
                         )
@@ -359,28 +381,41 @@ class _DeliveryTrackingCardState extends ConsumerState<DeliveryTrackingCard> {
                   ),
                   MarkerLayer(
                     markers: [
-                      Marker(
-                        point: locations.first,
-                        width: 32,
-                        height: 32,
-                        child: const Icon(
-                          Icons.flag_circle,
-                          color: storeGreen,
-                          size: 30,
-                        ),
-                      ),
-                      Marker(
-                        point: locations.last,
-                        width: 42,
-                        height: 42,
-                        child: const CircleAvatar(
-                          backgroundColor: storeGreen,
-                          child: Icon(
-                            Icons.delivery_dining,
-                            color: Colors.white,
+                      if (locations.isNotEmpty)
+                        Marker(
+                          point: locations.first,
+                          width: 32,
+                          height: 32,
+                          child: const Icon(
+                            Icons.flag_circle,
+                            color: storeGreen,
+                            size: 30,
                           ),
                         ),
-                      ),
+                      if (locations.isNotEmpty)
+                        Marker(
+                          point: locations.last,
+                          width: 42,
+                          height: 42,
+                          child: const CircleAvatar(
+                            backgroundColor: storeGreen,
+                            child: Icon(
+                              Icons.delivery_dining,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      if (home != null)
+                        Marker(
+                          point: home,
+                          width: 38,
+                          height: 38,
+                          child: const Icon(
+                            Icons.home_pin,
+                            color: Color(0xFFD94A4A),
+                            size: 36,
+                          ),
+                        ),
                     ],
                   ),
                   RichAttributionWidget(
@@ -397,24 +432,29 @@ class _DeliveryTrackingCardState extends ConsumerState<DeliveryTrackingCard> {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Text(
-                'Recorded GPS fixes · accuracy ±${(last?['accuracy'] as num?)?.round() ?? '?'} m. The line connects recorded fixes.',
-                style: const TextStyle(fontSize: 12, color: Colors.black54),
+            if (last != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Text(
+                  'Recorded GPS fixes · accuracy ±${(last?['accuracy'] as num?)?.round() ?? '?'} m. The line connects recorded fixes.',
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                ),
               ),
-            ),
             TextButton.icon(
               onPressed: () => openDeliveryLink(
                 context,
                 Uri.https('www.google.com', '/maps/search/', {
                   'api': '1',
                   'query':
-                      '${locations.last.latitude},${locations.last.longitude}',
+                      '${mapPoints.last.latitude},${mapPoints.last.longitude}',
                 }),
               ),
               icon: const Icon(Icons.map_outlined),
-              label: const Text('View location in Google Maps'),
+              label: Text(
+                home != null
+                    ? 'View delivery pin in Google Maps'
+                    : 'View employee location in Google Maps',
+              ),
             ),
           ],
         ],

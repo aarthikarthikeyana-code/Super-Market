@@ -101,7 +101,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ['order_id', 'customer_name', 'customer_phone', 'delivery_address', 'delivery_instructions',
+        fields = ['order_id', 'customer_name', 'customer_phone', 'delivery_address', 'address_details', 'delivery_instructions',
                   'subtotal', 'delivery_charge', 'total_amount', 'payment_method', 'payment_status', 'status',
                   'assigned_to', 'assigned_to_details', 'estimated_delivery_at', 'delivery_note',
                   'created_at', 'updated_at', 'packed_at', 'dispatched_at', 'delivered_at', 'items', 'events',
@@ -114,15 +114,61 @@ class CheckoutItemSerializer(serializers.Serializer):
     quantity = serializers.IntegerField(min_value=1, max_value=100)
 
 
+class StructuredAddressSerializer(serializers.Serializer):
+    address_line1 = serializers.CharField(min_length=3, max_length=200)
+    address_line2 = serializers.CharField(required=False, allow_blank=True, default='', max_length=200)
+    pincode = serializers.RegexField(r'^[1-9][0-9]{5}$')
+    city = serializers.CharField(min_length=2, max_length=80)
+    state = serializers.CharField(min_length=2, max_length=80)
+    landmark = serializers.CharField(min_length=2, max_length=160)
+    latitude = serializers.DecimalField(max_digits=9, decimal_places=6, min_value=-90, max_value=90, required=False, allow_null=True)
+    longitude = serializers.DecimalField(max_digits=10, decimal_places=6, min_value=-180, max_value=180, required=False, allow_null=True)
+    location_accuracy = serializers.FloatField(min_value=0, max_value=1000, required=False, allow_null=True)
+    location_source = serializers.ChoiceField(choices=['gps', 'map'], required=False)
+
+    def validate(self, attrs):
+        import math
+        required = ['address_line1', 'pincode', 'city', 'state', 'landmark']
+        missing = {key: 'This address field is required.' for key in required if not attrs.get(key)}
+        if missing:
+            raise ValidationError(missing)
+        lat, lng = attrs.get('latitude'), attrs.get('longitude')
+        if (lat is None) != (lng is None):
+            raise ValidationError('Provide both coordinates for the delivery pin.')
+        accuracy = attrs.get('location_accuracy')
+        if accuracy is not None and not math.isfinite(accuracy):
+            raise ValidationError({'location_accuracy': 'Use a finite accuracy value.'})
+        if lat is not None:
+            attrs['latitude'], attrs['longitude'] = str(lat), str(lng)
+        else:
+            for key in ['latitude', 'longitude', 'location_accuracy', 'location_source']:
+                attrs.pop(key, None)
+        return attrs
+
+    def to_representation(self, instance):
+        return super().to_representation(instance) if instance else {}
+
+
+def address_text(details):
+    return ', '.join(filter(None, [details['address_line1'], details.get('address_line2'),
+                                  'Landmark: ' + details['landmark'], details['city'], details['state'], details['pincode']]))
+
+
 class CheckoutSerializer(serializers.Serializer):
     idempotency_key = serializers.UUIDField()
     expected_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, min_value=Decimal('0.01'))
     customer_name = serializers.CharField(min_length=2, max_length=100)
     customer_phone = serializers.RegexField(r'^\+?[0-9]{10,15}$', max_length=16)
     delivery_address = serializers.CharField(min_length=12, max_length=1000)
+    address_details = StructuredAddressSerializer(required=False)
     delivery_instructions = serializers.CharField(max_length=500, required=False, allow_blank=True, default='')
     payment_method = serializers.ChoiceField(choices=['cod'], default='cod')
     items = CheckoutItemSerializer(many=True, allow_empty=False, max_length=100)
+
+    def validate(self, attrs):
+        if attrs.get('address_details'):
+            attrs['delivery_address'] = address_text(attrs['address_details'])
+        return attrs
 
     def validate_items(self, items):
         ids = [item['product_id'] for item in items]
@@ -151,10 +197,18 @@ class CustomerPhoneSerializer(serializers.Serializer):
 
 
 class CustomerProfileSerializer(serializers.ModelSerializer):
+    address_details = StructuredAddressSerializer(required=False)
     class Meta:
         model = CustomerProfile
-        fields = ['phone', 'name', 'address', 'delivery_instructions']
+        fields = ['phone', 'name', 'address', 'address_details', 'delivery_instructions']
         read_only_fields = ['phone']
+
+    def validate(self, attrs):
+        if attrs.get('address_details'):
+            attrs['address'] = address_text(attrs['address_details'])
+        elif 'address' in attrs and self.instance and attrs['address'] != self.instance.address:
+            attrs['address_details'] = {}
+        return attrs
 
     def validate_address(self, value):
         value = value.strip()
@@ -310,9 +364,10 @@ class CashReceiptSerializer(serializers.ModelSerializer):
 class CashDueSerializer(serializers.ModelSerializer):
     amount = serializers.DecimalField(source='cash_collected_amount', max_digits=10, decimal_places=2, read_only=True)
     collected_at = serializers.DateTimeField(source='cash_collected_at', read_only=True)
+    items = OrderItemSerializer(many=True, read_only=True)
     class Meta:
         model = Order
-        fields = ['order_id', 'amount', 'collected_at']
+        fields = ['order_id', 'customer_name', 'delivered_at', 'items', 'amount', 'collected_at']
 
 
 class CashHandoverSerializer(serializers.Serializer):

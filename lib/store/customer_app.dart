@@ -1859,8 +1859,8 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
   final _form = GlobalKey<FormState>();
   final _name = TextEditingController(),
       _phone = TextEditingController(),
-      _address = TextEditingController(),
       _notes = TextEditingController();
+  final _deliveryAddress = DeliveryAddressData();
   bool _busy = false;
   @override
   void initState() {
@@ -1880,7 +1880,7 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
       if (!mounted) return;
       if (_name.text.isEmpty) _name.text = profile['name'] ?? '';
       _phone.text = profile['phone'] ?? '';
-      if (_address.text.isEmpty) _address.text = profile['address'] ?? '';
+      _deliveryAddress.restore(profile);
       if (_notes.text.isEmpty) {
         _notes.text = profile['delivery_instructions'] ?? '';
       }
@@ -1895,7 +1895,7 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
   void dispose() {
     _name.dispose();
     _phone.dispose();
-    _address.dispose();
+    _deliveryAddress.dispose();
     _notes.dispose();
     super.dispose();
   }
@@ -1914,7 +1914,8 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
     try {
       await api.saveCustomerProfile({
         'name': _name.text.trim(),
-        'address': _address.text.trim(),
+        'address': _deliveryAddress.formatted,
+        'address_details': _deliveryAddress.value,
         'delivery_instructions': _notes.text.trim(),
       });
       if (!mounted) return;
@@ -1923,7 +1924,8 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
       final response = await api.checkout({
         'customer_name': _name.text.trim(),
         'customer_phone': _phone.text.trim(),
-        'delivery_address': _address.text.trim(),
+        'delivery_address': _deliveryAddress.formatted,
+        'address_details': _deliveryAddress.value,
         'delivery_instructions': _notes.text.trim(),
         'payment_method': 'cod',
         'expected_total':
@@ -1994,12 +1996,12 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
                     ),
                   ],
                   const Text(
-                    'Where should we deliver?',
-                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
+                    'Delivery address',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Your store will prepare your order and assign a delivery person. Track every update in My orders.',
+                    'Confirm your address and delivery pin before placing the order.',
                     style: TextStyle(color: Colors.black54, height: 1.5),
                   ),
                   const SizedBox(height: 24),
@@ -2026,25 +2028,18 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
                         : null,
                   ),
                   const SizedBox(height: 14),
-                  TextFormField(
-                    controller: _address,
-                    enabled: !_busy,
-                    minLines: 3,
-                    maxLines: 5,
-                    decoration: const InputDecoration(
-                      labelText: 'Full address, landmark and pincode',
-                    ),
-                    validator: (s) => (s?.trim().length ?? 0) < 12
-                        ? 'Enter your complete delivery address'
-                        : null,
+                  StructuredAddressFields(
+                    address: _deliveryAddress,
+                    enabled: !_busy && !_loadingProfile,
                   ),
-                  const SizedBox(height: 14),
                   TextFormField(
                     controller: _notes,
                     enabled: !_busy,
                     maxLength: 500,
                     decoration: const InputDecoration(
-                      labelText: 'Delivery instructions (optional)',
+                      labelText: 'Note for delivery employee (optional)',
+                      helperText: 'Gate access, floor, or a request to call on arrival. Leave blank if not needed.',
+                      helperMaxLines: 3,
                     ),
                   ),
                   const SizedBox(height: 18),
@@ -2299,14 +2294,33 @@ class _TrackingState extends ConsumerState<OrderTrackingScreen> {
     }
   }
 
+  Future<void> _refreshCode() async {
+    if (_paying) return;
+    setState(() => _paying = true);
+    try {
+      await ref.read(storeApiProvider).refreshDeliveryCode(widget.orderId);
+    } catch (e) {
+      if (mounted) showStoreError(context, e);
+    } finally {
+      if (mounted) {
+        setState(() => _paying = false);
+        _reload();
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Theme(
     data: storeTheme(),
     child: Scaffold(
       appBar: AppBar(
-        title: const Text('Track your order'),
+        title: const Text('Track my order'),
         actions: [
-          IconButton(onPressed: _reload, icon: const Icon(Icons.refresh)),
+          IconButton(
+            onPressed: _reload,
+            tooltip: 'Refresh order',
+            icon: const Icon(Icons.refresh),
+          ),
         ],
       ),
       body: FutureBuilder<Map<String, dynamic>>(
@@ -2329,211 +2343,392 @@ class _TrackingState extends ConsumerState<OrderTrackingScreen> {
           final order = StoreOrder(
             Map<String, dynamic>.from(snapshot.data!['order']),
           );
+          final confirmation = Map<String, dynamic>.from(
+            snapshot.data!['delivery_confirmation'] ?? {},
+          );
           final person = order.data['assigned_to_details'] as Map?;
           final eta = DateTime.tryParse(
             '${order.data['estimated_delivery_at']}',
           )?.toLocal();
+          final closed = ['Delivered', 'Cancelled'].contains(order.status);
+          final headline =
+              <String, String>{
+                'New': 'Your order is placed',
+                'Preparing': 'We are preparing your groceries',
+                'Packed': 'Your groceries are packed',
+                'Out for Delivery': 'Your delivery is on the way',
+                'Delivery Attempted': 'We need to arrange another attempt',
+                'Delivered': 'Your groceries are delivered',
+                'Cancelled': 'This order was cancelled',
+              }[order.status] ??
+              order.status;
+          final message =
+              <String, String>{
+                'New':
+                    'The store will accept your order and start preparing it.',
+                'Preparing': 'Your items are being checked and packed.',
+                'Packed': person == null
+                    ? 'The store is assigning a delivery employee.'
+                    : 'Your employee will pick up the packed items.',
+                'Out for Delivery': 'Keep your phone available. Share your delivery code only after receiving your items.',
+                'Delivery Attempted':
+                    '${order.data['delivery_note'] ?? 'The store will contact you about the next attempt.'}',
+                'Delivered':
+                    'Thank you. Your delivery and payment record are below.',
+                'Cancelled':
+                    '${order.data['cancellation_reason'] ?? 'Contact the store if you need help.'}',
+              }[order.status] ??
+              'Pull down for the latest update.';
           return RefreshIndicator(
             onRefresh: () async {
               _reload();
               await _future;
             },
             child: ListView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(18),
               children: [
-                Text(
-                  order.id,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 20,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                Row(
                   children: [
+                    Expanded(
+                      child: Text(
+                        order.shortId,
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                     StatusChip(order.status),
-                    StatusChip(order.paymentStatus),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
+                Text(
+                  headline,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    color: Colors.black54,
+                    fontSize: 14,
+                    height: 1.6,
+                  ),
+                ),
+                const SizedBox(height: 16),
                 OrderJourney(order: order),
-                const SizedBox(height: 16),
-                CodPaymentCard(order: order),
-                const SizedBox(height: 16),
-                if (order.status == 'Out for Delivery') ...[
+                const SizedBox(height: 14),
+                if (!closed)
                   Card(
-                    color: const Color(0xFFE6F1E9),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(14),
+                      leading: const Icon(Icons.schedule, color: storeGreen),
+                      title: Text(
+                        eta == null
+                            ? 'Arrival time not set yet'
+                            : eta.isBefore(DateTime.now())
+                            ? 'Your delivery is taking longer'
+                            : 'Expected arrival',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      subtitle: Text(
+                        eta == null
+                            ? 'Your store will update the estimated time here.'
+                            : '${eta.day}/${eta.month}, ${eta.hour.toString().padLeft(2, '0')}:${eta.minute.toString().padLeft(2, '0')}${eta.isBefore(DateTime.now()) ? ' was the last estimate. Check the latest update below.' : ' (estimated)'}',
+                        style: const TextStyle(height: 1.6),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 14),
+                if (!closed)
+                  Card(
+                    color: const Color(0xFFEAF7F0),
                     child: Padding(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Your delivery confirmation code',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                            ),
+                          const Row(
+                            children: [
+                              Icon(
+                                Icons.verified_user_outlined,
+                                color: storeGreen,
+                              ),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Your delivery code',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 10),
-                          if (snapshot
-                                  .data!['delivery_confirmation']?['code'] !=
-                              null)
-                            Text(
-                              '${snapshot.data!['delivery_confirmation']['code']}',
+                          const SizedBox(height: 12),
+                          if (confirmation['code'] != null)
+                            SelectableText(
+                              '${confirmation['code']}',
                               style: const TextStyle(
-                                fontSize: 38,
-                                letterSpacing: 10,
+                                fontSize: 36,
                                 fontWeight: FontWeight.w900,
+                                letterSpacing: 8,
                                 color: storeGreen,
                               ),
                             )
                           else
                             FilledButton(
-                              onPressed: _paying
-                                  ? null
-                                  : () async {
-                                      setState(() => _paying = true);
-                                      try {
-                                        await ref
-                                            .read(storeApiProvider)
-                                            .refreshDeliveryCode(order.id);
-                                      } catch (e) {
-                                        if (context.mounted) {
-                                          showStoreError(context, e);
-                                        }
-                                      } finally {
-                                        if (mounted) {
-                                          setState(() => _paying = false);
-                                          _reload();
-                                        }
-                                      }
-                                    },
-                              child: const Text('Get a fresh delivery code'),
+                              onPressed: _paying ? null : _refreshCode,
+                              child: const Text('Get delivery code'),
                             ),
                           const SizedBox(height: 10),
                           Text(
-                            '${order.paymentStatus == 'cod' ? 'Receive all items and pay ${money(order.total)} in cash before sharing this code.' : 'This order is already paid. Share this code after receiving all items.'} Your employee cannot view this code in their app.',
-                            style: const TextStyle(height: 1.6),
+                            order.paymentStatus == 'cod'
+                                ? 'Receive your groceries and pay ${money(order.total)} in cash. Then tell this code to the delivery employee.'
+                                : 'Tell this code to the employee after receiving all items. This order is already paid.',
+                            style: const TextStyle(fontSize: 13, height: 1.6),
                           ),
-                          if (snapshot
-                                  .data!['delivery_confirmation']?['expires_at'] !=
-                              null)
-                            Text(
-                              'Valid until ${DateTime.tryParse('${snapshot.data!['delivery_confirmation']['expires_at']}')?.toLocal().toString().split('.').first ?? ''}',
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Keep it private until the handover. Your employee cannot see it in their app.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.black54,
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 14),
+                Card(
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(14),
+                    leading: const Icon(
+                      Icons.payments_outlined,
+                      color: storeGreen,
+                    ),
+                    title: Text(
+                      order.status == 'Cancelled'
+                          ? 'No payment due'
+                          : order.paymentStatus == 'collected'
+                          ? 'Cash paid to your delivery employee'
+                          : order.paymentStatus == 'cod'
+                          ? 'Cash to pay at delivery'
+                          : 'Payment recorded',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    trailing: Text(
+                      order.status == 'Cancelled'
+                          ? money(0)
+                          : money(order.total),
+                      style: const TextStyle(
+                        fontSize: 21,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (person != null && order.status != 'Cancelled')
+                  Card(
+                    child: ListTile(
+                      leading: const CircleAvatar(
+                        backgroundColor: Color(0xFFEAF7F0),
+                        child: Icon(Icons.delivery_dining, color: storeGreen),
+                      ),
+                      title: Text(
+                        '${person['name']}',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      subtitle: const Text('Your assigned delivery employee'),
+                      trailing: IconButton(
+                        tooltip: 'Call delivery employee',
+                        onPressed: () => openDeliveryLink(
+                          context,
+                          Uri(scheme: 'tel', path: '${person['phone']}'),
+                        ),
+                        icon: const Icon(
+                          Icons.call_outlined,
+                          color: storeGreen,
+                        ),
+                      ),
+                    ),
+                  ),
+                if (order.status == 'Out for Delivery') ...[
+                  const SizedBox(height: 14),
+                  DeliveryTrackingCard(orderId: order.id),
+                ],
+                if ('${order.data['delivery_note'] ?? ''}'.trim().isNotEmpty &&
+                    order.status != 'Delivery Attempted')
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Card(
+                      child: ListTile(
+                        leading: const Icon(
+                          Icons.chat_bubble_outline,
+                          color: storeGreen,
+                        ),
+                        title: const Text('Update from your store'),
+                        subtitle: Text(
+                          '${order.data['delivery_note']}',
+                          style: const TextStyle(height: 1.6),
+                        ),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 14),
+                Card(
+                  child: ExpansionTile(
+                    title: const Text(
+                      'Delivery address',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                    leading: const Icon(
+                      Icons.location_on_outlined,
+                      color: storeGreen,
+                    ),
+                    childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: SelectableText(
+                          '${order.data['customer_name']}\n${order.data['delivery_address']}',
+                          style: const TextStyle(height: 1.7),
+                        ),
+                      ),
+                      if ('${order.data['delivery_instructions'] ?? ''}'
+                          .isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Your note: ${order.data['delivery_instructions']}',
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: Colors.black54,
                               ),
                             ),
-                        ],
+                          ),
+                        ),
+                      TextButton.icon(
+                        onPressed: () => openDeliveryLink(
+                          context,
+                          directionsForOrder(order),
+                        ),
+                        icon: const Icon(Icons.map_outlined),
+                        label: const Text('View delivery location'),
                       ),
-                    ),
+                    ],
                   ),
-                  DeliveryTrackingCard(orderId: order.id),
-                  const SizedBox(height: 16),
-                ],
-                if (order.canCancel)
-                  OutlinedButton.icon(
-                    onPressed: _paying ? null : _cancelCheckout,
-                    icon: const Icon(Icons.close),
-                    label: const Text('Cancel order before preparation'),
-                  ),
-                if (order.status == 'Delivery Attempted')
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Text(
-                      'Your delivery needs attention. Your store will contact you to arrange another attempt.',
-                    ),
-                  ),
-                if (order.status == 'Cancelled')
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Text(
-                      'Reason: ${order.data['cancellation_reason'] ?? 'Order cancelled'}',
-                    ),
-                  ),
-                if (person != null)
-                  Card(
-                    child: ListTile(
-                      leading: const Icon(
-                        Icons.delivery_dining,
-                        color: storeGreen,
-                      ),
-                      title: Text('${person['name']}'),
-                      subtitle: Text('Delivery contact: ${person['phone']}'),
-                    ),
-                  ),
-                if (eta != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Text(
-                      'Estimated arrival: ${eta.day}/${eta.month}, ${eta.hour.toString().padLeft(2, '0')}:${eta.minute.toString().padLeft(2, '0')}',
-                    ),
-                  ),
-                if ('${order.data['delivery_note'] ?? ''}'.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Text(
-                      order.data['delivery_note'],
-                      style: const TextStyle(color: storeGreen),
-                    ),
-                  ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Delivery progress',
-                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 12),
-                for (final event in order.events)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
+                Card(
+                  child: ExpansionTile(
+                    title: Text(
+                      'Items & bill (${order.items.length})',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
                     leading: const Icon(
-                      Icons.check_circle_outline,
+                      Icons.shopping_bag_outlined,
                       color: storeGreen,
                     ),
-                    title: Text('${event['status']}'),
-                    subtitle: Text(
-                      '${event['note']}\n${DateTime.tryParse('${event['created_at']}')?.toLocal().toString().split('.').first ?? ''}',
+                    childrenPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    children: [
+                      for (final item in order.items)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            productLabel(item),
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          subtitle: Text(
+                            '${item['unit']} x ${item['quantity']}',
+                          ),
+                          trailing: Text(money(amount(item['total_price']))),
+                        ),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Delivery charge'),
+                        trailing: Text(
+                          money(amount(order.data['delivery_charge'])),
+                        ),
+                      ),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text(
+                          'Order total',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        trailing: Text(
+                          money(order.total),
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Card(
+                  child: ExpansionTile(
+                    title: const Text(
+                      'Order updates',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                    leading: const Icon(Icons.history, color: storeGreen),
+                    children: [
+                      for (final event in order.events)
+                        ListTile(
+                          leading: const Icon(
+                            Icons.check_circle_outline,
+                            size: 18,
+                            color: storeGreen,
+                          ),
+                          title: Text(
+                            '${event['status']}',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          subtitle: Text(
+                            '${event['note']}\n${DateTime.tryParse('${event['created_at']}')?.toLocal().toString().split('.').first ?? ''}',
+                            style: const TextStyle(fontSize: 12, height: 1.5),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (order.canCancel)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 14),
+                    child: OutlinedButton.icon(
+                      onPressed: _paying ? null : _cancelCheckout,
+                      icon: const Icon(Icons.cancel_outlined),
+                      label: const Text('Cancel before preparation'),
                     ),
                   ),
-                const Divider(height: 32),
-                const Text(
-                  'Order details',
-                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
-                ),
-                for (final item in order.items)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(productLabel(item)),
-                    subtitle: Text(
-                      '${item['unit']} \u00d7 ${item['quantity']}',
-                    ),
-                    trailing: Text(money(amount(item['total_price']))),
-                  ),
-                const Divider(),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Total'),
-                  trailing: Text(
-                    money(order.total),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 22,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  '${order.data['customer_name']}\n${order.data['customer_phone']}\n${order.data['delivery_address']}',
-                  style: const TextStyle(height: 1.6),
-                ),
                 const SizedBox(height: 20),
                 const Text(
-                  'Status updates refresh automatically every 15 seconds.',
-                  style: TextStyle(color: Colors.black54, fontSize: 12),
+                  'Updates refresh every 15 seconds.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, color: Colors.black54),
                 ),
               ],
             ),

@@ -676,7 +676,7 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
                       TextButton.icon(
                         onPressed: () => openDeliveryLink(
                           context,
-                          directionsTo('${_order.data['delivery_address']}'),
+                          directionsForOrder(_order),
                         ),
                         icon: const Icon(Icons.navigation_outlined),
                         label: const Text('Navigate with Google Maps'),

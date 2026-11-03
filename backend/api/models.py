@@ -131,6 +131,7 @@ class Order(models.Model):
     customer_name = models.CharField(max_length=100, default='')
     customer_phone = models.CharField(max_length=30, default='')
     delivery_address = models.TextField(default='')
+    address_details = models.JSONField(default=dict, blank=True)
     delivery_date = models.CharField(max_length=50, default='', blank=True)
     time_slot = models.CharField(max_length=50, default='', blank=True)
     delivery_instructions = models.TextField(blank=True, default='')
@@ -248,6 +249,7 @@ class CustomerProfile(models.Model):
     wishlist = models.ManyToManyField(Product, blank=True, related_name='saved_by_customers')
     name = models.CharField(max_length=100, blank=True)
     address = models.TextField(blank=True)
+    address_details = models.JSONField(default=dict, blank=True)
     delivery_instructions = models.CharField(max_length=500, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 

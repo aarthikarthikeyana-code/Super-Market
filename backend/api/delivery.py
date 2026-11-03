@@ -18,7 +18,7 @@ class InvalidDeliveryCode(ValidationError):
 
 def issue_code(order):
     order.delivery_code_nonce = uuid.uuid4()
-    order.delivery_code_expires_at = timezone.now() + timedelta(hours=2)
+    order.delivery_code_expires_at = timezone.now() + timedelta(hours=24)
     order.delivery_code_attempts = 0
     order.delivery_code_verified_at = None
 
@@ -29,16 +29,18 @@ def code_value(order):
 
 
 def customer_confirmation(order):
-    active = (order.status == 'Out for Delivery' and order.delivery_code_nonce
+    active = (order.status in ['New', 'Preparing', 'Packed', 'Out for Delivery', 'Delivery Attempted'] and order.delivery_code_nonce
               and order.delivery_code_expires_at and order.delivery_code_expires_at > timezone.now()
               and order.delivery_code_attempts < 5 and not order.delivery_code_verified_at)
     return {'code': code_value(order) if active else None,
             'expires_at': order.delivery_code_expires_at if active else None,
-            'can_refresh': order.status == 'Out for Delivery' and not active,
+            'can_refresh': order.status in ['New', 'Preparing', 'Packed', 'Out for Delivery', 'Delivery Attempted'] and not active,
             'message': 'Share only after receiving your groceries and paying the cash due.'}
 
 
 def verify_code(order, supplied):
+    if order.status != 'Out for Delivery':
+        raise ValidationError({'delivery_code': 'Start the assigned delivery before verifying the customer code.'})
     if not customer_confirmation(order)['code']:
         raise ValidationError({'delivery_code': 'Ask the customer to refresh their delivery code in their order screen.'})
     if not isinstance(supplied, str) or not secrets.compare_digest(code_value(order), supplied.strip()):
@@ -101,6 +103,7 @@ def tracking_payload(order, *, customer=False):
         recent.insert(0, first)
     last = recent[-1] if recent else None
     return {'active': order.status == 'Out for Delivery',
+            'destination': {key: order.address_details[key] for key in ['latitude', 'longitude'] if key in order.address_details},
             'stale': not last or (timezone.now() - last.captured_at).total_seconds() > 90,
             'points': [{'latitude': str(p.latitude), 'longitude': str(p.longitude),
                         'accuracy': p.accuracy, 'captured_at': p.captured_at} for p in recent]}

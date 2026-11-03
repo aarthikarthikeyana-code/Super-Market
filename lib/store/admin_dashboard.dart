@@ -562,6 +562,49 @@ class OperationsDashboard extends ConsumerWidget {
                 ),
             const SizedBox(height: 22),
             OpsHeading(
+              'Orders & sales',
+              action: 'Reports',
+              onAction: onReports,
+            ),
+            OpsPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _SmallMetric(
+                          'Orders received',
+                          '${data['orders_placed'] ?? 0}',
+                          onTap: () => onOrders('All'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _SmallMetric(
+                          'Recorded sales',
+                          money(amount(data['revenue'])),
+                          color: opsGreen,
+                          onTap: onReports,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '${data['delivered'] ?? 0} delivered · ${data['cancelled_orders'] ?? 0} cancelled',
+                    style: const TextStyle(fontSize: 12, color: opsMuted),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'All-time orders. Sales include paid or cash-collected orders.',
+                    style: TextStyle(fontSize: 10, color: opsMuted),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 22),
+            OpsHeading(
               'COD Cash Control',
               action: 'View all',
               onAction: onCash,
@@ -1277,11 +1320,18 @@ class _CashControlPanelState extends State<CashControlPanel> {
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: Text(
-                              '${person['name']}',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
+                            child: TextButton(
+                              onPressed: () => widget.onReceive(person),
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                alignment: Alignment.centerLeft,
+                              ),
+                              child: Text(
+                                '${person['name']}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ),

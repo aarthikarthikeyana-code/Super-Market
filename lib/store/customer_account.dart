@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 
 import 'state.dart';
 import 'models.dart';
@@ -8,6 +13,536 @@ import 'widgets.dart';
 import 'paged_feed.dart';
 
 import 'login_screen.dart';
+import 'api.dart';
+import 'delivery_tracking.dart';
+
+class DeliveryAddressData extends ChangeNotifier {
+  final line1 = TextEditingController(),
+      line2 = TextEditingController(),
+      pincode = TextEditingController(),
+      city = TextEditingController(),
+      state = TextEditingController(),
+      landmark = TextEditingController();
+  LatLng? pin;
+  double? accuracy;
+  String source = 'map', legacy = '';
+  bool restoring = false, dirty = false, savedPin = false;
+  Map<String, dynamic> get value => {
+    'address_line1': line1.text.trim(),
+    'address_line2': line2.text.trim(),
+    'pincode': pincode.text.trim(),
+    'city': city.text.trim(),
+    'state': state.text.trim(),
+    'landmark': landmark.text.trim(),
+    if (pin != null) ...{
+      'latitude': pin!.latitude.toStringAsFixed(6),
+      'longitude': pin!.longitude.toStringAsFixed(6),
+      'location_source': source,
+      if (accuracy != null) 'location_accuracy': accuracy,
+    },
+  };
+  String get formatted => [
+    line1.text.trim(),
+    if (line2.text.trim().isNotEmpty) line2.text.trim(),
+    'Landmark: ${landmark.text.trim()}',
+    city.text.trim(),
+    state.text.trim(),
+    pincode.text.trim(),
+  ].where((s) => s.isNotEmpty).join(', ');
+  void restore(Map<String, dynamic> profile) {
+    if (dirty) return;
+    restoring = true;
+    final details = Map<String, dynamic>.from(profile['address_details'] ?? {});
+    legacy = details.isEmpty ? '${profile['address'] ?? ''}' : '';
+    line1.text = '${details['address_line1'] ?? legacy}';
+    line2.text = '${details['address_line2'] ?? ''}';
+    pincode.text = '${details['pincode'] ?? ''}';
+    city.text = '${details['city'] ?? ''}';
+    state.text = '${details['state'] ?? ''}';
+    landmark.text = '${details['landmark'] ?? ''}';
+    final lat = double.tryParse('${details['latitude']}'),
+        lng = double.tryParse('${details['longitude']}');
+    pin = lat != null && lng != null && lat.abs() <= 90 && lng.abs() <= 180
+        ? LatLng(lat, lng)
+        : null;
+    accuracy = double.tryParse('${details['location_accuracy']}');
+    source = '${details['location_source'] ?? 'map'}';
+    savedPin = pin != null;
+    restoring = false;
+    notifyListeners();
+  }
+
+  void edited() {
+    dirty = true;
+    if (savedPin) {
+      pin = null;
+      accuracy = null;
+      savedPin = false;
+      notifyListeners();
+    }
+  }
+
+  void setPin(LatLng point, {double? accuracy, String source = 'map'}) {
+    pin = point;
+    this.accuracy = accuracy;
+    this.source = source;
+    savedPin = false;
+    dirty = true;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    for (final c in [line1, line2, pincode, city, state, landmark]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+}
+
+class StructuredAddressFields extends ConsumerStatefulWidget {
+  final DeliveryAddressData address;
+  final bool enabled;
+  const StructuredAddressFields({
+    super.key,
+    required this.address,
+    this.enabled = true,
+  });
+  @override
+  ConsumerState<StructuredAddressFields> createState() =>
+      _StructuredAddressFieldsState();
+}
+
+class _StructuredAddressFieldsState
+    extends ConsumerState<StructuredAddressFields> {
+  Timer? _debounce;
+  int _generation = 0;
+  bool _looking = false, _locating = false;
+  String? _postalHint, _notFound;
+  List<String> _offices = [];
+  DeliveryAddressData get a => widget.address;
+  @override
+  void initState() {
+    super.initState();
+    a.addListener(_changed);
+    a.pincode.addListener(_queue);
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  void _queue() {
+    if (a.restoring) return;
+    _generation++;
+    _debounce?.cancel();
+    setState(() {
+      _notFound = null;
+      _postalHint = null;
+      _offices = [];
+      _looking = false;
+    });
+    final pin = a.pincode.text.trim();
+    if (RegExp(r'^[1-9][0-9]{5}$').hasMatch(pin)) {
+      _debounce = Timer(const Duration(milliseconds: 400), () => _lookup(pin));
+    }
+  }
+
+  Future<void> _lookup(String pincode) async {
+    final generation = ++_generation;
+    final oldCity = a.city.text, oldState = a.state.text;
+    setState(() => _looking = true);
+    try {
+      final result = await ref.read(storeApiProvider).lookupPincode(pincode);
+      if (!mounted ||
+          generation != _generation ||
+          a.pincode.text.trim() != pincode) {
+        return;
+      }
+      if (result['matched'] == true) {
+        if (a.city.text == oldCity) a.city.text = '${result['district'] ?? ''}';
+        if (a.state.text == oldState) a.state.text = '${result['state'] ?? ''}';
+        setState(() {
+          _offices = List<String>.from(result['offices'] ?? []);
+          _postalHint =
+              'Postal district and state filled. Check or edit your city/town.';
+        });
+      } else {
+        setState(() => _notFound = pincode);
+      }
+    } catch (_) {
+      if (mounted && generation == _generation) {
+        setState(
+          () => _postalHint =
+              'PIN lookup is unavailable. Enter city/town and state manually.',
+        );
+      }
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _looking = false);
+      }
+    }
+  }
+
+  Future<void> _locate() async {
+    if (_locating || !widget.enabled) return;
+    setState(() => _locating = true);
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        throw StoreException(
+          'Turn on device location, or choose your delivery pin on the map.',
+        );
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        throw StoreException(
+          'Location permission was not granted. You can select a pin on the map or enter the address manually.',
+        );
+      }
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 20),
+        ),
+      );
+      if (!mounted) return;
+      if (position.isMocked || position.accuracy > 1000) {
+        throw StoreException(
+          'The GPS fix is not accurate enough. Choose your exact delivery point on the map.',
+        );
+      }
+      await _choosePin(
+        candidate: LatLng(position.latitude, position.longitude),
+        candidateAccuracy: position.accuracy,
+        candidateSource: 'gps',
+      );
+    } catch (e) {
+      if (mounted) showStoreError(context, e);
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  Future<void> _choosePin({
+    LatLng? candidate,
+    double? candidateAccuracy,
+    String candidateSource = 'map',
+  }) async {
+    if (!widget.enabled) return;
+    LatLng? selected = candidate ?? a.pin;
+    final original = selected;
+    final result = await showModalBottomSheet<LatLng>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, update) => SafeArea(
+          child: SizedBox(
+            height: MediaQuery.sizeOf(ctx).height * .76,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Choose delivery location',
+                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Move and zoom the map. Tap your building entrance, then confirm the pin.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: Colors.black54,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: FlutterMap(
+                        options: MapOptions(
+                          initialCenter:
+                              original ?? const LatLng(20.5937, 78.9629),
+                          initialZoom: original == null ? 4 : 17,
+                          onTap: (_, point) => update(() => selected = point),
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate: const String.fromEnvironment(
+                              'MAP_TILE_URL',
+                              defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            ),
+                            userAgentPackageName: 'com.agaram.supermarket',
+                          ),
+                          if (selected != null)
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  point: selected!,
+                                  width: 44,
+                                  height: 44,
+                                  child: const Icon(
+                                    Icons.location_pin,
+                                    color: storeGreen,
+                                    size: 42,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          RichAttributionWidget(
+                            attributions: [
+                              TextSourceAttribution(
+                                'OpenStreetMap contributors',
+                                onTap: () => openDeliveryLink(
+                                  ctx,
+                                  Uri.parse(
+                                    'https://www.openstreetmap.org/copyright',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    selected == null
+                        ? 'No delivery pin selected yet.'
+                        : 'Selected: ${selected!.latitude.toStringAsFixed(6)}, ${selected!.longitude.toStringAsFixed(6)}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: selected == null
+                          ? null
+                          : () => Navigator.pop(ctx, selected),
+                      icon: const Icon(Icons.check),
+                      label: const Text('Confirm delivery pin'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      final unchanged =
+          original != null &&
+          original.latitude == result.latitude &&
+          original.longitude == result.longitude;
+      a.setPin(
+        result,
+        accuracy: unchanged
+            ? (candidate != null ? candidateAccuracy : a.accuracy)
+            : null,
+        source: unchanged
+            ? (candidate != null ? candidateSource : a.source)
+            : 'map',
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _generation++;
+    _debounce?.cancel();
+    a.removeListener(_changed);
+    a.pincode.removeListener(_queue);
+    super.dispose();
+  }
+
+  Widget _field(
+    TextEditingController controller,
+    String label, {
+    String? hint,
+    bool optional = false,
+    int maxLength = 200,
+  }) => Padding(
+    padding: const EdgeInsets.only(bottom: 14),
+    child: TextFormField(
+      controller: controller,
+      enabled: widget.enabled,
+      maxLength: maxLength,
+      decoration: InputDecoration(
+        labelText: label,
+        helperText: hint,
+        helperMaxLines: 2,
+        counterText: '',
+      ),
+      textCapitalization: TextCapitalization.words,
+      onChanged: (_) => a.edited(),
+      validator: (s) =>
+          !optional && (s?.trim().length ?? 0) < (controller == a.line1 ? 3 : 2)
+          ? 'Enter $label'
+          : null,
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Delivery pin',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                a.pin == null
+                    ? 'Add a pin to help the employee find your entrance. You can also enter the address manually.'
+                    : '${a.source == 'gps' ? 'GPS location' : 'Selected map pin'}${a.accuracy == null ? '' : ' · accuracy ±${a.accuracy!.round()} m'}\nCheck the pin matches your delivery address.',
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.5,
+                  color: Colors.black54,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: !widget.enabled || _locating ? null : _locate,
+                    icon: const Icon(Icons.my_location, size: 18),
+                    label: Text(
+                      _locating
+                          ? 'Finding location...'
+                          : 'Use current location',
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: !widget.enabled || _locating ? null : _choosePin,
+                    icon: const Icon(Icons.map_outlined, size: 18),
+                    label: Text(a.pin == null ? 'Select on map' : 'Adjust pin'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+      const SizedBox(height: 18),
+      if (a.legacy.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: Text(
+            'Your saved address uses the earlier format. Confirm the separate fields below.\n${a.legacy}',
+            style: const TextStyle(
+              fontSize: 12,
+              height: 1.5,
+              color: Colors.black54,
+            ),
+          ),
+        ),
+      _field(a.line1, 'Address 1', hint: 'House / flat number and street'),
+      _field(
+        a.line2,
+        'Address 2 (optional)',
+        hint: 'Apartment, building or area',
+        optional: true,
+      ),
+      TextFormField(
+        controller: a.pincode,
+        enabled: widget.enabled,
+        keyboardType: TextInputType.number,
+        maxLength: 6,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        decoration: InputDecoration(
+          labelText: 'Pincode',
+          helperText: _looking ? 'Looking up city and state...' : _postalHint,
+          helperMaxLines: 3,
+          suffixIcon: _looking
+              ? const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : const Icon(Icons.local_post_office_outlined),
+        ),
+        onChanged: (_) => a.edited(),
+        validator: (s) => !RegExp(r'^[1-9][0-9]{5}$').hasMatch(s ?? '')
+            ? 'Enter a 6-digit Indian PIN'
+            : _notFound == s
+            ? 'PIN was not found. Check the number.'
+            : null,
+      ),
+      if (_offices.length > 1)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            onPressed: !widget.enabled
+                ? null
+                : () async {
+                    final office = await showModalBottomSheet<String>(
+                      context: context,
+                      showDragHandle: true,
+                      builder: (ctx) => SafeArea(
+                        child: ListView(
+                          shrinkWrap: true,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Text(
+                                'Choose your postal area',
+                                style: TextStyle(fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                            for (final office in _offices)
+                              ListTile(
+                                title: Text(office),
+                                onTap: () => Navigator.pop(ctx, office),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                    if (office != null && mounted) {
+                      a.city.text = office;
+                      a.edited();
+                    }
+                  },
+            child: const Text('Choose a postal area for this PIN'),
+          ),
+        ),
+      const SizedBox(height: 8),
+      _field(
+        a.city,
+        'City / town',
+        hint: 'Check the postal suggestion and edit if needed',
+        maxLength: 80,
+      ),
+      _field(a.state, 'State', maxLength: 80),
+      _field(
+        a.landmark,
+        'Landmark',
+        hint: 'A nearby place that helps identify your building',
+        maxLength: 160,
+      ),
+    ],
+  );
+}
 
 Future<bool> ensureCustomerAccount(BuildContext context, WidgetRef ref) async {
   try {
@@ -553,13 +1088,14 @@ class CustomerAddressEditor extends ConsumerStatefulWidget {
 
 class _AddressEditorState extends ConsumerState<CustomerAddressEditor> {
   final _form = GlobalKey<FormState>();
-  late final TextEditingController _name, _address, _notes;
+  late final TextEditingController _name, _notes;
+  final _deliveryAddress = DeliveryAddressData();
   bool _busy = false;
   @override
   void initState() {
     super.initState();
     _name = TextEditingController(text: widget.profile['name']);
-    _address = TextEditingController(text: widget.profile['address']);
+    _deliveryAddress.restore(widget.profile);
     _notes = TextEditingController(
       text: widget.profile['delivery_instructions'],
     );
@@ -568,7 +1104,7 @@ class _AddressEditorState extends ConsumerState<CustomerAddressEditor> {
   @override
   void dispose() {
     _name.dispose();
-    _address.dispose();
+    _deliveryAddress.dispose();
     _notes.dispose();
     super.dispose();
   }
@@ -579,7 +1115,8 @@ class _AddressEditorState extends ConsumerState<CustomerAddressEditor> {
     try {
       await ref.read(storeApiProvider).saveCustomerProfile({
         'name': _name.text.trim(),
-        'address': _address.text.trim(),
+        'address': _deliveryAddress.formatted,
+        'address_details': _deliveryAddress.value,
         'delivery_instructions': _notes.text.trim(),
       });
       if (mounted) Navigator.pop(context, true);
@@ -618,26 +1155,19 @@ class _AddressEditorState extends ConsumerState<CustomerAddressEditor> {
                     (v?.trim().length ?? 0) < 2 ? 'Enter your name' : null,
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _address,
+              StructuredAddressFields(
+                address: _deliveryAddress,
                 enabled: !_busy,
-                minLines: 3,
-                maxLines: 5,
-                maxLength: 1000,
-                decoration: const InputDecoration(
-                  labelText: 'Full address, landmark and pincode',
-                ),
-                validator: (v) => (v?.trim().length ?? 0) < 12
-                    ? 'Enter your complete delivery address'
-                    : null,
               ),
-              const SizedBox(height: 16),
               TextFormField(
                 controller: _notes,
                 enabled: !_busy,
                 maxLength: 500,
                 decoration: const InputDecoration(
-                  labelText: 'Delivery instructions (optional)',
+                  labelText: 'Note for delivery employee (optional)',
+                  helperText:
+                      'Gate access, floor, or call-on-arrival instructions.',
+                  helperMaxLines: 2,
                 ),
               ),
               const SizedBox(height: 24),

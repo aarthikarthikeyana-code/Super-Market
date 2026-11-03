@@ -428,11 +428,18 @@ class OperationsCashControl extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '${p['name']}',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
+                      TextButton(
+                        onPressed: () => onReceive(p),
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          alignment: Alignment.centerLeft,
+                        ),
+                        child: Text(
+                          '${p['name']}',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
                       Text(
@@ -531,6 +538,8 @@ class OperationsReports extends ConsumerWidget {
             child: Column(
               children: [
                 for (final row in <(String, String, String)>[
+                  ('All orders received', 'orders_placed', 'All'),
+                  ('Cancelled orders', 'cancelled_orders', 'Cancelled'),
                   ('New orders', 'new_orders', 'New'),
                   ('Preparing', 'preparing', 'Preparing'),
                   ('Packed', 'packed', 'Packed'),

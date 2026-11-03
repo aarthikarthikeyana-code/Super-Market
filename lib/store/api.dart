@@ -400,6 +400,11 @@ class StoreApi {
   Future<Map<String, dynamic>> browseCatalog() async =>
       Map<String, dynamic>.from(await request('GET', '/catalog/browse/'));
 
+  Future<Map<String, dynamic>> lookupPincode(String pincode) async =>
+      Map<String, dynamic>.from(
+        await request('GET', '/address/pincode/$pincode/'),
+      );
+
   Future<StorePage<StoreProduct>> productPage({
     String? cursor,
     String search = '',

@@ -6,6 +6,34 @@ from .errors import ServiceUnavailable
 logger = logging.getLogger(__name__)
 
 
+def lookup_pincode(pincode):
+    import json
+    import re
+    from urllib.request import Request, urlopen
+    from django.core.cache import cache
+    from rest_framework.exceptions import ValidationError
+    if not re.fullmatch(r'[1-9][0-9]{5}', pincode):
+        raise ValidationError({'pincode': 'Enter a valid six-digit Indian PIN code.'})
+    key = 'postal-address-v1:' + pincode
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    try:
+        request = Request('https://api.postalpincode.in/pincode/' + pincode, headers={'User-Agent': 'AgaramSupermarket/1.0', 'Accept': 'application/json'})
+        with urlopen(request, timeout=6) as response:
+            data = json.loads(response.read(1024 * 1024))
+        record = data[0]
+        offices = record.get('PostOffice') or []
+        offices = [office for office in offices if str(office.get('Pincode')) == pincode]
+        result = {'pincode': pincode, 'matched': bool(offices), 'district': str(offices[0].get('District') or '') if offices else '',
+                  'state': str(offices[0].get('State') or '') if offices else '',
+                  'offices': sorted(set(str(office['Name']) for office in offices if office.get('Name')))}
+        cache.set(key, result, 86400 if offices else 300)
+        return result
+    except Exception:
+        raise ServiceUnavailable('PIN lookup is temporarily unavailable. Enter your city/town and state manually.') from None
+
+
 def upload_image(file):
     import cloudinary
     import cloudinary.uploader

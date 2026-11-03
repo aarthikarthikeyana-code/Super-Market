@@ -71,9 +71,12 @@ def create_order(customer, data):
         customer=customer, idempotency_key=data['idempotency_key'], order_id='AG' + uuid.uuid4().hex[:20].upper(),
         customer_name=data['customer_name'], customer_phone=data['customer_phone'],
         delivery_address=data['delivery_address'], delivery_instructions=data['delivery_instructions'],
+        address_details=data.get('address_details', {}),
         subtotal=subtotal, delivery_charge=charge, total_amount=total,
         payment_method='cod', payment_status='cod', status='New',
     )
+    delivery.issue_code(order)
+    order.save(update_fields=['delivery_code_nonce', 'delivery_code_expires_at', 'delivery_code_attempts', 'delivery_code_verified_at'])
     for item in data['items']:
         p = products[item['product_id']]
         OrderItem.objects.create(order=order, product=p, english_name=p.english_name, tamil_name=p.tamil_name,
@@ -167,9 +170,8 @@ def _transition_order(order_id, next_status, note='', person_id=None, eta=None,
         if not person or not person.ready_for_deliveries:
             raise ValidationError({'assigned_to': 'Choose an active employee with login, verified documents and a valid driving licence where applicable.'})
         order.assigned_to = person
-        if old_person != person.pk:
-            order.delivery_code_nonce = None
-            order.delivery_code_expires_at = None
+        if old_person and old_person != person.pk:
+            delivery.issue_code(order)
     if next_status in ['Out for Delivery', 'Delivered', 'Delivery Attempted']:
         person = DeliveryPersonnel.objects.select_for_update().filter(pk=order.assigned_to_id, is_active=True).first()
         if not person or not person.ready_for_deliveries:
@@ -198,7 +200,10 @@ def _transition_order(order_id, next_status, note='', person_id=None, eta=None,
         if next_status == 'Packed':
             order.items.update(is_packed=True)
         if next_status == 'Out for Delivery':
-            delivery.issue_code(order)
+            if not order.delivery_code_nonce or not order.delivery_code_expires_at or order.delivery_code_expires_at <= timezone.now():
+                delivery.issue_code(order)
+            else:
+                order.delivery_code_expires_at = max(order.delivery_code_expires_at, timezone.now() + timedelta(hours=2))
         if next_status == 'Delivered':
             order.delivery_code_verified_at = timezone.now()
             order.delivery_code_nonce = None

@@ -21,6 +21,8 @@ def dashboard_data(user):
     held = Q(payment_status='collected', cash_collected_for__isnull=False, cash_handover__isnull=True)
     received = Q(payment_status='collected') & (Q(cash_handover__isnull=False) | Q(cash_received_directly=True))
     stats = orders.aggregate(
+        orders_placed=Count('pk'),
+        cancelled_orders=Count('pk', filter=Q(status='Cancelled')),
         total_orders=Count('pk', filter=accepted), awaiting_payment=Count('pk', filter=Q(payment_status='pending')),
         new_orders=Count('pk', filter=accepted & Q(status='New')),
         preparing=Count('pk', filter=accepted & Q(status='Preparing')),

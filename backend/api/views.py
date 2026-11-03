@@ -79,6 +79,12 @@ def store_config(request):
                      'online_payments_enabled': False, 'payment_methods': ['cod'], 'cash_on_delivery_enabled': True, 'delivery_mode': 'on_demand', 'delivery_login_mode': 'password', 'customer_login_mode': 'otp' if settings.CUSTOMER_OTP_ENABLED else 'demo_code'})
 
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def address_pincode(request, pincode):
+    return Response(gateways.lookup_pincode(pincode))
+
+
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
@@ -456,7 +462,7 @@ def customer_orders(request):
     serializer.validated_data['customer_phone'] = profile.phone
     commerce.expire_pending_orders()
     order = commerce.create_order(request.user, serializer.validated_data)
-    return Response({'order': OrderSerializer(order).data, 'checkout': None}, status=201)
+    return Response({'order': OrderSerializer(order).data, 'checkout': None, 'delivery_confirmation': delivery.customer_confirmation(order)}, status=201, headers={'Cache-Control': 'private, no-store'})
 
 
 @api_view(['GET'])
@@ -464,7 +470,7 @@ def customer_orders(request):
 def customer_order_detail(request, order_id):
     order = get_object_or_404(orders_queryset(), order_id=order_id, customer=request.user)
     return Response({'order': OrderSerializer(order).data, 'checkout': None,
-                     'delivery_confirmation': delivery.customer_confirmation(order)})
+                     'delivery_confirmation': delivery.customer_confirmation(order)}, headers={'Cache-Control': 'private, no-store'})
 
 
 class DeliveryCodeRefreshThrottle(UserRateThrottle):
@@ -480,13 +486,13 @@ class DeliveryCodeRefreshThrottle(UserRateThrottle):
 @transaction.atomic
 def refresh_delivery_code(request, order_id):
     order = get_object_or_404(Order.objects.select_for_update(), order_id=order_id, customer=request.user)
-    if order.status != 'Out for Delivery':
-        raise ValidationError({'detail': 'A delivery code is available after your employee starts the delivery.'})
+    if order.status not in ['New', 'Preparing', 'Packed', 'Out for Delivery', 'Delivery Attempted']:
+        raise ValidationError({'detail': 'Delivery codes are only available for active orders.'})
     if not delivery.customer_confirmation(order)['code']:
         delivery.issue_code(order)
         order.save(update_fields=['delivery_code_nonce', 'delivery_code_expires_at', 'delivery_code_attempts', 'delivery_code_verified_at'])
         OrderEvent.objects.create(order=order, status=order.status, note='Customer requested a fresh delivery confirmation code.')
-    return Response(delivery.customer_confirmation(order))
+    return Response(delivery.customer_confirmation(order), headers={'Cache-Control': 'private, no-store'})
 
 
 @api_view(['GET', 'POST'])
@@ -805,10 +811,13 @@ def admin_employee_receipts(request, pk):
 @permission_classes([IsAdminUser])
 def employee_cash_handover(request, pk):
     person = get_object_or_404(DeliveryPersonnel, pk=pk)
-    due = person.cash_orders.filter(payment_status='collected', cash_handover__isnull=True).order_by('cash_collected_at')
+    due = person.cash_orders.filter(payment_status='collected', cash_handover__isnull=True).prefetch_related('items__product__image').order_by('cash_collected_at')
     if request.method == 'GET':
         if request.query_params.get('paginate') == 'true':
-            return collection_response(request, due, CashDueSerializer, ('cash_collected_at', 'pk'), {'cash_to_handover': str(cash_total(due))})
+            return collection_response(request, due, CashDueSerializer, ('cash_collected_at', 'pk'), {
+                'cash_to_handover': str(cash_total(due)), 'pending_orders': due.count(),
+                'cash_collected': str(cash_total(person.cash_orders.filter(payment_status='collected'))),
+                'cash_received_by_store': str(person.cash_handovers.aggregate(total=Sum('amount'))['total'] or Decimal('0.00'))})
         return Response({'cash_to_handover': str(cash_total(due)),
                          'orders': [{'order_id': o.order_id, 'amount': str(o.cash_collected_amount), 'collected_at': o.cash_collected_at} for o in due],
                          'receipts': [{'id': str(h.pk), 'amount': str(h.amount), 'received_at': h.received_at} for h in person.cash_handovers.all()[:20]]})
