@@ -29,6 +29,7 @@ class StoreProduct {
       sku;
   final double price, stock;
   final bool inStock;
+  final bool published;
   final double? rawMrp;
   const StoreProduct({
     required this.id,
@@ -44,6 +45,7 @@ class StoreProduct {
     required this.price,
     required this.stock,
     this.inStock = true,
+    this.published = true,
     this.rawMrp,
   }) : englishName = name;
   String get name => englishName.trim().isNotEmpty ? englishName : tamilName;
@@ -55,6 +57,7 @@ class StoreProduct {
   int get discountPercent =>
       mrp > price ? (((mrp - price) / mrp) * 100).round() : 0;
   factory StoreProduct.fromJson(Map<String, dynamic> j) => StoreProduct(
+    published: j['is_active'] != false,
     id: '${j['id']}',
     name: j['english_name'] ?? '',
     tamilName: j['tamil_name'] ?? '',
@@ -70,8 +73,9 @@ class StoreProduct {
     inStock: j['is_in_stock'] == true,
     rawMrp: j['mrp'] != null ? amount(j['mrp']) : null,
   );
-  bool get available => inStock && stock >= 1;
+  bool get available => published && inStock && stock >= 1;
   Map<String, dynamic> toJson() => {
+    'is_active': published,
     'id': id,
     'english_name': englishName,
     'tamil_name': tamilName,

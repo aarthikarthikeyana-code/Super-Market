@@ -25,6 +25,8 @@ from .serializers import EmployeeSerializer, DeliveryActionSerializer, CashRecei
 from rest_framework.pagination import CursorPagination
 from .models import Product, ProductImage, DeliveryPersonnel, Order, OrderEvent, CustomerProfile, CustomerLoginChallenge, CashHandover, EmployeeDocument
 from .serializers import ProductSerializer, DeliveryPersonnelSerializer, OrderSerializer, CheckoutSerializer, CustomerPhoneSerializer, CustomerProfileSerializer, normalize_customer_phone
+from .serializers import NewItemRequestSerializer
+from .models import NewItemRequest
 
 
 class StoreCursorPagination(CursorPagination):
@@ -393,13 +395,25 @@ def suggest_tamil_product_name(request):
 @permission_classes([IsAdminUser])
 def admin_products(request):
     if request.method == 'GET':
-        products = Product.objects.filter(is_active=True).select_related('image').order_by('tamil_name')
+        products = Product.objects.exclude(category__iregex=commerce.PRODUCE_CATEGORY_PATTERN).select_related('image').order_by('tamil_name')
+        publication = request.query_params.get('publication', 'published')
+        if publication != 'all':
+            products = products.filter(is_active=publication != 'hidden')
+        stock = request.query_params.get('stock')
+        if stock == 'low':
+            products = products.filter(is_active=True, is_in_stock=True, stock_kg__gt=0, stock_kg__lte=5)
+        elif stock == 'out':
+            products = products.filter(is_active=True).filter(Q(stock_kg__lte=0) | Q(is_in_stock=False))
+        if request.query_params.get('category'):
+            products = products.filter(category=request.query_params['category'])
+        if request.query_params.get('brand'):
+            products = products.filter(brand=request.query_params['brand'])
         if request.query_params.get('search'):
             products = products.filter(Q(english_name__icontains=request.query_params['search'][:100]) | Q(tamil_name__icontains=request.query_params['search'][:100]) | Q(brand__icontains=request.query_params['search'][:100]))
         return collection_response(request, products, ProductSerializer, ('tamil_name', 'pk'))
     serializer = ProductSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
-    product = serializer.save(id='P' + uuid.uuid4().hex, is_active=True)
+    product = serializer.save(id='P' + uuid.uuid4().hex, is_active=serializer.validated_data.get('is_active', True))
     return Response(ProductSerializer(product).data, status=201)
 
 
@@ -407,7 +421,7 @@ def admin_products(request):
 @permission_classes([IsAdminUser])
 def admin_product_detail(request, pk):
     with transaction.atomic():
-        product = get_object_or_404(Product.objects.select_for_update(), pk=pk, is_active=True)
+        product = get_object_or_404(Product.objects.select_for_update(), pk=pk)
         if request.method == 'DELETE':
             product.is_active = False
             product.save(update_fields=['is_active', 'updated_at'])
@@ -502,22 +516,14 @@ def cancel_checkout(request, order_id):
 @api_view(['GET'])
 @permission_classes([IsAdminUser])
 def admin_dashboard(request):
-    orders = orders_queryset()
-    fulfilled = orders.filter(payment_status__in=['paid', 'cod', 'collected']).exclude(status='Cancelled')
-    return Response({'total_products': Product.objects.filter(is_active=True).count(),
-                     'total_orders': fulfilled.count(), 'awaiting_payment': orders.filter(payment_status='pending').count(),
-                     'active_deliveries': fulfilled.filter(status='Out for Delivery').count(),
-                     'new_orders': fulfilled.filter(status='New').count(),
-                     'revenue': str(fulfilled.filter(payment_status__in=['paid', 'collected']).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')),
-                     'cash_collected': str(orders.filter(payment_status='collected').aggregate(total=Sum('cash_collected_amount'))['total'] or Decimal('0.00')),
-                     'cash_received_by_store': str((CashHandover.objects.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')) + (orders.filter(payment_status='collected', cash_received_directly=True).aggregate(total=Sum('cash_collected_amount'))['total'] or Decimal('0.00'))),
-                     'cash_with_employees': str(orders.filter(payment_status='collected', cash_collected_for__isnull=False, cash_handover__isnull=True).aggregate(total=Sum('cash_collected_amount'))['total'] or Decimal('0.00')),
-                     'cash_due': str(orders.filter(payment_status='cod').exclude(status='Cancelled').aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')),
-                     'delivery_attempted': fulfilled.filter(status='Delivery Attempted').count(),
-                     'packed': fulfilled.filter(status='Packed').count(),
-                     'delivered': fulfilled.filter(status='Delivered').count(),
-                     'low_stock': Product.objects.filter(is_active=True, stock_kg__lte=5).count(),
-                     'recent_orders': OrderSerializer(orders[:10], many=True).data})
+    from .operations import dashboard_data
+    return Response(dashboard_data(request.user))
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_search_requests(request):
+    return collection_response(request, NewItemRequest.objects.all(), NewItemRequestSerializer, ('-requested_at', '-pk'))
 
 
 @api_view(['GET'])
@@ -547,7 +553,21 @@ def admin_orders(request):
         orders = orders.filter(created_at__date=date)
     counts = dict(orders.order_by().values('status').annotate(total=Count('pk')).values_list('status', 'total'))
     stage = request.query_params.get('status')
-    if stage == 'Active':
+    if stage == 'Cash Review':
+        orders = orders.filter(payment_status='collected', cash_collected_for__isnull=True, cash_handover__isnull=True, cash_received_directly=False)
+    elif stage == 'Delivered Today':
+        orders = orders.filter(status='Delivered', delivered_at__date=timezone.localdate())
+    elif stage == 'Today Attention':
+        orders = orders.filter(created_at__date=timezone.localdate()).filter(Q(status__in=['New', 'Delivery Attempted']) | Q(status='Packed', assigned_to__isnull=True) | Q(status='Out for Delivery', estimated_delivery_at__lt=timezone.now()))
+    elif stage == 'Assigned':
+        orders = orders.filter(status='Packed', assigned_to__isnull=False)
+    elif stage == 'Cash Handover Complete':
+        orders = orders.filter(payment_status='collected').filter(Q(cash_handover__isnull=False) | Q(cash_received_directly=True))
+    elif stage == 'Pending Handover':
+        orders = orders.filter(payment_status='collected', cash_collected_for__isnull=False, cash_handover__isnull=True)
+    elif stage == 'Delayed':
+        orders = orders.filter(status='Out for Delivery', estimated_delivery_at__lt=timezone.now())
+    elif stage == 'Active':
         orders = orders.exclude(status__in=['Delivered', 'Cancelled'])
     elif stage and stage != 'All':
         orders = orders.filter(status=stage)
@@ -620,6 +640,8 @@ def admin_delivery_personnel(request):
             people = people.filter(Q(name__icontains=query) | Q(phone__icontains=query) | Q(employee_code__icontains=query))
         if request.query_params.get('ready') == 'true':
             people = people.filter(is_active=True, documents_verified=True, user__is_active=True, user__is_staff=False).exclude(user__password__startswith='!').filter(Q(vehicle_type__in=['walking', 'bicycle']) | Q(licence_expiry__gte=timezone.localdate()))
+        if request.query_params.get('cash') == 'pending':
+            people = people.filter(cash_orders__payment_status='collected', cash_orders__cash_handover__isnull=True).distinct()
         return collection_response(request, people, EmployeeSerializer, ('name', 'pk'))
     serializer = EmployeeSerializer(data=request.data, context={'request': request})
     serializer.is_valid(raise_exception=True)

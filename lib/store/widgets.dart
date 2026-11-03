@@ -604,7 +604,15 @@ class StatusChip extends StatelessWidget {
 class OrderSummaryCard extends StatelessWidget {
   final StoreOrder order;
   final VoidCallback onTap;
-  const OrderSummaryCard({super.key, required this.order, required this.onTap});
+  final VoidCallback? onAction;
+  final String? actionLabel;
+  const OrderSummaryCard({
+    super.key,
+    required this.order,
+    required this.onTap,
+    this.onAction,
+    this.actionLabel,
+  });
   @override
   Widget build(BuildContext context) {
     final cancelled = order.status == 'Cancelled';
@@ -754,6 +762,19 @@ class OrderSummaryCard extends StatelessWidget {
                   ),
                 ],
               ),
+              if (actionLabel != null) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.tonal(
+                    onPressed: onAction,
+                    child: Text(
+                      actionLabel!,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ),
+              ],
               const Divider(height: 24),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,

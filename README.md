@@ -210,3 +210,47 @@ Existing out-for-delivery orders obtain a code when their customer taps Get a
 fresh delivery code. Upgrade employee clients before enabling code-required
 completion. Real-phone pickup, Google Maps handoff, background behaviour,
 customer code entry and cash handover must be acceptance-tested before release.
+
+
+## Mobile operations dashboard
+
+The admin workspace uses Dashboard, Orders, Products, Delivery and More navigation.
+Dashboard summaries come from the authenticated `/api/admin/dashboard/` snapshot;
+there are no seeded dashboard records, synthetic charts or generated catalog photos.
+The header's Live data indicator reflects a successful API refresh, not store
+opening hours or employee presence. A bell badge counts real attention categories.
+
+Today's queue counts are current stages for orders placed on the store's local
+calendar day. Delivered counts deliveries completed that day, including orders
+placed earlier. The pipeline and COD balances are totals across recorded orders.
+Assigned is a display/filter for packed orders with an employee, not a new stored
+order status. Pipeline checkpoints are not additive: cash-received orders are also
+delivered. Late deliveries are flagged only when a recorded arrival estimate has
+passed. No route time or ETA is invented.
+
+Cash held by employees, confirmed handovers and direct admin receipts remain
+separate. Handovers are summed from receipt records once, not once per attached
+order. Unallocated collected cash is flagged for reconciliation. The current cash
+flow does not record employee-submitted amounts or an offline/online presence
+signal; those values are labelled as not recorded. Verification still requires
+counting physical cash and confirming the exact selected order total.
+
+Attention cards and pipeline steps open filtered queues. Order cards offer direct
+preparation, packing and assignment actions. Employee pickup and code/COD checks
+remain in the existing delivery flow. More includes real category/brand filters,
+recorded product requests, on-demand delivery configuration and recorded-total
+reports. Store settings are read-only; no unsupported settings writes are implied.
+
+Products show Tamil names first and expose Edit, Stock and Hide/Publish actions.
+Hidden grocery records can be managed and republished by administrators while
+remaining absent from customer browse, details and checkout. Product images still
+come exclusively from admin uploads. Employee creation retains the three-step
+wizard with a compact introduction and a review before activation.
+
+This update extends existing API responses and uses existing schema fields; it
+adds no database migration beyond the earlier delivery migration 0012. Deploy
+the matching backend before using the new app. Isolated checks cover empty data,
+correct reporting periods, cash accounting, publication, permissions, derived
+filters and bounded previews with 1,005 orders. Phone layouts are checked at
+360 and 320 logical pixels, including larger text. Preview images are rendered
+from an empty isolated database and do not represent live store balances.

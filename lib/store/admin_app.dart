@@ -14,6 +14,8 @@ import 'delivery_app.dart';
 import 'paged_feed.dart';
 import 'employee_picker.dart';
 import 'delivery_tracking.dart';
+import 'admin_dashboard.dart';
+import 'admin_pages.dart';
 
 class AdminConsoleScreen extends ConsumerStatefulWidget {
   const AdminConsoleScreen({super.key});
@@ -29,6 +31,15 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   Map<String, dynamic> _stageCounts = {};
   final Set<String> _selectedOrders = {};
   bool _batchBusy = false;
+  String? _quickOrderId;
+  String _productFilter = 'all', _productSearch = '';
+  String? _productCategory, _productBrand;
+  Map<String, dynamic>? _assignmentEmployee;
+  final _orderSearchInput = TextEditingController(),
+      _productSearchInput = TextEditingController(),
+      _teamSearchInput = TextEditingController();
+  final _orderSearchFocus = FocusNode();
+  Timer? _productDebounce;
   Timer? _searchDebounce, _teamDebounce;
   Timer? _poll;
   late final StoreApi _api;
@@ -44,13 +55,18 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
         ref.read(storeApiProvider).feedChanges.value++;
         ref.invalidate(adminOrdersProvider);
         ref.invalidate(adminDashboardProvider);
-        if (_tab == 3) ref.invalidate(deliveryTeamProvider);
+        if (_tab == 5) ref.invalidate(deliveryTeamProvider);
       }
     });
   }
 
   @override
   void dispose() {
+    _orderSearchInput.dispose();
+    _productSearchInput.dispose();
+    _teamSearchInput.dispose();
+    _orderSearchFocus.dispose();
+    _productDebounce?.cancel();
     _searchDebounce?.cancel();
     _teamDebounce?.cancel();
     _api.staffChanges.removeListener(_staffChanged);
@@ -103,104 +119,31 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     return PopScope(
       canPop: !_signedIn,
       child: Theme(
-        data: storeTheme(),
+        data: operationsTheme(),
         child: !_signedIn
             ? AdminSignInScreen(onSuccess: _loginSuccess)
             : Scaffold(
-                appBar: AppBar(
-                  automaticallyImplyLeading: false,
-                  toolbarHeight: 80,
-                  title: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          const Text(
-                            'Agaram Workspace',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE4F0E7),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFF006B3C),
-                                width: 1,
-                              ),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.admin_panel_settings,
-                                  size: 13,
-                                  color: Color(0xFF006B3C),
-                                ),
-                                SizedBox(width: 3),
-                                Text(
-                                  'Role: Admin',
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF006B3C),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        [
-                          'Store overview',
-                          'Product catalog',
-                          'Order management',
-                          'Staff & Employees',
-                        ][_tab],
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ],
-                  ),
-                  actions: [
-                    IconButton(
-                      tooltip: 'Refresh',
-                      onPressed: () => refreshCommerce(ref),
-                      icon: const Icon(Icons.refresh),
-                    ),
-                    IconButton(
-                      tooltip: 'Logout',
-                      onPressed: _logout,
-                      icon: const Icon(Icons.logout),
-                    ),
-                  ],
-                ),
+                appBar: _header(),
                 body: switch (_tab) {
                   0 => _overview(),
-                  1 => _products(),
-                  2 => _orders(),
-                  _ => _team(),
+                  1 => _orders(),
+                  2 => _products(),
+                  3 => OperationsDeliveryControl(onOrder: _openOrder),
+                  4 => OperationsMore(onOpen: _openMore),
+                  5 => _team(),
+                  6 => OperationsCashControl(onReceive: _receiveCash),
+                  _ => OperationsReports(
+                    onOrders: _showOrders,
+                    onInventory: _showInventory,
+                  ),
                 },
-                floatingActionButton: _tab == 1
+                floatingActionButton: _tab == 2
                     ? FloatingActionButton.extended(
                         onPressed: () => _editProduct(),
                         icon: const Icon(Icons.add),
                         label: const Text('Add product'),
                       )
-                    : _tab == 3
+                    : _tab == 5
                     ? FloatingActionButton.extended(
                         onPressed: () => _editPerson(),
                         icon: const Icon(Icons.person_add_alt_1_rounded),
@@ -208,24 +151,28 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                       )
                     : null,
                 bottomNavigationBar: NavigationBar(
-                  selectedIndex: _tab,
+                  selectedIndex: _tab <= 4 ? _tab : 4,
                   onDestinationSelected: (i) => setState(() => _tab = i),
                   destinations: const [
                     NavigationDestination(
                       icon: Icon(Icons.space_dashboard_outlined),
-                      label: 'Overview',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.inventory_2_outlined),
-                      label: 'Products',
+                      label: 'Dashboard',
                     ),
                     NavigationDestination(
                       icon: Icon(Icons.receipt_long_outlined),
                       label: 'Orders',
                     ),
                     NavigationDestination(
-                      icon: Icon(Icons.badge_outlined),
-                      label: 'Employees',
+                      icon: Icon(Icons.inventory_2_outlined),
+                      label: 'Products',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.route_outlined),
+                      label: 'Delivery',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.grid_view_outlined),
+                      label: 'More',
                     ),
                   ],
                 ),
@@ -234,145 +181,466 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     );
   }
 
-  Widget _overview() => DataView(
-    value: ref.watch(adminDashboardProvider),
-    onRetry: () => ref.invalidate(adminDashboardProvider),
-    builder: (data) => RefreshIndicator(
-      onRefresh: () async {
-        await ref.refresh(adminDashboardProvider.future).then((_) {});
-      },
-      child: ListView(
-        padding: const EdgeInsets.all(20),
-        physics: const AlwaysScrollableScrollPhysics(),
+  PreferredSizeWidget _header() {
+    final snapshot = ref.watch(adminDashboardProvider);
+    final data = snapshot.asData?.value;
+    final alerts = List<Map<String, dynamic>>.from(data?['alerts'] ?? []);
+    final profile = Map<String, dynamic>.from(data?['admin_profile'] ?? {});
+    final live = data != null && !snapshot.hasError && !snapshot.isLoading;
+    return AppBar(
+      automaticallyImplyLeading: false,
+      toolbarHeight: 70,
+      titleSpacing: 18,
+      title: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: storeGreen,
-              borderRadius: BorderRadius.circular(24),
-            ),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Your store, at a glance.',
+                  'Agaram',
                   style: TextStyle(
-                    fontSize: 27,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -.5,
                   ),
                 ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Cash collected at delivery',
-                  style: TextStyle(color: Color(0xFFD2E7D9)),
-                ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 2),
                 Text(
-                  money(amount(data['cash_collected'])),
-                  style: const TextStyle(
-                    fontSize: 34,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Received by store: ${money(amount(data['cash_received_by_store']))}\nWith employees: ${money(amount(data['cash_with_employees']))}',
-                  style: const TextStyle(color: Colors.white70, height: 1.5),
+                  _tab == 0
+                      ? 'Store Operations'
+                      : const [
+                          'Store Operations',
+                          'Orders',
+                          'Products',
+                          'Delivery Control',
+                          'More',
+                          'Delivery Team',
+                          'Cash Handover',
+                          'Reports',
+                        ][_tab],
+                  style: const TextStyle(fontSize: 10, color: opsMuted),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
-          LayoutBuilder(
-            builder: (ctx, c) => Wrap(
-              spacing: 12,
-              runSpacing: 12,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+            decoration: BoxDecoration(
+              color: live ? opsMint : const Color(0xFFEEEFEA),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _stat(
-                  'Published products',
-                  data['total_products'],
-                  Icons.inventory_2_outlined,
-                  (c.maxWidth - 12) / 2,
-                ),
-                _stat(
-                  'New orders',
-                  data['new_orders'],
-                  Icons.shopping_bag_outlined,
-                  (c.maxWidth - 12) / 2,
-                ),
-                _stat(
-                  'Out for delivery',
-                  data['active_deliveries'],
-                  Icons.delivery_dining,
-                  (c.maxWidth - 12) / 2,
-                ),
-                _stat(
-                  'Low stock',
-                  data['low_stock'],
-                  Icons.warning_amber_rounded,
-                  (c.maxWidth - 12) / 2,
+                Icon(Icons.circle, size: 5, color: live ? opsGreen : opsMuted),
+                const SizedBox(width: 4),
+                Text(
+                  snapshot.hasError
+                      ? 'Retry'
+                      : live
+                      ? 'Live data'
+                      : 'Syncing',
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: live ? opsGreen : opsMuted,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 22),
-          Text(
-            '${money(amount(data['cash_due']))} cash to collect Â· ${data['delivered']} delivered',
-            style: const TextStyle(color: Colors.black54),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Recent orders',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 14),
-          if ((data['recent_orders'] as List).isEmpty)
-            const Card(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text('New customer orders will appear here.'),
-              ),
-            ),
-          for (final j in data['recent_orders'])
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: OrderSummaryCard(
-                order: StoreOrder(Map<String, dynamic>.from(j)),
-                onTap: () =>
-                    _openOrder(StoreOrder(Map<String, dynamic>.from(j))),
-              ),
-            ),
         ],
       ),
-    ),
-  );
-  Widget _stat(String label, dynamic value, IconData icon, double width) =>
-      SizedBox(
-        width: width,
-        child: Card(
+      actions: [
+        IconButton(
+          tooltip: 'Search orders',
+          visualDensity: VisualDensity.compact,
+          constraints: const BoxConstraints(minWidth: 34),
+          onPressed: () {
+            setState(() => _tab = 1);
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _orderSearchFocus.requestFocus();
+            });
+          },
+          icon: const Icon(Icons.search, size: 21),
+        ),
+        IconButton(
+          tooltip: 'Operational alerts',
+          visualDensity: VisualDensity.compact,
+          constraints: const BoxConstraints(minWidth: 34),
+          onPressed: _showAlerts,
+          icon: Badge(
+            isLabelVisible: alerts.isNotEmpty,
+            label: Text('${alerts.length}'),
+            child: const Icon(Icons.notifications_none, size: 21),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: IconButton(
+            tooltip: 'Admin profile',
+            visualDensity: VisualDensity.compact,
+            onPressed: _showProfile,
+            icon: CircleAvatar(
+              radius: 15,
+              backgroundColor: opsMint,
+              child: Text(
+                profile['name'] == null
+                    ? 'AD'
+                    : opsInitial('${profile['name']}'),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: opsGreen,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showOrders(String stage, {Map<String, dynamic>? employee}) {
+    final today = stage.startsWith('Today ');
+    final selected = today ? stage.substring(6) : stage;
+    setState(() {
+      _tab = 1;
+      _orderFilter = selected == 'Unassigned'
+          ? 'Packed'
+          : today && selected == 'Delivered'
+          ? 'Delivered Today'
+          : today && selected == 'Active'
+          ? 'Today Attention'
+          : selected;
+      _unassignedOnly = stage == 'Unassigned';
+      _todayOnly = today && !['Delivered', 'Active'].contains(selected);
+      _orderSearch = '';
+      _orderSearchInput.clear();
+      _selectedOrders.clear();
+      _assignmentEmployee = employee;
+    });
+  }
+
+  void _showInventory(String filter) {
+    setState(() {
+      _tab = 2;
+      _productFilter = filter;
+      _productCategory = null;
+      _productBrand = null;
+      _productSearch = '';
+      _productSearchInput.clear();
+    });
+  }
+
+  Future<void> _receiveCash(Map<String, dynamic> person) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => EmployeeCashScreen(person: person)),
+    );
+    if (mounted) refreshCommerce(ref);
+  }
+
+  Future<void> _showProfile() async {
+    try {
+      final data = await ref.read(adminDashboardProvider.future);
+      if (!mounted) return;
+      final profile = Map<String, dynamic>.from(data['admin_profile'] ?? {});
+      await showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        builder: (ctx) => SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, color: storeGreen),
-                const SizedBox(height: 12),
-                Text(
-                  '$value',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 28,
-                  ),
+                const Text(
+                  'Admin Profile',
+                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
                 ),
-                const SizedBox(height: 5),
-                Text(label, style: const TextStyle(color: Colors.black54)),
+                const SizedBox(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const CircleAvatar(
+                    backgroundColor: opsMint,
+                    child: Icon(
+                      Icons.admin_panel_settings_outlined,
+                      color: opsGreen,
+                    ),
+                  ),
+                  title: Text('${profile['name'] ?? 'Admin'}'),
+                  subtitle: Text('${profile['email'] ?? ''}'),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.sync),
+                  title: const Text('Refresh store data'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    refreshCommerce(ref);
+                  },
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.logout, color: opsRed),
+                  title: const Text('Logout'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _logout();
+                  },
+                ),
               ],
             ),
           ),
         ),
       );
+    } catch (e) {
+      if (mounted) showStoreError(context, e);
+    }
+  }
+
+  Future<void> _showAlerts() async {
+    try {
+      final data = await ref.read(adminDashboardProvider.future);
+      if (!mounted) return;
+      final alerts = List<Map<String, dynamic>>.from(data['alerts'] ?? []);
+      await showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        builder: (ctx) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const OpsHeading('Operational alerts'),
+                if (alerts.isEmpty)
+                  const OpsEmpty(
+                    'All caught up',
+                    'No action is currently required.',
+                    icon: Icons.task_alt,
+                  )
+                else
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (final alert in alerts)
+                          ListTile(
+                            title: Text('${alert['title']}'),
+                            subtitle: Text('${alert['detail']}'),
+                            trailing: Text('${alert['count']}'),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              final key = alert['key'];
+                              if (key == 'cash') {
+                                setState(() => _tab = 6);
+                              } else if (key == 'stock') {
+                                _showInventory('low');
+                              } else if (key == 'team') {
+                                setState(() => _tab = 5);
+                              } else {
+                                _showOrders(
+                                  key == 'cash_review'
+                                      ? 'Cash Review'
+                                      : key == 'assignment'
+                                      ? 'Unassigned'
+                                      : key == 'delayed'
+                                      ? 'Delayed'
+                                      : key == 'attempted'
+                                      ? 'Delivery Attempted'
+                                      : 'New',
+                                );
+                              }
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) showStoreError(context, e);
+    }
+  }
+
+  Future<void> _openMore(String action) async {
+    if (action == 'team') {
+      setState(() => _tab = 5);
+      return;
+    }
+    if (action == 'inventory' || action == 'low') {
+      _showInventory(action == 'low' ? 'low' : 'all');
+      return;
+    }
+    if (action == 'cash') {
+      setState(() => _tab = 6);
+      return;
+    }
+    if (action == 'reports') {
+      setState(() => _tab = 7);
+      return;
+    }
+    if (action == 'cancelled') {
+      _showOrders('Cancelled');
+      return;
+    }
+    if (action == 'profile') {
+      await _showProfile();
+      return;
+    }
+    if (action == 'logout') {
+      await _logout();
+      return;
+    }
+    if (action == 'requests') {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => Theme(
+            data: operationsTheme(),
+            child: const Scaffold(
+              appBar: null,
+              body: SafeArea(child: OperationsRequests()),
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+    try {
+      final data = await ref.read(adminDashboardProvider.future);
+      if (!mounted) return;
+      final facet = action == 'categories' || action == 'brands';
+      final values = List<String>.from(data[action] ?? []);
+      final store = Map<String, dynamic>.from(data['store'] ?? {});
+      await showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        isScrollControlled: true,
+        builder: (ctx) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  facet
+                      ? action == 'categories'
+                            ? 'Categories'
+                            : 'Brands'
+                      : action == 'slots'
+                      ? 'Delivery Slots'
+                      : 'Store Settings',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (facet) ...[
+                  if (values.isEmpty)
+                    const OpsEmpty(
+                      'No data yet',
+                      'Categories and brands come from your saved products.',
+                    ),
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (final value in values)
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(value),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              setState(() {
+                                _tab = 2;
+                                _productFilter = 'all';
+                                _productSearch = '';
+                                _productSearchInput.clear();
+                                _productCategory = action == 'categories'
+                                    ? value
+                                    : null;
+                                _productBrand = action == 'brands'
+                                    ? value
+                                    : null;
+                              });
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                ] else if (action == 'slots') ...[
+                  OpsEmpty(
+                    store['delivery_mode'] == 'on_demand'
+                        ? 'On-demand delivery'
+                        : 'No delivery slots configured',
+                    'Set an arrival estimate on each assigned order. There are no scheduled delivery slots to manage.',
+                    icon: Icons.schedule,
+                  ),
+                ] else ...[
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Store'),
+                    subtitle: Text('${store['name'] ?? 'No data yet'}'),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Payment'),
+                    subtitle: Text(
+                      store['cash_on_delivery'] == true
+                          ? 'Cash on delivery'
+                          : 'No payment configuration available',
+                    ),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Delivery charge'),
+                    subtitle: Text(
+                      store['delivery_charge'] == null
+                          ? 'No data yet'
+                          : money(amount(store['delivery_charge'])),
+                    ),
+                  ),
+                  const Text(
+                    'Current store configuration. Contact your store operator to change these settings.',
+                    style: TextStyle(fontSize: 12, color: opsMuted),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) showStoreError(context, e);
+    }
+  }
+
+  Widget _overview() => OperationsDashboard(
+    onOrders: _showOrders,
+    onInventory: _showInventory,
+    onAddProduct: () => _editProduct(),
+    onCreateEmployee: () => _editPerson(),
+    onTeam: () => setState(() => _tab = 5),
+    onCash: () => setState(() => _tab = 6),
+    onDelivery: () => setState(() => _tab = 3),
+    onReports: () => setState(() => _tab = 7),
+    onOrder: _openOrder,
+    onProduct: _editProduct,
+    onReceiveCash: _receiveCash,
+  );
+
   Future<void> _editProduct([StoreProduct? product]) async {
     final result = await Navigator.push<bool>(
       context,
@@ -384,120 +652,239 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   Widget _products() {
     final api = ref.watch(storeApiProvider);
     return PagedFeed<StoreProduct>(
-      queryKey: ('adminProducts', api.adminToken),
+      queryKey: (
+        'adminProducts',
+        api.adminToken,
+        _productFilter,
+        _productSearch,
+        _productCategory,
+        _productBrand,
+      ),
       changes: api.feedChanges,
-      load: (cursor) => api.productPage(cursor: cursor, admin: true),
+      load: (cursor) => api.productPage(
+        cursor: cursor,
+        admin: true,
+        search: _productSearch,
+        publication: ['published', 'hidden'].contains(_productFilter)
+            ? _productFilter
+            : 'all',
+        stockFilter: ['low', 'out'].contains(_productFilter)
+            ? _productFilter
+            : null,
+        category: _productCategory ?? 'All',
+        brand: _productBrand,
+      ),
       identity: (p) => p.id,
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-      emptyTitle: 'Build your product catalog',
-      emptyMessage:
-          'Publish real products with prices, stock and product photos.',
-      emptyAction: 'Add your first product',
-      onEmptyAction: () => _editProduct(),
-      itemBuilder: (ctx, p, _) {
-        return Card(
-          child: InkWell(
-            onTap: () => _editProduct(p),
-            borderRadius: BorderRadius.circular(20),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 72,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: ProductPhoto(p.imageUrl, height: 72),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          p.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                          ),
-                        ),
-                        Text(
-                          '${p.category} / ${p.unit}',
-                          style: const TextStyle(
-                            color: Colors.black54,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '${money(p.price)} / Stock: ${p.stock.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            color: storeGreen,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  PopupMenuButton<String>(
-                    onSelected: (action) async {
-                      if (action == 'edit') {
-                        _editProduct(p);
-                        return;
-                      }
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Remove product?'),
-                          content: Text(
-                            '${p.name} will no longer appear in the customer store. Existing order records are preserved.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx, false),
-                              child: const Text('Cancel'),
-                            ),
-                            FilledButton(
-                              onPressed: () => Navigator.pop(ctx, true),
-                              child: const Text('Remove'),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (confirm == true) {
-                        try {
-                          await ref.read(storeApiProvider).deleteProduct(p.id);
-                          refreshCommerce(ref);
-                        } catch (e) {
-                          if (mounted) showStoreError(context, e);
-                        }
-                      }
-                    },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'edit', child: Text('Edit product')),
-                      PopupMenuItem(
-                        value: 'remove',
-                        child: Text('Remove product'),
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 100),
+      header: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Products',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _productSearchInput,
+            decoration: const InputDecoration(
+              hintText: 'Search Tamil name, reference or brand',
+              prefixIcon: Icon(Icons.search),
+            ),
+            onChanged: (value) {
+              _productDebounce?.cancel();
+              _productDebounce = Timer(const Duration(milliseconds: 350), () {
+                if (mounted) setState(() => _productSearch = value.trim());
+              });
+            },
+          ),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final filter in <(String, String)>[
+                  ('All', 'all'),
+                  ('Published', 'published'),
+                  ('Hidden', 'hidden'),
+                  ('Low Stock', 'low'),
+                  ('Out of Stock', 'out'),
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 7),
+                    child: ChoiceChip(
+                      label: Text(
+                        filter.$1,
+                        style: const TextStyle(fontSize: 11),
                       ),
-                    ],
+                      selected: _productFilter == filter.$2,
+                      onSelected: (_) =>
+                          setState(() => _productFilter = filter.$2),
+                    ),
                   ),
-                ],
-              ),
+              ],
             ),
           ),
-        );
-      },
+          if (_productCategory != null || _productBrand != null)
+            InputChip(
+              label: Text(_productCategory ?? _productBrand!),
+              onDeleted: () => setState(() {
+                _productCategory = null;
+                _productBrand = null;
+              }),
+            ),
+          const SizedBox(height: 16),
+        ],
+      ),
+      emptyTitle: 'No products in this view',
+      emptyMessage: 'Add real products or choose a different filter.',
+      emptyAction: 'Add product',
+      onEmptyAction: () => _editProduct(),
+      itemBuilder: (_, product, _) => OperationsProductCard(
+        product: product,
+        onEdit: () => _editProduct(product),
+        onStock: () => _editStock(product),
+        onPublication: () => _togglePublication(product),
+      ),
     );
+  }
+
+  Future<void> _togglePublication(StoreProduct product) async {
+    try {
+      await ref.read(storeApiProvider).saveProduct({
+        'is_active': !product.published,
+      }, id: product.id);
+      if (mounted) refreshCommerce(ref);
+    } catch (e) {
+      if (mounted) showStoreError(context, e);
+    }
+  }
+
+  Future<void> _editStock(StoreProduct product) async {
+    final input = TextEditingController(text: product.stock.toStringAsFixed(2));
+    var available = product.inStock;
+    final form = GlobalKey<FormState>();
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, update) => AlertDialog(
+          title: const Text('Update stock'),
+          content: Form(
+            key: form,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.tamilName.isNotEmpty
+                      ? product.tamilName
+                      : product.englishName,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: input,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Stock quantity',
+                  ),
+                  validator: (s) {
+                    final value = double.tryParse(s ?? '');
+                    return value == null ||
+                            !value.isFinite ||
+                            value < 0 ||
+                            value > 99999999
+                        ? 'Enter a valid stock quantity'
+                        : null;
+                  },
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: available,
+                  onChanged: (v) => update(() => available = v ?? false),
+                  title: const Text('Available for sale'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (form.currentState!.validate()) {
+                  Navigator.pop(ctx, {
+                    'stock_kg': input.text.trim(),
+                    'is_in_stock': available,
+                  });
+                }
+              },
+              child: const Text('Save stock'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result != null) {
+      try {
+        await ref.read(storeApiProvider).saveProduct(result, id: product.id);
+        if (mounted) refreshCommerce(ref);
+      } catch (e) {
+        if (mounted) showStoreError(context, e);
+      }
+    }
+    // Dialog route can still be completing its closing animation.
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    input.dispose();
   }
 
   Widget _orders() {
     final api = ref.watch(storeApiProvider);
     return Column(
       children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(18, 8, 18, 4),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Orders',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+            ),
+          ),
+        ),
+        if (_assignmentEmployee != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: InputChip(
+              label: Text('Assign to ${_assignmentEmployee!['name']}'),
+              onDeleted: () => setState(() => _assignmentEmployee = null),
+            ),
+          ),
+        if ([
+          'Delivered Today',
+          'Today Attention',
+          'Delayed',
+          'Cash Handover Complete',
+          'Pending Handover',
+          'Cash Review',
+        ].contains(_orderFilter))
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: InputChip(
+                label: Text(_orderFilter),
+                onDeleted: () => _showOrders('Active'),
+              ),
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
           child: TextField(
+            controller: _orderSearchInput,
+            focusNode: _orderSearchFocus,
             decoration: const InputDecoration(
               hintText: 'Search order, customer, phone or address',
               prefixIcon: Icon(Icons.search),
@@ -551,6 +938,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                 'New',
                 'Preparing',
                 'Packed',
+                'Assigned',
                 'Out for Delivery',
                 'Delivery Attempted',
                 'Delivered',
@@ -686,6 +1074,10 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                         child: OrderSummaryCard(
                           order: order,
                           onTap: () => _openOrder(order),
+                          actionLabel: _orderActionLabel(order),
+                          onAction: _quickOrderId == null
+                              ? () => _quickOrder(order)
+                              : null,
                         ),
                       ),
                     ],
@@ -693,6 +1085,10 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                 : OrderSummaryCard(
                     order: order,
                     onTap: () => _openOrder(order),
+                    actionLabel: _orderActionLabel(order),
+                    onAction: _quickOrderId == null
+                        ? () => _quickOrder(order)
+                        : null,
                   ),
           ),
         ),
@@ -700,12 +1096,134 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     );
   }
 
+  String _orderActionLabel(StoreOrder order) => switch (order.status) {
+    'New' => 'Start Preparing',
+    'Preparing' => 'Mark Packed',
+    'Packed' =>
+      order.data['assigned_to'] == null
+          ? 'Assign Employee'
+          : 'View employee pickup',
+    'Out for Delivery' => 'Track delivery',
+    'Delivered' =>
+      order.paymentStatus == 'collected' &&
+              order.data['cash_handover'] == null &&
+              order.data['cash_received_directly'] != true
+          ? 'Verify Cash'
+          : 'Completed · view record',
+    'Cancelled' => 'View cancellation',
+    _ => 'Review order',
+  };
+
+  Future<void> _quickOrder(StoreOrder order) async {
+    if (_quickOrderId != null) return;
+    if (order.status == 'New' || order.status == 'Preparing') {
+      final confirmed = await showModalBottomSheet<bool>(
+        context: context,
+        showDragHandle: true,
+        builder: (ctx) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${_orderActionLabel(order)} · ${order.shortId}',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                for (final item in order.items.take(5))
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Text('${productLabel(item)} x ${item['quantity']}'),
+                  ),
+                if (order.items.length > 5)
+                  Text('+ ${order.items.length - 5} more items'),
+                const SizedBox(height: 16),
+                Text(
+                  order.status == 'Preparing'
+                      ? 'Confirm all items are checked and packed before making this order available for pickup.'
+                      : 'Accept this order and start preparing the items.',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: opsMuted,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: Text(_orderActionLabel(order)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      setState(() => _quickOrderId = order.id);
+      try {
+        await ref.read(storeApiProvider).updateOrder(order.id, {
+          'status': order.nextStatus,
+        });
+        if (mounted) refreshCommerce(ref);
+      } catch (e) {
+        if (mounted) showStoreError(context, e);
+      } finally {
+        if (mounted) setState(() => _quickOrderId = null);
+      }
+      return;
+    }
+    if (order.status == 'Packed' && order.data['assigned_to'] == null) {
+      final person =
+          _assignmentEmployee ??
+          await Navigator.push<Map<String, dynamic>>(
+            context,
+            MaterialPageRoute(builder: (_) => const EmployeePickerScreen()),
+          );
+      if (person == null || !mounted) return;
+      setState(() => _quickOrderId = order.id);
+      try {
+        await ref.read(storeApiProvider).updateOrder(order.id, {
+          'assigned_to': person['id'],
+        });
+        if (mounted) refreshCommerce(ref);
+      } catch (e) {
+        if (mounted) showStoreError(context, e);
+      } finally {
+        if (mounted) setState(() => _quickOrderId = null);
+      }
+      return;
+    }
+    if (_orderActionLabel(order) == 'Verify Cash' &&
+        order.data['assigned_to'] != null) {
+      try {
+        final person = await ref
+            .read(storeApiProvider)
+            .employeeRecord(order.data['assigned_to'] as int);
+        if (mounted) await _receiveCash(person);
+      } catch (e) {
+        if (mounted) showStoreError(context, e);
+      }
+      return;
+    }
+    await _openOrder(order);
+  }
+
   Future<void> _assignSelected() async {
     if (_batchBusy || _selectedOrders.isEmpty) return;
-    final employee = await Navigator.push<Map<String, dynamic>>(
-      context,
-      MaterialPageRoute(builder: (_) => const EmployeePickerScreen()),
-    );
+    final employee =
+        _assignmentEmployee ??
+        await Navigator.push<Map<String, dynamic>>(
+          context,
+          MaterialPageRoute(builder: (_) => const EmployeePickerScreen()),
+        );
     if (employee == null || !mounted) return;
     setState(() => _batchBusy = true);
     try {
@@ -749,12 +1267,28 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
             style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final metric in <(String, String)>[
+                ('Available', 'available'),
+                ('On delivery', 'on_delivery'),
+                ('Inactive', 'inactive'),
+              ])
+                OpsPill(
+                  '${metric.$1} ${ref.watch(adminDashboardProvider).asData?.value['team']?[metric.$2] ?? 0}',
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
           const Text(
             '1. Create login & contact details\n2. Check identity and activate\n3. Open a packed order and assign an employee',
             style: TextStyle(height: 1.7, color: Colors.black54),
           ),
           const SizedBox(height: 12),
           TextField(
+            controller: _teamSearchInput,
             decoration: const InputDecoration(
               hintText: 'Search employee, ID or mobile',
               prefixIcon: Icon(Icons.search),
@@ -804,13 +1338,35 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                       : 'Inactive',
                 ),
               ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: () => _editPerson(p),
-                  icon: const Icon(Icons.manage_accounts_outlined),
-                  label: const Text('Manage profile & receive cash'),
-                ),
+              Wrap(
+                spacing: 4,
+                children: [
+                  TextButton(
+                    onPressed: () => _editPerson(p),
+                    child: const Text(
+                      'View Profile',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: p['ready_for_deliveries'] == true
+                        ? () => _showOrders('Unassigned', employee: p)
+                        : null,
+                    child: const Text(
+                      'Assign Order',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: amount(p['cash_to_handover']) > 0
+                        ? () => _receiveCash(p)
+                        : null,
+                    child: const Text(
+                      'Receive Cash',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -827,7 +1383,12 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   Future<void> _editPerson([Map<String, dynamic>? person]) async {
     final selected = await Navigator.push<Map<String, dynamic>>(
       context,
-      MaterialPageRoute(builder: (_) => EmployeeEditorScreen(person: person)),
+      MaterialPageRoute(
+        builder: (_) => Theme(
+          data: operationsTheme(),
+          child: EmployeeEditorScreen(person: person),
+        ),
+      ),
     );
     if (!mounted) return;
     ref.invalidate(deliveryTeamProvider);
@@ -1018,7 +1579,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
       _description,
       _sku;
   String _imageId = '', _imageUrl = '';
-  bool _busy = false, _uploading = false, _available = true;
+  bool _busy = false, _uploading = false, _available = true, _published = true;
   Timer? _nameDebounce;
   int _nameGeneration = 0;
   bool _suggestingName = false, _applyingName = false;
@@ -1039,13 +1600,14 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
     _brand = TextEditingController(text: p?.brand ?? '');
     _category = TextEditingController(text: p?.category ?? 'Groceries');
     _price = TextEditingController(text: p?.price.toStringAsFixed(2) ?? '');
-    _stock = TextEditingController(text: p?.stock.toStringAsFixed(0) ?? '');
+    _stock = TextEditingController(text: p?.stock.toStringAsFixed(2) ?? '');
     _unit = TextEditingController(text: p?.unit ?? '');
     _description = TextEditingController(text: p?.description ?? '');
     _sku = TextEditingController(text: p?.sku ?? '');
     _imageId = p?.imageId ?? '';
     _imageUrl = p?.imageUrl ?? '';
     _available = p?.inStock ?? true;
+    _published = p?.published ?? true;
     _name.addListener(_queueTamilName);
     _tamil.addListener(_tamilEdited);
   }
@@ -1194,12 +1756,13 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
         'brand': _brand.text.trim(),
         'category': _category.text.trim(),
         'price': double.parse(_price.text).toStringAsFixed(2),
-        'stock_kg': int.parse(_stock.text),
+        'stock_kg': double.parse(_stock.text).toStringAsFixed(2),
         'unit': _unit.text.trim(),
         'description': _description.text.trim(),
         'sku': _sku.text.trim(),
         'image': _imageId.isEmpty ? null : _imageId,
         'is_in_stock': _available,
+        'is_active': _published,
       }, id: widget.product?.id);
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -1213,7 +1776,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
   Widget build(BuildContext context) => PopScope(
     canPop: !_busy && !_uploading,
     child: Theme(
-      data: storeTheme(),
+      data: operationsTheme(),
       child: Scaffold(
         appBar: AppBar(
           title: Text(widget.product == null ? 'Add product' : 'Edit product'),
@@ -1274,21 +1837,21 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
               ),
               const SizedBox(height: 22),
               const Text(
-                'Make it easy to find.',
+                'Product details',
                 style: TextStyle(
-                  fontSize: 26,
+                  fontSize: 22,
                   fontWeight: FontWeight.w800,
                   color: storeInk,
                 ),
               ),
               const SizedBox(height: 8),
               const Text(
-                'A clear name, a real photo and the right price. Your product is published straight to the store.',
+                'Tamil name is shown first. Enter the actual price, selling unit and stock.',
                 style: TextStyle(color: Colors.black54, height: 1.5),
               ),
               const SizedBox(height: 20),
-              _field(_name, 'English / Tanglish name (optional)'),
               _field(_tamil, 'Tamil product name', required: true),
+              _field(_name, 'English / Tanglish reference (optional)'),
               if (_suggestingName) const LinearProgressIndicator(minHeight: 2),
               Row(
                 children: [
@@ -1346,8 +1909,15 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                       'Stock (units)',
                       numeric: true,
                       validator: (s) {
-                        final v = int.tryParse(s ?? '');
-                        return v == null || v < 0 ? 'Use a whole number' : null;
+                        final v = double.tryParse(s ?? '');
+                        return v == null ||
+                                !v.isFinite ||
+                                v < 0 ||
+                                v > 99999999 ||
+                                !RegExp(r'^\d+(\.\d{1,2})?$')
+                                    .hasMatch(s?.trim() ?? '')
+                            ? 'Enter a stock quantity with up to 2 decimals'
+                            : null;
                       },
                     ),
                   ),
@@ -1364,6 +1934,15 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                 value: _available,
                 onChanged: _busy ? null : (v) => setState(() => _available = v),
               ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _published,
+                title: const Text('Publish in customer store'),
+                subtitle: const Text(
+                  'Hidden products stay in your inventory and existing order history.',
+                ),
+                onChanged: _busy ? null : (v) => setState(() => _published = v),
+              ),
               const SizedBox(height: 22),
               FilledButton(
                 onPressed: _busy || _uploading || _namePending ? null : _save,
@@ -1371,7 +1950,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                   _busy
                       ? 'Saving product...'
                       : widget.product == null
-                      ? 'Publish product'
+                      ? (_published ? 'Publish product' : 'Save hidden product')
                       : 'Save changes',
                 ),
               ),
@@ -1567,7 +2146,7 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
 
   @override
   Widget build(BuildContext context) => Theme(
-    data: storeTheme(),
+    data: operationsTheme(),
     child: Scaffold(
       appBar: AppBar(
         title: Text('Order ${_order.shortId}'),

@@ -8,7 +8,13 @@ from rest_framework.exceptions import ValidationError
 from .commerce import cash_total, is_grocery_category
 from decimal import Decimal
 from rest_framework import serializers
-from .models import Product, ProductImage, DeliveryPersonnel, EmployeeCodeSequence, Order, OrderItem, OrderEvent, CustomerProfile, CashHandover
+from .models import Product, ProductImage, DeliveryPersonnel, EmployeeCodeSequence, Order, OrderItem, OrderEvent, CustomerProfile, CashHandover, NewItemRequest
+
+
+class NewItemRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NewItemRequest
+        fields = ['id', 'item_name', 'customer_phone', 'requested_at', 'status', 'notes']
 
 
 @transaction.atomic
@@ -98,7 +104,7 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = ['order_id', 'customer_name', 'customer_phone', 'delivery_address', 'delivery_instructions',
                   'subtotal', 'delivery_charge', 'total_amount', 'payment_method', 'payment_status', 'status',
                   'assigned_to', 'assigned_to_details', 'estimated_delivery_at', 'delivery_note',
-                  'created_at', 'updated_at', 'delivered_at', 'items', 'events',
+                  'created_at', 'updated_at', 'packed_at', 'dispatched_at', 'delivered_at', 'items', 'events',
                   'cash_collected_amount', 'cash_collected_at', 'cash_received_directly', 'delivery_attempts', 'cancellation_reason', 'cash_handover']
         read_only_fields = fields
 

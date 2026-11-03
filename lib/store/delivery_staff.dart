@@ -355,31 +355,15 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
           controller: _scroll,
           padding: const EdgeInsets.all(20),
           children: [
-            Card(
-              color: storeGreen,
-              child: const Padding(
-                padding: EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Build your delivery team',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Set up login, check documents, then assign packed orders. Employees handle delivery and cash; you confirm cash handovers.',
-                      style: TextStyle(color: Colors.white70, height: 1.6),
-                    ),
-                  ],
-                ),
+            const Text(
+              'Create a login, record work details, then verify and activate.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.black54,
+                height: 1.5,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
             Row(
               children: [
                 for (var i = 0; i < 3; i++)
@@ -525,6 +509,34 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
             ],
             if (_setupStep == 2) ...[
               _heading('3. Verify identity & activate'),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Review employee details',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${_fields['name']!.text}\n${_fields['phone']!.text}\n${_fields['city']!.text} · ${_fields['pincode']!.text}',
+                        style: const TextStyle(fontSize: 12, height: 1.7),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Role: Delivery employee${_person?['employee_code'] == null ? ' · ID generated after saving' : ' · ${_person!['employee_code']}'}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
               DropdownButtonFormField<String>(
                 initialValue: _idType,
                 isExpanded: true,

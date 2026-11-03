@@ -411,6 +411,8 @@ class StoreApi {
     bool? inStock,
     String? collection,
     bool admin = false,
+    String publication = 'published',
+    String? stockFilter,
   }) async {
     if (cursor == null) await config();
     return _page(
@@ -419,6 +421,8 @@ class StoreApi {
       cursor: cursor,
       admin: admin,
       filters: {
+        if (admin) 'publication': publication,
+        if (admin && stockFilter != null) 'stock': stockFilter,
         if (search.isNotEmpty) 'search': search,
         if (category != 'All' && category.isNotEmpty) 'category': category,
         if (brand != null && brand.isNotEmpty && brand != 'All') 'brand': brand,
@@ -464,6 +468,7 @@ class StoreApi {
     String? cursor,
     String search = '',
     bool ready = false,
+    bool cashPending = false,
   }) => _page(
     '/admin/delivery-personnel/',
     (j) => j,
@@ -472,6 +477,7 @@ class StoreApi {
     filters: {
       if (search.isNotEmpty) 'search': search,
       if (ready) 'ready': 'true',
+      if (cashPending) 'cash': 'pending',
     },
   );
   Future<StorePage<StoreProduct>> wishlistPage(String? cursor) => _page(
@@ -492,6 +498,8 @@ class StoreApi {
         cursor: cursor,
         admin: true,
       );
+  Future<StorePage<Map<String, dynamic>>> adminRequestPage(String? cursor) =>
+      _page('/admin/search-requests/', (j) => j, cursor: cursor, admin: true);
   Future<StorePage<Map<String, dynamic>>> receiptPage({
     int? employeeId,
     String? cursor,

@@ -31,6 +31,7 @@ urlpatterns = [
     path('admin/login/', views.admin_login),
     path('admin/logout/', views.admin_logout),
     path('admin/dashboard/', views.admin_dashboard),
+    path('admin/search-requests/', views.admin_search_requests),
     path('admin/products/', views.admin_products),
     path('admin/products/tamil-name/', views.suggest_tamil_product_name),
     path('admin/products/<str:pk>/', views.admin_product_detail),
