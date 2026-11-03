@@ -2,6 +2,8 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path('orders/<str:order_id>/delivery-code/', views.refresh_delivery_code),
+    path('orders/<str:order_id>/tracking/', views.order_tracking),
     path('health/', views.health),
     path('config/', views.store_config),
     path('session/', views.customer_session),
@@ -34,6 +36,7 @@ urlpatterns = [
     path('admin/products/<str:pk>/', views.admin_product_detail),
     path('admin/images/', views.upload_product_image),
     path('admin/orders/', views.admin_orders),
+    path('admin/orders/assign/', views.admin_batch_assign),
     path('admin/orders/<str:order_id>/', views.admin_order_update),
     path('admin/delivery-personnel/', views.admin_delivery_personnel),
     path('admin/delivery-personnel/<int:pk>/', views.admin_delivery_person_detail),

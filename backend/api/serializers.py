@@ -99,7 +99,7 @@ class OrderSerializer(serializers.ModelSerializer):
                   'subtotal', 'delivery_charge', 'total_amount', 'payment_method', 'payment_status', 'status',
                   'assigned_to', 'assigned_to_details', 'estimated_delivery_at', 'delivery_note',
                   'created_at', 'updated_at', 'delivered_at', 'items', 'events',
-                  'cash_collected_amount', 'cash_collected_at', 'delivery_attempts', 'cancellation_reason', 'cash_handover']
+                  'cash_collected_amount', 'cash_collected_at', 'cash_received_directly', 'delivery_attempts', 'cancellation_reason', 'cash_handover']
         read_only_fields = fields
 
 
@@ -285,6 +285,7 @@ class DeliveryActionSerializer(serializers.Serializer):
     delivery_note = serializers.CharField(required=False, allow_blank=True, max_length=255, default='')
     cash_collected = serializers.BooleanField(required=False, default=False)
     cash_collected_amount = serializers.DecimalField(required=False, max_digits=10, decimal_places=2, min_value=Decimal('0.01'))
+    delivery_code = serializers.RegexField(r'^\d{5}$', required=False, default='', max_length=5)
     def to_internal_value(self, data):
         extra = set(data) - set(self.fields)
         if extra:

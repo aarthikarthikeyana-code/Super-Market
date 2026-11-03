@@ -606,80 +606,203 @@ class OrderSummaryCard extends StatelessWidget {
   final VoidCallback onTap;
   const OrderSummaryCard({super.key, required this.order, required this.onTap});
   @override
-  Widget build(BuildContext context) => Card(
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.receipt_long_outlined, color: storeGreen),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    order.id,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                    overflow: TextOverflow.ellipsis,
+  Widget build(BuildContext context) {
+    final cancelled = order.status == 'Cancelled';
+    final completed = order.status == 'Delivered';
+    final attention = ['New', 'Delivery Attempted'].contains(order.status);
+    final person = order.data['assigned_to_details'] as Map?;
+    final date = DateTime.tryParse('${order.data['created_at']}')?.toLocal();
+    final units = order.items.fold<int>(
+      0,
+      (sum, item) => sum + (item['quantity'] as num).toInt(),
+    );
+    final photo = order.items.isEmpty
+        ? ''
+        : '${order.items.first['image_url'] ?? ''}';
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      order.shortId,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                      ),
+                    ),
                   ),
-                ),
-                const Icon(Icons.chevron_right, color: Colors.black38),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                StatusChip(order.status),
-                StatusChip(order.paymentStatus),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Text(
-              order.items
-                  .map((i) => '${productLabel(i)} × ${i['quantity']}')
-                  .join(', '),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    order.data['customer_name'] ?? '',
-                    style: const TextStyle(color: Colors.black54),
+                  if (date != null)
+                    Text(
+                      '${date.day}/${date.month} · ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.chevron_right, color: Colors.black38),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  StatusChip(order.status),
+                  if (!cancelled) StatusChip(order.paymentStatus),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: 56,
+                      height: 56,
+                      child: ProductPhoto(photo, height: 56),
+                    ),
                   ),
-                ),
-                Text(
-                  money(order.total),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${order.data['customer_name'] ?? 'Customer'}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          order.items
+                              .map(
+                                (i) => '${productLabel(i)} × ${i['quantity']}',
+                              )
+                              .join(', '),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${order.data['delivery_address'] ?? ''}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '$units items · ${person?['name'] ?? (cancelled ? 'Closed' : 'Unassigned')}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        money(order.total),
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        cancelled
+                            ? 'No cash due'
+                            : completed
+                            ? (order.paymentStatus == 'collected'
+                                  ? 'Cash collected'
+                                  : 'Paid online')
+                            : order.paymentStatus == 'cod'
+                            ? 'Collect on delivery'
+                            : 'Paid online',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: cancelled ? Colors.black54 : storeGreen,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    cancelled
+                        ? Icons.cancel_outlined
+                        : attention
+                        ? Icons.bolt
+                        : completed
+                        ? Icons.task_alt
+                        : Icons.arrow_circle_right_outlined,
+                    size: 17,
+                    color: attention ? const Color(0xFF9B5B13) : storeGreen,
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      order.nextAction,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: attention ? const Color(0xFF9B5B13) : storeGreen,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class OrderActionDialog extends StatefulWidget {
   final String kind;
   final double total;
   final bool requireReturn;
+  final bool adminAssistance;
   const OrderActionDialog({
     super.key,
     required this.kind,
     this.total = 0,
     this.requireReturn = false,
+    this.adminAssistance = false,
   });
   @override
   State<OrderActionDialog> createState() => OrderActionDialogState();
@@ -688,10 +811,13 @@ class OrderActionDialog extends StatefulWidget {
 class OrderActionDialogState extends State<OrderActionDialog> {
   final _form = GlobalKey<FormState>();
   final _value = TextEditingController();
+  final _deliveryCode = TextEditingController();
   bool _confirmed = false;
+  bool _storeReceived = false;
   @override
   void dispose() {
     _value.dispose();
+    _deliveryCode.dispose();
     super.dispose();
   }
 
@@ -700,6 +826,7 @@ class OrderActionDialogState extends State<OrderActionDialog> {
     final handover = widget.kind == 'handover';
     final cash = widget.kind == 'cash' || handover;
     final cancel = widget.kind == 'cancel';
+    final codeOnly = widget.kind == 'delivery';
     final needsConfirm = cash || widget.requireReturn;
     return AlertDialog(
       title: Text(
@@ -709,6 +836,8 @@ class OrderActionDialogState extends State<OrderActionDialog> {
             ? 'Confirm cash collection'
             : cancel
             ? 'Cancel this order?'
+            : codeOnly
+            ? 'Verify delivery code'
             : 'Record delivery attempt',
       ),
       content: SingleChildScrollView(
@@ -725,37 +854,60 @@ class OrderActionDialogState extends State<OrderActionDialog> {
                     ? 'Collect ${money(widget.total)} from the customer before completing delivery.'
                     : cancel
                     ? 'The reason is visible to the customer. Stock will be restored once this cancellation is confirmed.'
+                    : codeOnly
+                    ? 'This order is already paid. Hand over all items and ask the customer for the delivery code shown in their order screen.'
                     : 'Tell the customer why delivery could not be completed. You can arrange another attempt from this order.',
               ),
               const SizedBox(height: 18),
-              TextFormField(
-                controller: _value,
-                keyboardType: cash
-                    ? const TextInputType.numberWithOptions(decimal: true)
-                    : TextInputType.multiline,
-                maxLines: cash ? 1 : 3,
-                maxLength: cash ? 12 : 255,
-                decoration: InputDecoration(
-                  labelText: handover
-                      ? 'Cash received (INR)'
-                      : cash
-                      ? 'Cash collected (INR)'
-                      : 'Reason',
-                  hintText: cash ? widget.total.toStringAsFixed(2) : null,
+              if (widget.kind == 'cash' || codeOnly) ...[
+                const Text(
+                  'Ask the customer to open Orders → this order. Enter their delivery code only after handing over all items.',
                 ),
-                validator: (value) {
-                  if (cash) {
-                    if (!RegExp(r'^\d+(\.\d{1,2})?$')
-                            .hasMatch(value?.trim() ?? '') ||
-                        double.tryParse(value!.trim()) != widget.total) {
-                      return 'Enter exactly ${money(widget.total)}';
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _deliveryCode,
+                  keyboardType: TextInputType.number,
+                  maxLength: 5,
+                  decoration: const InputDecoration(
+                    labelText: 'Delivery code',
+                    hintText: '5 digits',
+                    prefixIcon: Icon(Icons.verified_user_outlined),
+                  ),
+                  validator: (s) => RegExp(r'^\d{5}$').hasMatch(s?.trim() ?? '')
+                      ? null
+                      : 'Enter the customer’s 5-digit delivery code',
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (!codeOnly)
+                TextFormField(
+                  controller: _value,
+                  keyboardType: cash
+                      ? const TextInputType.numberWithOptions(decimal: true)
+                      : TextInputType.multiline,
+                  maxLines: cash ? 1 : 3,
+                  maxLength: cash ? 12 : 255,
+                  decoration: InputDecoration(
+                    labelText: handover
+                        ? 'Cash received (INR)'
+                        : cash
+                        ? 'Cash collected (INR)'
+                        : 'Reason',
+                    hintText: cash ? widget.total.toStringAsFixed(2) : null,
+                  ),
+                  validator: (value) {
+                    if (cash) {
+                      if (!RegExp(r'^\d+(\.\d{1,2})?$')
+                              .hasMatch(value?.trim() ?? '') ||
+                          double.tryParse(value!.trim()) != widget.total) {
+                        return 'Enter exactly ${money(widget.total)}';
+                      }
+                    } else if ((value?.trim().length ?? 0) < 3) {
+                      return 'Enter a clear reason';
                     }
-                  } else if ((value?.trim().length ?? 0) < 3) {
-                    return 'Enter a clear reason';
-                  }
-                  return null;
-                },
-              ),
+                    return null;
+                  },
+                ),
               if (needsConfirm)
                 CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
@@ -768,6 +920,18 @@ class OrderActionDialogState extends State<OrderActionDialog> {
                         : cash
                         ? 'Cash has been received from the customer.'
                         : 'Undelivered items are back in store and available for stock.',
+                  ),
+                ),
+              if (widget.kind == 'cash' && widget.adminAssistance)
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _storeReceived,
+                  onChanged: (v) => setState(() => _storeReceived = v ?? false),
+                  title: const Text(
+                    'I delivered and the cash is already with the store.',
+                  ),
+                  subtitle: const Text(
+                    'Leave unchecked when recording cash still held by the assigned employee.',
                   ),
                 ),
             ],
@@ -789,17 +953,24 @@ class OrderActionDialogState extends State<OrderActionDialog> {
                       'cash_collected': true,
                       'cash_collected_amount': _value.text.trim(),
                     },
+                    if (widget.kind == 'cash' || codeOnly)
+                      'delivery_code': _deliveryCode.text.trim(),
+                    if (widget.kind == 'cash' && widget.adminAssistance)
+                      'cash_received_by_store': _storeReceived,
                     if (cancel) ...{
                       'cancellation_reason': _value.text.trim(),
                       'stock_returned': _confirmed,
                     },
-                    if (!cash && !cancel) 'delivery_note': _value.text.trim(),
+                    if (!cash && !cancel && !codeOnly)
+                      'delivery_note': _value.text.trim(),
                   });
                 },
           child: Text(
             handover
                 ? 'Confirm store receipt'
                 : cash
+                ? 'Complete delivery'
+                : codeOnly
                 ? 'Complete delivery'
                 : cancel
                 ? 'Cancel order'

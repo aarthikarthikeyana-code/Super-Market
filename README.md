@@ -40,7 +40,7 @@ Customers sign in, review their saved address and place an order without prepayi
 
 Administrators manage **New -> Preparing -> Packed -> Out for Delivery -> Delivered**. Dispatch requires an active delivery person. At delivery, the assigned employee enters the exact cash amount and confirms receipt from the customer; an administrator can also record this on the employee's behalf. Only then does the order become Delivered / Cash collected. The receipt records the amount, timestamp and staff user. The dashboard separately reports cash collected and cash still due; placing an order does not count as cash received.
 
-An unsuccessful delivery becomes **Delivery Attempted** with a mandatory customer-visible reason. Staff can assign another person/arrival estimate and retry, or cancel after confirming the items have returned to store. Orders already out for delivery must first be marked attempted before cancellation; this prevents restoring stock that is still with a driver. Delivered orders cannot be cancelled or edited through this flow. Delivery notes, assigned contact, estimated arrival and the activity timeline appear in the customer app. Administrators manage preparation, assignments, cancellations and cash handovers. Delivery employees sign in separately to manage only their assigned work. There is no GPS tracking.
+An unsuccessful delivery becomes **Delivery Attempted** with a mandatory customer-visible reason. Staff can assign another person/arrival estimate and retry, or cancel after confirming the items have returned to store. Orders already out for delivery must first be marked attempted before cancellation; this prevents restoring stock that is still with a driver. Delivered orders cannot be cancelled or edited through this flow. Delivery notes, assigned contact, estimated arrival and the activity timeline appear in the customer app. Administrators manage preparation, assignments, cancellations and cash handovers. Delivery employees sign in separately to manage only their assigned work. Active deliveries support permission-based device GPS sharing, recorded trip display and Google Maps navigation; see the delivery workspace notes below.
 
 Existing unpaid online checkouts may still be cancelled or released by `python manage.py expire_checkouts`. Historical paid orders remain readable and are not converted into cash payments. Old payment disputes/refunds require manual review against the original provider's records.
 
@@ -142,3 +142,71 @@ The existing Antigravity green/cream screens use the public `/api/catalog/browse
 Fresh produce categories are excluded from customer catalog, details, wishlist and checkout; existing records and order history are retained. New/changed fresh produce categories are rejected by product validation. Grocery categories such as dried fruits and vegetable oils remain allowed. Product photos require an admin-uploaded image record; unverified legacy URLs are not displayed. Missing photos use neutral basket/category icons. MRP is not synthesized, savings/discounts are not fabricated, and cart totals use the exact backend delivery fee without a hardcoded free-delivery threshold. Login stays in the hamburger menu and existing purchase authentication remains unchanged.
 
 This search/browse completion adds no database migrations and seeds no records. The existing delivery-password migration 0011 is a separate pending change; run it manually if not already applied. No migrations are applied by application startup.
+
+
+## Delivery workspace and customer confirmation
+
+The admin queue opens on Active orders. Search by order ID, customer, mobile,
+address or employee; combine stage, Needs employee and Today filters. Stage
+counts come from the server and pages contain at most 48 orders (24 by default).
+Short order references keep cards readable; full references remain in details.
+Cancelled cards show the reason and no cash due, without duplicate status chips.
+A 1,006-order isolated test verifies filtering and cursor paging; this is a
+functional check, not a production traffic benchmark.
+
+Employee onboarding has three stages: Login, Work details, Verify and activate.
+Existing checks still require active accounts, original-document verification and
+valid licences for motor vehicles. Only eligible employees appear in assignment.
+Choosing an employee saves the assignment immediately. Select packed orders in
+the queue to assign up to 50 at once. Batch assignment validates and locks every
+selected order; if one is no longer packed, none of that batch is assigned.
+Normal store work is
+Prepare -> Pack -> Assign; the employee picks up from their own app. Admin pickup
+and completion controls live under Admin delivery assistance for exceptional use.
+When an administrator personally receives the customer cash, the completion dialog
+has an explicit cash-already-with-store option. This credits the store directly
+and does not leave a false debt against the assigned employee.
+
+Dispatch issues a five-digit code for that order. Only its authenticated customer
+can retrieve it from their order detail endpoint. It is never included in staff
+or shared order serializers. The code expires after two hours; five incorrect
+attempts lock it, and only the customer can request a fresh code (five refresh
+requests per hour per order). Incorrect attempts persist without recording cash.
+Completion requires the code plus the exact COD amount and explicit cash receipt
+confirmation, including when an administrator assists. Repeating a successful
+cash completion does not create another receipt. Historical prepaid orders use
+code verification without collecting cash again. The existing customer demo
+login is still not proof of phone ownership: configure verified SMS login before
+public release; delivery confirmation cannot secure a compromised customer account.
+
+An employee can enable trip location sharing after pickup and stop it explicitly.
+Only active, assigned, verified employees can submit fresh coordinates for their
+orders. Android uses a visible foreground-service notification; iOS and web need
+the app open. App termination, permission denial, battery restrictions, lost GPS
+or network access can interrupt updates. Reopen the active delivery and resume
+sharing after an app restart. No always-on or off-duty tracking is implemented.
+Customer maps disappear after delivery/cancellation. Staff can review recorded
+fixes; timestamps and accuracy distinguish recent fixes from stale information.
+The displayed line joins sampled GPS fixes and is not a calculated road route.
+Google Maps navigation uses the customer's address; verify that Maps resolves the
+address correctly. No destination coordinates or road ETA are fabricated.
+
+Embedded maps use flutter_map with OpenStreetMap attribution. MAP_TILE_URL can
+select a compatible tile provider via a Dart define. The default public tile
+service is suitable for development; configure a provider appropriate for your
+production volume and preserve its attribution and usage requirements.
+Location storage is bounded to approximately 1,000 fixes per order and responses
+to at most 300 sampled fixes. Schedule the following command daily to remove
+closed-trip fixes older than seven days:
+
+```powershell
+.\.venv\Scripts\python.exe backend/manage.py purge_delivery_locations --dry-run
+.\.venv\Scripts\python.exe backend/manage.py purge_delivery_locations
+```
+
+Deploy the backend and mobile update together. Apply migration 0012 manually
+before serving the new backend; application startup does not run migrations.
+Existing out-for-delivery orders obtain a code when their customer taps Get a
+fresh delivery code. Upgrade employee clients before enabling code-required
+completion. Real-phone pickup, Google Maps handoff, background behaviour,
+customer code entry and cash handover must be acceptance-tested before release.

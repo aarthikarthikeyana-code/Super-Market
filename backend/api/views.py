@@ -19,7 +19,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser, BasePermission
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle, UserRateThrottle
-from . import commerce, gateways
+from . import commerce, gateways, delivery
 from .commerce import cash_total
 from .serializers import EmployeeSerializer, DeliveryActionSerializer, CashReceiptSerializer, CashDueSerializer, CashHandoverSerializer
 from rest_framework.pagination import CursorPagination
@@ -449,7 +449,46 @@ def customer_orders(request):
 @permission_classes([IsAuthenticated])
 def customer_order_detail(request, order_id):
     order = get_object_or_404(orders_queryset(), order_id=order_id, customer=request.user)
-    return Response({'order': OrderSerializer(order).data, 'checkout': None})
+    return Response({'order': OrderSerializer(order).data, 'checkout': None,
+                     'delivery_confirmation': delivery.customer_confirmation(order)})
+
+
+class DeliveryCodeRefreshThrottle(UserRateThrottle):
+    scope = 'delivery_code'
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {'scope': self.scope, 'ident': f'{request.user.pk}:{view.kwargs.get("order_id", "")}' }
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([DeliveryCodeRefreshThrottle])
+@transaction.atomic
+def refresh_delivery_code(request, order_id):
+    order = get_object_or_404(Order.objects.select_for_update(), order_id=order_id, customer=request.user)
+    if order.status != 'Out for Delivery':
+        raise ValidationError({'detail': 'A delivery code is available after your employee starts the delivery.'})
+    if not delivery.customer_confirmation(order)['code']:
+        delivery.issue_code(order)
+        order.save(update_fields=['delivery_code_nonce', 'delivery_code_expires_at', 'delivery_code_attempts', 'delivery_code_verified_at'])
+        OrderEvent.objects.create(order=order, status=order.status, note='Customer requested a fresh delivery confirmation code.')
+    return Response(delivery.customer_confirmation(order))
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def order_tracking(request, order_id):
+    user = request.user
+    allowed = Order.objects.filter(customer__isnull=False)
+    if not user.is_staff:
+        allowed = allowed.filter(Q(customer=user) | Q(assigned_to__user=user, assigned_to__is_active=True))
+    order = get_object_or_404(allowed, order_id=order_id)
+    if request.method == 'POST':
+        data = delivery.LocationInput(data=request.data)
+        data.is_valid(raise_exception=True)
+        delivery.record_location(order_id, user, data.validated_data)
+        return Response(status=204)
+    return Response(delivery.tracking_payload(order, customer=order.customer_id == user.pk and not user.is_staff))
 
 
 @api_view(['POST'])
@@ -471,7 +510,7 @@ def admin_dashboard(request):
                      'new_orders': fulfilled.filter(status='New').count(),
                      'revenue': str(fulfilled.filter(payment_status__in=['paid', 'collected']).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')),
                      'cash_collected': str(orders.filter(payment_status='collected').aggregate(total=Sum('cash_collected_amount'))['total'] or Decimal('0.00')),
-                     'cash_received_by_store': str(CashHandover.objects.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')),
+                     'cash_received_by_store': str((CashHandover.objects.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')) + (orders.filter(payment_status='collected', cash_received_directly=True).aggregate(total=Sum('cash_collected_amount'))['total'] or Decimal('0.00'))),
                      'cash_with_employees': str(orders.filter(payment_status='collected', cash_collected_for__isnull=False, cash_handover__isnull=True).aggregate(total=Sum('cash_collected_amount'))['total'] or Decimal('0.00')),
                      'cash_due': str(orders.filter(payment_status='cod').exclude(status='Cancelled').aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')),
                      'delivery_attempted': fulfilled.filter(status='Delivery Attempted').count(),
@@ -485,15 +524,59 @@ def admin_dashboard(request):
 @permission_classes([IsAdminUser])
 def admin_orders(request):
     orders = orders_queryset()
-    if request.query_params.get('status'):
-        orders = orders.filter(status=request.query_params['status'])
-    return collection_response(request, orders, OrderSerializer, ('-created_at', '-pk'))
+    search = request.query_params.get('search', '').strip()[:100]
+    if search:
+        orders = orders.filter(Q(order_id__icontains=search) | Q(customer_name__icontains=search)
+                               | Q(customer_phone__icontains=search) | Q(delivery_address__icontains=search)
+                               | Q(assigned_to__name__icontains=search))
+    if request.query_params.get('assigned') == 'unassigned':
+        orders = orders.filter(assigned_to__isnull=True).exclude(status__in=['Delivered', 'Cancelled'])
+    elif request.query_params.get('assigned'):
+        try:
+            orders = orders.filter(assigned_to_id=int(request.query_params['assigned']))
+        except ValueError:
+            raise ValidationError({'assigned': 'Choose a valid employee.'}) from None
+    if request.query_params.get('date'):
+        from django.utils.dateparse import parse_date
+        try:
+            date = parse_date(request.query_params['date'])
+        except ValueError:
+            date = None
+        if not date:
+            raise ValidationError({'date': 'Use YYYY-MM-DD.'})
+        orders = orders.filter(created_at__date=date)
+    counts = dict(orders.order_by().values('status').annotate(total=Count('pk')).values_list('status', 'total'))
+    stage = request.query_params.get('status')
+    if stage == 'Active':
+        orders = orders.exclude(status__in=['Delivered', 'Cancelled'])
+    elif stage and stage != 'All':
+        orders = orders.filter(status=stage)
+    return collection_response(request, orders, OrderSerializer, ('-created_at', '-pk'), {'stage_counts': counts})
 
 
-@api_view(['PATCH'])
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+@transaction.atomic
+def admin_batch_assign(request):
+    from rest_framework import serializers
+    ids = serializers.ListField(child=serializers.CharField(max_length=32), min_length=1, max_length=50).run_validation(request.data.get('order_ids'))
+    if len(ids) != len(set(ids)):
+        raise ValidationError({'order_ids': 'Choose each order only once.'})
+    person_id = serializers.IntegerField(min_value=1).run_validation(request.data.get('assigned_to'))
+    orders = list(Order.objects.select_for_update().filter(order_id__in=ids, customer__isnull=False).order_by('pk'))
+    if len(orders) != len(ids) or any(o.status != 'Packed' for o in orders):
+        raise ValidationError({'order_ids': 'Only current packed orders can be batch assigned. Refresh the queue and select again. No assignments were saved.'})
+    for order in orders:
+        commerce.transition_order(order.order_id, None, person_id=person_id, actor=request.user)
+    return Response({'assigned': len(orders)})
+
+
+@api_view(['GET', 'PATCH'])
 @permission_classes([IsAdminUser])
 def admin_order_update(request, order_id):
-    get_object_or_404(Order, order_id=order_id, customer__isnull=False)
+    current = get_object_or_404(orders_queryset(), order_id=order_id)
+    if request.method == 'GET':
+        return Response(OrderSerializer(current).data)
     note = str(request.data.get('delivery_note', ''))
     if len(note) > 255:
         raise ValidationError({'delivery_note': 'Use at most 255 characters.'})
@@ -508,7 +591,7 @@ def admin_order_update(request, order_id):
             person_id = int(person_id)
         except (ValueError, TypeError):
             raise ValidationError({'assigned_to': 'Choose a valid delivery person.'}) from None
-    for field in ['cash_collected', 'stock_returned']:
+    for field in ['cash_collected', 'stock_returned', 'cash_received_by_store']:
         if field in request.data and type(request.data[field]) is not bool:
             raise ValidationError({field: 'Use true or false.'})
     if request.data.get('status') == 'Cancelled':
@@ -522,7 +605,8 @@ def admin_order_update(request, order_id):
         if request.data.get('cash_collected_amount') is not None:
             cash_amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01')).run_validation(request.data['cash_collected_amount'])
         order = commerce.transition_order(order_id, request.data.get('status'), note, person_id, eta,
-                                          cash_collected=request.data.get('cash_collected', False), cash_amount=cash_amount, actor=request.user)
+                                          cash_collected=request.data.get('cash_collected', False), cash_amount=cash_amount, actor=request.user,
+                                          delivery_code=request.data.get('delivery_code', ''), cash_received_by_store=request.data.get('cash_received_by_store', False))
     return Response(OrderSerializer(order).data)
 
 
@@ -646,7 +730,8 @@ def employee_order(request, order_id):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         order = commerce.transition_order(order_id, data['status'], data['delivery_note'],
-                                          cash_collected=data['cash_collected'], cash_amount=data.get('cash_collected_amount'), actor=request.user)
+                                          cash_collected=data['cash_collected'], cash_amount=data.get('cash_collected_amount'), actor=request.user,
+                                          delivery_code=data.get('delivery_code', ''))
     return Response(OrderSerializer(order).data)
 
 

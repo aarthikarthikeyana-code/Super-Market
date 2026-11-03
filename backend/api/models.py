@@ -111,11 +111,16 @@ class Order(models.Model):
     payment_status = models.CharField(max_length=20, default='pending')
     cash_collected_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     cash_collected_at = models.DateTimeField(null=True, blank=True)
+    cash_received_directly = models.BooleanField(default=False)
     cash_collected_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='cash_collections_recorded')
     cash_collected_for = models.ForeignKey(DeliveryPersonnel, null=True, blank=True, on_delete=models.PROTECT, related_name='cash_orders')
     cash_handover = models.ForeignKey('CashHandover', null=True, blank=True, on_delete=models.PROTECT, related_name='orders')
     delivery_attempts = models.PositiveSmallIntegerField(default=0)
     cancellation_reason = models.CharField(max_length=255, blank=True)
+    delivery_code_nonce = models.UUIDField(null=True, blank=True)
+    delivery_code_expires_at = models.DateTimeField(null=True, blank=True)
+    delivery_code_attempts = models.PositiveSmallIntegerField(default=0)
+    delivery_code_verified_at = models.DateTimeField(null=True, blank=True)
     razorpay_order_id = models.CharField(max_length=100, null=True, blank=True, unique=True)
     razorpay_payment_id = models.CharField(max_length=100, null=True, blank=True, unique=True)
     stock_released = models.BooleanField(default=False)
@@ -153,9 +158,23 @@ class Order(models.Model):
                    models.Index(fields=['assigned_to', '-created_at', '-id'], name='delivery_order_cursor_idx'),
                    models.Index(fields=['-created_at', '-id'], name='orders_created_cursor_idx'),
                    models.Index(fields=['cash_collected_for', 'cash_handover', 'cash_collected_at', 'id'], name='cash_due_employee_cursor_idx')]
+        indexes += [models.Index(fields=['status', '-created_at', '-id'], name='orders_stage_cursor_idx')]
 
     def __str__(self):
         return f"{self.order_id} - {self.status}"
+
+
+class DeliveryLocation(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='locations')
+    employee = models.ForeignKey(DeliveryPersonnel, on_delete=models.CASCADE)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6)
+    longitude = models.DecimalField(max_digits=10, decimal_places=6)
+    accuracy = models.FloatField()
+    captured_at = models.DateTimeField()
+    received_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=['order', '-captured_at', '-id'], name='delivery_location_order_idx')]
 
 
 class CashHandover(models.Model):

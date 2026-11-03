@@ -13,6 +13,7 @@ import 'delivery_staff.dart';
 import 'delivery_app.dart';
 import 'paged_feed.dart';
 import 'employee_picker.dart';
+import 'delivery_tracking.dart';
 
 class AdminConsoleScreen extends ConsumerStatefulWidget {
   const AdminConsoleScreen({super.key});
@@ -23,7 +24,12 @@ class AdminConsoleScreen extends ConsumerStatefulWidget {
 class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   bool _signedIn = false;
   int _tab = 0;
-  String _orderFilter = 'All';
+  String _orderFilter = 'Active', _orderSearch = '', _teamSearch = '';
+  bool _unassignedOnly = false, _todayOnly = false;
+  Map<String, dynamic> _stageCounts = {};
+  final Set<String> _selectedOrders = {};
+  bool _batchBusy = false;
+  Timer? _searchDebounce, _teamDebounce;
   Timer? _poll;
   late final StoreApi _api;
   @override
@@ -45,6 +51,8 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _teamDebounce?.cancel();
     _api.staffChanges.removeListener(_staffChanged);
     _poll?.cancel();
     super.dispose();
@@ -487,12 +495,58 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     final api = ref.watch(storeApiProvider);
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+          child: TextField(
+            decoration: const InputDecoration(
+              hintText: 'Search order, customer, phone or address',
+              prefixIcon: Icon(Icons.search),
+            ),
+            onChanged: (value) {
+              _searchDebounce?.cancel();
+              _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+                if (mounted) {
+                  setState(() {
+                    _orderSearch = value.trim();
+                    _selectedOrders.clear();
+                  });
+                }
+              });
+            },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              FilterChip(
+                label: const Text('Needs employee'),
+                selected: _unassignedOnly,
+                onSelected: (v) => setState(() {
+                  _unassignedOnly = v;
+                  _orderFilter = 'Active';
+                  _selectedOrders.clear();
+                }),
+              ),
+              const SizedBox(width: 8),
+              FilterChip(
+                label: const Text('Today'),
+                selected: _todayOnly,
+                onSelected: (v) => setState(() {
+                  _todayOnly = v;
+                  _selectedOrders.clear();
+                }),
+              ),
+            ],
+          ),
+        ),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
           child: Row(
             children: [
               for (final status in [
+                'Active',
                 'All',
                 'New',
                 'Preparing',
@@ -505,32 +559,172 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
-                    label: Text(status),
+                    label: Text(
+                      _stageCounts.containsKey(status)
+                          ? '$status (${_stageCounts[status]})'
+                          : status,
+                    ),
                     selected: _orderFilter == status,
-                    onSelected: (_) => setState(() => _orderFilter = status),
+                    onSelected: (_) => setState(() {
+                      _orderFilter = status;
+                      _selectedOrders.clear();
+                    }),
                   ),
                 ),
             ],
           ),
         ),
+        if (_selectedOrders.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _batchBusy ? null : _assignSelected,
+                    icon: const Icon(Icons.group_add_outlined),
+                    label: Text(
+                      _batchBusy
+                          ? 'Assigning...'
+                          : 'Assign ${_selectedOrders.length} packed orders',
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: _batchBusy
+                      ? null
+                      : () => setState(_selectedOrders.clear),
+                  tooltip: 'Clear selection',
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+          ),
         Expanded(
           child: PagedFeed<StoreOrder>(
-            queryKey: ('adminOrders', api.adminToken, _orderFilter),
+            queryKey: (
+              'adminOrders',
+              api.adminToken,
+              _orderFilter,
+              _orderSearch,
+              _unassignedOnly,
+              _todayOnly,
+            ),
             changes: api.feedChanges,
             load: (cursor) => api.orderPage(
               cursor: cursor,
               admin: true,
               status: _orderFilter,
+              search: _orderSearch,
+              assigned: _unassignedOnly ? 'unassigned' : null,
+              date: _todayOnly
+                  ? DateTime.now().toIso8601String().split('T').first
+                  : null,
+            ),
+            onMetadata: (metadata) {
+              final counts = Map<String, dynamic>.from(
+                metadata['stage_counts'] ?? {},
+              );
+              counts['All'] = counts.values.fold<int>(
+                0,
+                (sum, value) => sum + (value as num).toInt(),
+              );
+              counts['Active'] =
+                  (counts['All'] as int) -
+                  ((counts['Delivered'] as num?)?.toInt() ?? 0) -
+                  ((counts['Cancelled'] as num?)?.toInt() ?? 0);
+              if (mounted && counts.toString() != _stageCounts.toString()) {
+                setState(() => _stageCounts = counts);
+              }
+            },
+            header: const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: Text(
+                'Prepare > Pack > Assign. Select packed orders to assign a batch. Employees handle pickup, delivery and cash.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.black54,
+                  height: 1.5,
+                ),
+              ),
             ),
             identity: (o) => o.id,
             emptyTitle: 'No orders in this stage',
             emptyMessage: 'Choose another stage or pull down to refresh.',
-            itemBuilder: (_, order, _) =>
-                OrderSummaryCard(order: order, onTap: () => _openOrder(order)),
+            itemBuilder: (_, order, _) => order.status == 'Packed'
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 34,
+                        child: Checkbox(
+                          value: _selectedOrders.contains(order.id),
+                          onChanged: _batchBusy
+                              ? null
+                              : (value) {
+                                  if (value == true &&
+                                      _selectedOrders.length >= 50) {
+                                    showStoreError(
+                                      context,
+                                      StoreException(
+                                        'Assign up to 50 packed orders at a time.',
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  setState(() {
+                                    if (value == true) {
+                                      _selectedOrders.add(order.id);
+                                    } else {
+                                      _selectedOrders.remove(order.id);
+                                    }
+                                  });
+                                },
+                        ),
+                      ),
+                      Expanded(
+                        child: OrderSummaryCard(
+                          order: order,
+                          onTap: () => _openOrder(order),
+                        ),
+                      ),
+                    ],
+                  )
+                : OrderSummaryCard(
+                    order: order,
+                    onTap: () => _openOrder(order),
+                  ),
           ),
         ),
       ],
     );
+  }
+
+  Future<void> _assignSelected() async {
+    if (_batchBusy || _selectedOrders.isEmpty) return;
+    final employee = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(builder: (_) => const EmployeePickerScreen()),
+    );
+    if (employee == null || !mounted) return;
+    setState(() => _batchBusy = true);
+    try {
+      await ref
+          .read(storeApiProvider)
+          .assignPackedOrders(_selectedOrders.toList(), employee['id'] as int);
+      if (mounted) {
+        setState(_selectedOrders.clear);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Packed orders assigned to ${employee['name']}.'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) showStoreError(context, e);
+    } finally {
+      if (mounted) setState(() => _batchBusy = false);
+    }
   }
 
   Future<void> _openOrder(StoreOrder order) async {
@@ -544,9 +738,37 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   Widget _team() {
     final api = ref.watch(storeApiProvider);
     return PagedFeed<Map<String, dynamic>>(
-      queryKey: ('adminTeam', api.adminToken),
+      queryKey: ('adminTeam', api.adminToken, _teamSearch),
       changes: api.feedChanges,
-      load: (cursor) => api.employeePage(cursor: cursor),
+      load: (cursor) => api.employeePage(cursor: cursor, search: _teamSearch),
+      header: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Your delivery team',
+            style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '1. Create login & contact details\n2. Check identity and activate\n3. Open a packed order and assign an employee',
+            style: TextStyle(height: 1.7, color: Colors.black54),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            decoration: const InputDecoration(
+              hintText: 'Search employee, ID or mobile',
+              prefixIcon: Icon(Icons.search),
+            ),
+            onChanged: (s) {
+              _teamDebounce?.cancel();
+              _teamDebounce = Timer(const Duration(milliseconds: 350), () {
+                if (mounted) setState(() => _teamSearch = s.trim());
+              });
+            },
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
       identity: (p) => '${p['id']}',
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
       emptyTitle: 'Set up your delivery team',
@@ -585,11 +807,9 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
-                  onPressed: p['has_login'] == true
-                      ? () => _openEmployee(p)
-                      : null,
-                  icon: const Icon(Icons.login),
-                  label: const Text('View employee portal'),
+                  onPressed: () => _editPerson(p),
+                  icon: const Icon(Icons.manage_accounts_outlined),
+                  label: const Text('Manage profile & receive cash'),
                 ),
               ),
             ],
@@ -1201,6 +1421,8 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
   int? _person;
   String _personName = '';
   bool _busy = false;
+  Timer? _detailPoll;
+  String? _refreshError;
   final _note = TextEditingController(), _minutes = TextEditingController();
   @override
   void initState() {
@@ -1209,10 +1431,36 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
     _person = _order.data['assigned_to'];
     _personName = '${_order.data['assigned_to_details']?['name'] ?? ''}';
     _note.text = _order.data['delivery_note'] ?? '';
+    _reloadOrder();
+    _detailPoll = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!_busy) _reloadOrder();
+    });
+  }
+
+  Future<void> _reloadOrder() async {
+    try {
+      final order = await ref.read(storeApiProvider).adminOrder(_order.id);
+      if (mounted) {
+        setState(() {
+          _order = order;
+          _person = order.data['assigned_to'];
+          _personName = '${order.data['assigned_to_details']?['name'] ?? ''}';
+          _refreshError = null;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _refreshError =
+              'Could not refresh this order. Refresh before changing it.',
+        );
+      }
+    }
   }
 
   @override
   void dispose() {
+    _detailPoll?.cancel();
     _note.dispose();
     _minutes.dispose();
     super.dispose();
@@ -1250,6 +1498,9 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
       if (mounted) {
         setState(() {
           _order = updated;
+          _person = updated.data['assigned_to'];
+          _personName = '${updated.data['assigned_to_details']?['name'] ?? ''}';
+          _refreshError = null;
           _minutes.clear();
           _note.text = updated.data['delivery_note'] ?? '';
         });
@@ -1268,6 +1519,7 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
       }
     } catch (e) {
       if (mounted) showStoreError(context, e);
+      if (mounted) await _reloadOrder();
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -1275,10 +1527,14 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
 
   Future<void> _advance() async {
     final next = _order.nextStatus;
-    if (next == 'Delivered' && _order.paymentStatus == 'cod') {
+    if (next == 'Delivered') {
       final extra = await showDialog<Map<String, dynamic>>(
         context: context,
-        builder: (_) => OrderActionDialog(kind: 'cash', total: _order.total),
+        builder: (_) => OrderActionDialog(
+          kind: _order.paymentStatus == 'cod' ? 'cash' : 'delivery',
+          total: _order.total,
+          adminAssistance: true,
+        ),
       );
       if (extra != null && mounted) await _update(next: next, extra: extra);
     } else {
@@ -1313,11 +1569,56 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
   Widget build(BuildContext context) => Theme(
     data: storeTheme(),
     child: Scaffold(
-      appBar: AppBar(title: const Text('Manage order')),
+      appBar: AppBar(
+        title: Text('Order ${_order.shortId}'),
+        actions: [
+          IconButton(
+            onPressed: _busy ? null : _reloadOrder,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Text(
+          if (_refreshError != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                _refreshError!,
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+          Card(
+            color: storeGreen,
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'NEXT ACTION',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _order.nextAction,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SelectableText(
             _order.id,
             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
           ),
@@ -1327,13 +1628,31 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
             runSpacing: 8,
             children: [
               StatusChip(_order.status),
-              StatusChip(_order.paymentStatus),
+              if (_order.status != 'Cancelled')
+                StatusChip(_order.paymentStatus),
             ],
           ),
           const SizedBox(height: 22),
           CodPaymentCard(order: _order),
           const SizedBox(height: 16),
           OrderJourney(order: _order),
+          if (_order.status == 'Cancelled')
+            Card(
+              color: const Color(0xFFFFF0E2),
+              child: ListTile(
+                leading: const Icon(Icons.cancel_outlined),
+                title: const Text('Cancelled · no cash due'),
+                subtitle: Text(
+                  '${_order.data['cancellation_reason']}\nReserved stock has been released.',
+                ),
+              ),
+            ),
+          if ([
+            'Out for Delivery',
+            'Delivery Attempted',
+            'Delivered',
+          ].contains(_order.status))
+            DeliveryTrackingCard(orderId: _order.id, admin: true),
           const SizedBox(height: 16),
           Card(
             child: Padding(
@@ -1352,6 +1671,30 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
                   SelectableText(
                     '${_order.data['customer_phone']}\n${_order.data['delivery_address']}',
                     style: const TextStyle(height: 1.6),
+                  ),
+                  Wrap(
+                    spacing: 12,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () => openDeliveryLink(
+                          context,
+                          directionsTo('${_order.data['delivery_address']}'),
+                        ),
+                        icon: const Icon(Icons.directions_outlined),
+                        label: const Text('Google Maps'),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => openDeliveryLink(
+                          context,
+                          Uri(
+                            scheme: 'tel',
+                            path: '${_order.data['customer_phone']}',
+                          ),
+                        ),
+                        icon: const Icon(Icons.call_outlined),
+                        label: const Text('Call customer'),
+                      ),
+                    ],
                   ),
                   if ('${_order.data['delivery_instructions'] ?? ''}'
                       .isNotEmpty)
@@ -1382,12 +1725,12 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
           if (_order.canFulfill) ...[
             const SizedBox(height: 22),
             const Text(
-              'Delivery management',
+              'Assign delivery employee',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 14),
             OutlinedButton.icon(
-              onPressed: _busy
+              onPressed: _busy || _order.status == 'Out for Delivery'
                   ? null
                   : () async {
                       final employee =
@@ -1402,13 +1745,25 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
                           _person = employee['id'];
                           _personName = employee['name'];
                         });
+                        await _update();
                       }
                     },
               icon: const Icon(Icons.person_search_outlined),
               label: Text(
                 _personName.isEmpty
-                    ? 'Assign a verified delivery employee'
-                    : 'Assigned: $_personName',
+                    ? 'Choose employee & save assignment'
+                    : '$_personName · change assignment',
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'Choose a verified employee. Their assigned order appears automatically in the employee app. They collect the items after packing.',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.5,
+                  color: Colors.black54,
+                ),
               ),
             ),
             const SizedBox(height: 14),
@@ -1435,7 +1790,7 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
               child: const Text('Save delivery details'),
             ),
             const SizedBox(height: 12),
-            if (_order.nextStatus != null)
+            if (['New', 'Preparing'].contains(_order.status))
               FilledButton(
                 onPressed: _busy ? null : _advance,
                 child: Text(
@@ -1446,9 +1801,54 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
                       ? 'Confirm cash & complete delivery'
                       : _order.status == 'Delivery Attempted'
                       ? 'Retry delivery'
-                      : 'Mark ${_order.nextStatus}',
+                      : _order.status == 'New'
+                      ? 'Accept order & start preparation'
+                      : 'Items checked · mark packed',
                 ),
               ),
+            if ([
+              'Packed',
+              'Out for Delivery',
+              'Delivery Attempted',
+            ].contains(_order.status)) ...[
+              const SizedBox(height: 12),
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.delivery_dining, color: storeGreen),
+                  title: Text(
+                    _personName.isEmpty
+                        ? 'Choose an employee to continue'
+                        : _personName,
+                  ),
+                  subtitle: Text(
+                    _order.status == 'Packed'
+                        ? 'Employee picks up from their app. Customer receives a delivery code when the trip starts.'
+                        : 'Employee handles navigation, cash collection and customer code verification.',
+                  ),
+                ),
+              ),
+              ExpansionTile(
+                title: const Text('Admin delivery assistance'),
+                subtitle: const Text('Use only when helping an employee'),
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Text(
+                      'An assigned, verified employee is still required. Completion requires the customer’s delivery code and exact cash amount.',
+                    ),
+                  ),
+                  FilledButton(
+                    onPressed: _busy || _person == null ? null : _advance,
+                    child: Text(
+                      _order.status == 'Out for Delivery'
+                          ? 'Verify customer code & cash'
+                          : 'Confirm employee pickup & dispatch',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ],
             if (_order.status == 'Out for Delivery') ...[
               const SizedBox(height: 12),
               OutlinedButton.icon(

@@ -30,6 +30,8 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
   Map<String, dynamic>? _person;
   bool _busy = false, _active = true, _consent = false, _verified = false;
   String _vehicle = 'bicycle', _idType = '', _kind = 'identity';
+  int _setupStep = 0;
+  final _scroll = ScrollController();
   final _keys = [
     'name',
     'phone',
@@ -51,6 +53,7 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
   void initState() {
     super.initState();
     _person = widget.person;
+    if (_person?['ready_for_deliveries'] == true) _setupStep = 2;
     for (final key in _keys) {
       _fields[key] = TextEditingController(text: '${_person?[key] ?? ''}');
     }
@@ -66,6 +69,7 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
 
   @override
   void dispose() {
+    _scroll.dispose();
     for (final field in _fields.values) {
       field.dispose();
     }
@@ -348,8 +352,73 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
       body: Form(
         key: _form,
         child: ListView(
+          controller: _scroll,
           padding: const EdgeInsets.all(20),
           children: [
+            Card(
+              color: storeGreen,
+              child: const Padding(
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Build your delivery team',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Set up login, check documents, then assign packed orders. Employees handle delivery and cash; you confirm cash handovers.',
+                      style: TextStyle(color: Colors.white70, height: 1.6),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                for (var i = 0; i < 3; i++)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: Column(
+                        children: [
+                          Container(
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: i <= _setupStep
+                                  ? storeGreen
+                                  : const Color(0xFFE0E6E1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            [
+                              '1 Login',
+                              '2 Work details',
+                              '3 Verify & activate',
+                            ][i],
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: i == _setupStep
+                                  ? FontWeight.w800
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 18),
             if (_person?['employee_code'] != null)
               Card(
                 child: ListTile(
@@ -368,215 +437,284 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
                   ),
                 ),
               ),
-            _heading('Contact and login'),
-            _field('name', 'Full name', required: true, length: 100),
-            _field('phone', 'Mobile number', required: true, phone: true),
-            _field('email', 'Email (optional)'),
-            _field(
-              'password',
-              _person?['has_login'] == true
-                  ? 'New password (leave blank to keep)'
-                  : 'Create employee password',
-              secret: true,
-            ),
-            Text(
-              'Employee ID or mobile number + password is required. Password resets sign out existing employee sessions.',
-              style: TextStyle(fontSize: 12, color: Colors.black54),
-            ),
-            _heading('Residential address'),
-            _field('address', 'Full address', required: true, lines: 3),
-            _field('city', 'City / town', required: true),
-            _field('pincode', 'Pincode', required: true, length: 6),
-            _heading('Emergency contact'),
-            _field(
-              'emergency_contact_name',
-              'Emergency contact name',
-              required: true,
-            ),
-            _field(
-              'emergency_contact_phone',
-              'Emergency contact mobile',
-              required: true,
-              phone: true,
-            ),
-            _heading('Work and vehicle'),
-            _date('joining_date', 'Joining date'),
-            DropdownButtonFormField<String>(
-              initialValue: _vehicle,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Delivery mode'),
-              items: [
-                for (final entry in {
-                  'walking': 'Walking',
-                  'bicycle': 'Bicycle',
-                  'motorcycle': 'Motorcycle / scooter',
-                  'car': 'Car',
-                  'van': 'Van',
-                }.entries)
-                  DropdownMenuItem(value: entry.key, child: Text(entry.value)),
-              ],
-              onChanged: _busy ? null : (v) => setState(() => _vehicle = v!),
-            ),
-            const SizedBox(height: 14),
-            if (_motor) ...[
+            if (_setupStep == 0) ...[
+              _heading('1. Employee contact & login'),
+              _field('name', 'Full name', required: true, length: 100),
+              _field('phone', 'Mobile number', required: true, phone: true),
+              _field('email', 'Email (optional)'),
               _field(
-                'vehicle_number',
-                'Vehicle registration number',
-                required: true,
+                'password',
+                _person?['has_login'] == true
+                    ? 'New password (leave blank to keep)'
+                    : 'Create employee password',
+                secret: true,
+                required: _person?['has_login'] != true,
               ),
-              _field(
-                'licence_number',
-                'Driving licence number',
-                required: true,
+              Text(
+                'Employee ID or mobile number + password is required. Password resets sign out existing employee sessions.',
+                style: TextStyle(fontSize: 12, color: Colors.black54),
               ),
-              _date('licence_expiry', 'Driving licence expiry', required: true),
             ],
-            _heading('Identity and verification'),
-            DropdownButtonFormField<String>(
-              initialValue: _idType,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'ID proof type'),
-              items: [
-                for (final entry in {
-                  '': 'Not provided yet',
-                  'masked_aadhaar': 'Masked Aadhaar (optional)',
-                  'voter_id': 'Voter ID',
-                  'passport': 'Passport',
-                  'driving_licence': 'Driving licence',
-                  'other': 'Other government ID',
-                }.entries)
-                  DropdownMenuItem(value: entry.key, child: Text(entry.value)),
-              ],
-              onChanged: _busy ? null : (v) => setState(() => _idType = v!),
-            ),
-            const SizedBox(height: 14),
-            _field(
-              'id_last_four',
-              'ID last four characters (optional)',
-              length: 4,
-            ),
-            const Text(
-              'Use masked Aadhaar or another accepted ID. Do not enter a full Aadhaar number. Upload document photos only with employee consent.',
-              style: TextStyle(
-                height: 1.5,
-                fontSize: 12,
-                color: Colors.black54,
-              ),
-            ),
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _consent,
-              title: const Text(
-                'Employee consent recorded for storing onboarding documents',
-              ),
-              onChanged: _busy
-                  ? null
-                  : (v) => setState(() {
-                      _consent = v!;
-                      if (!_consent) _verified = false;
-                    }),
-            ),
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _verified,
-              title: const Text(
-                'I have checked the original ID and applicable vehicle documents',
-              ),
-              subtitle: const Text(
-                'New or removed document copies require another admin check.',
-              ),
-              onChanged: _busy || !_consent
-                  ? null
-                  : (v) => setState(() => _verified = v!),
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _active,
-              title: const Text('Employee account active'),
-              subtitle: const Text(
-                'Reassign open orders and receive cash before deactivating.',
-              ),
-              onChanged: _busy ? null : (v) => setState(() => _active = v),
-            ),
-            const SizedBox(height: 18),
-            FilledButton(
-              onPressed: _busy ? null : _save,
-              child: Text(
-                _busy
-                    ? 'Please wait…'
-                    : _person == null
-                    ? 'Create employee account'
-                    : 'Save employee details',
-              ),
-            ),
-            if (_person?['has_login'] == true)
-              OutlinedButton.icon(
-                onPressed: _busy ? null : () => Navigator.pop(context, _person),
-                icon: const Icon(Icons.login),
-                label: const Text('View employee portal'),
-              ),
-            _heading('Private document photos'),
-            if (_person == null)
-              const Text(
-                'Save the employee account first, then upload private document photos.',
-              )
-            else ...[
-              DropdownButtonFormField<String>(
-                initialValue: _kind,
-                isExpanded: true,
-                items: [
-                  for (final entry in employeeDocuments.entries)
-                    DropdownMenuItem(
-                      value: entry.key,
-                      child: Text(entry.value, overflow: TextOverflow.ellipsis),
-                    ),
-                ],
-                onChanged: _busy ? null : (v) => setState(() => _kind = v!),
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: _busy ? null : _upload,
-                icon: const Icon(Icons.upload_file_outlined),
-                label: const Text('Upload document photo'),
-              ),
-              for (final document in _person!['documents'] ?? [])
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.lock_outline),
-                    title: Text(
-                      employeeDocuments[document['kind']] ?? document['kind'],
-                    ),
-                    subtitle: const Text('Private · admin access only'),
-                    onTap: _busy ? null : () => _view(document),
-                    trailing: IconButton(
-                      tooltip: 'Delete private document',
-                      onPressed: _busy ? null : () => _delete(document),
-                      icon: const Icon(Icons.delete_outline),
-                    ),
+            if (_setupStep == 1) ...[
+              _heading('2. Address & work details'),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'Private staff records help your store contact the employee and check delivery readiness. Customers only see their assigned employee’s name and phone.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.black54,
+                    height: 1.5,
                   ),
                 ),
-              _heading('Cash handovers'),
-              Text(
-                '${money(amount(_person!['cash_to_handover']))} to receive from this employee',
               ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: _busy
-                    ? null
-                    : () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                EmployeeCashScreen(person: _person!),
-                          ),
-                        );
-                        await _reloadDocuments();
-                      },
-                icon: const Icon(Icons.payments_outlined),
-                label: const Text('Manage cash handovers'),
+              _field('address', 'Full address', required: true, lines: 3),
+              _field('city', 'City / town', required: true),
+              _field('pincode', 'Pincode', required: true, length: 6),
+              _heading('Emergency contact'),
+              _field(
+                'emergency_contact_name',
+                'Emergency contact name',
+                required: true,
               ),
+              _field(
+                'emergency_contact_phone',
+                'Emergency contact mobile',
+                required: true,
+                phone: true,
+              ),
+              _heading('Work and vehicle'),
+              _date('joining_date', 'Joining date'),
+              DropdownButtonFormField<String>(
+                initialValue: _vehicle,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Delivery mode'),
+                items: [
+                  for (final entry in {
+                    'walking': 'Walking',
+                    'bicycle': 'Bicycle',
+                    'motorcycle': 'Motorcycle / scooter',
+                    'car': 'Car',
+                    'van': 'Van',
+                  }.entries)
+                    DropdownMenuItem(
+                      value: entry.key,
+                      child: Text(entry.value),
+                    ),
+                ],
+                onChanged: _busy ? null : (v) => setState(() => _vehicle = v!),
+              ),
+              const SizedBox(height: 14),
+              if (_motor) ...[
+                _field(
+                  'vehicle_number',
+                  'Vehicle registration number',
+                  required: true,
+                ),
+                _field(
+                  'licence_number',
+                  'Driving licence number',
+                  required: true,
+                ),
+                _date(
+                  'licence_expiry',
+                  'Driving licence expiry',
+                  required: true,
+                ),
+              ],
             ],
+            if (_setupStep == 2) ...[
+              _heading('3. Verify identity & activate'),
+              DropdownButtonFormField<String>(
+                initialValue: _idType,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'ID proof type'),
+                items: [
+                  for (final entry in {
+                    '': 'Not provided yet',
+                    'masked_aadhaar': 'Masked Aadhaar (optional)',
+                    'voter_id': 'Voter ID',
+                    'passport': 'Passport',
+                    'driving_licence': 'Driving licence',
+                    'other': 'Other government ID',
+                  }.entries)
+                    DropdownMenuItem(
+                      value: entry.key,
+                      child: Text(entry.value),
+                    ),
+                ],
+                onChanged: _busy ? null : (v) => setState(() => _idType = v!),
+              ),
+              const SizedBox(height: 14),
+              _field(
+                'id_last_four',
+                'ID last four characters (optional)',
+                length: 4,
+              ),
+              const Text(
+                'Use masked Aadhaar or another accepted ID. Do not enter a full Aadhaar number. Upload document photos only with employee consent.',
+                style: TextStyle(
+                  height: 1.5,
+                  fontSize: 12,
+                  color: Colors.black54,
+                ),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _consent,
+                title: const Text(
+                  'Employee consent recorded for storing onboarding documents',
+                ),
+                onChanged: _busy
+                    ? null
+                    : (v) => setState(() {
+                        _consent = v!;
+                        if (!_consent) _verified = false;
+                      }),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _verified,
+                title: const Text(
+                  'I have checked the original ID and applicable vehicle documents',
+                ),
+                subtitle: const Text(
+                  'New or removed document copies require another admin check.',
+                ),
+                onChanged: _busy || !_consent
+                    ? null
+                    : (v) => setState(() => _verified = v!),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _active,
+                title: const Text('Employee account active'),
+                subtitle: const Text(
+                  'Reassign open orders and receive cash before deactivating.',
+                ),
+                onChanged: _busy ? null : (v) => setState(() => _active = v),
+              ),
+              const SizedBox(height: 18),
+              FilledButton(
+                onPressed: _busy ? null : _save,
+                child: Text(
+                  _busy
+                      ? 'Please wait…'
+                      : _person == null
+                      ? 'Create employee account'
+                      : 'Save employee details',
+                ),
+              ),
+              if (_person?['has_login'] == true)
+                OutlinedButton.icon(
+                  onPressed: _busy
+                      ? null
+                      : () => Navigator.pop(context, _person),
+                  icon: const Icon(Icons.login),
+                  label: const Text('Open employee sign-in'),
+                ),
+              _heading('Private document photos'),
+              if (_person == null)
+                const Text(
+                  'Save the employee account first, then upload private document photos.',
+                )
+              else ...[
+                DropdownButtonFormField<String>(
+                  initialValue: _kind,
+                  isExpanded: true,
+                  items: [
+                    for (final entry in employeeDocuments.entries)
+                      DropdownMenuItem(
+                        value: entry.key,
+                        child: Text(
+                          entry.value,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: _busy ? null : (v) => setState(() => _kind = v!),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _upload,
+                  icon: const Icon(Icons.upload_file_outlined),
+                  label: const Text('Upload document photo'),
+                ),
+                for (final document in _person!['documents'] ?? [])
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.lock_outline),
+                      title: Text(
+                        employeeDocuments[document['kind']] ?? document['kind'],
+                      ),
+                      subtitle: const Text('Private · admin access only'),
+                      onTap: _busy ? null : () => _view(document),
+                      trailing: IconButton(
+                        tooltip: 'Delete private document',
+                        onPressed: _busy ? null : () => _delete(document),
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                    ),
+                  ),
+                _heading('Cash handovers'),
+                Text(
+                  '${money(amount(_person!['cash_to_handover']))} to receive from this employee',
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _busy
+                      ? null
+                      : () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  EmployeeCashScreen(person: _person!),
+                            ),
+                          );
+                          await _reloadDocuments();
+                        },
+                  icon: const Icon(Icons.payments_outlined),
+                  label: const Text('Manage cash handovers'),
+                ),
+              ],
+            ],
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                if (_setupStep > 0)
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _busy
+                          ? null
+                          : () {
+                              setState(() => _setupStep--);
+                              _scroll.jumpTo(0);
+                            },
+                      child: const Text('Back'),
+                    ),
+                  ),
+                if (_setupStep > 0) const SizedBox(width: 12),
+                if (_setupStep < 2)
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _busy
+                          ? null
+                          : () {
+                              if (_form.currentState!.validate()) {
+                                setState(() => _setupStep++);
+                                _scroll.jumpTo(0);
+                              }
+                            },
+                      child: Text(
+                        _setupStep == 0
+                            ? 'Continue to work details'
+                            : 'Continue to verification',
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 32),
           ],
         ),

@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Delivery employees can share their location with the store and customer during an active delivery.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Location is used only for an employee's active delivery trip.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Store staff can choose product photos for the catalog.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>

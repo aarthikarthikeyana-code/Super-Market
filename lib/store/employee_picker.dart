@@ -28,6 +28,13 @@ class _EmployeePickerState extends ConsumerState<EmployeePickerScreen> {
       appBar: AppBar(title: const Text('Assign delivery employee')),
       body: Column(
         children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
+            child: Text(
+              'Select one verified employee. Check their current workload before assigning. This order will appear in their delivery app.',
+              style: TextStyle(height: 1.6, color: Colors.black54),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.all(20),
             child: TextField(
@@ -57,12 +64,18 @@ class _EmployeePickerState extends ConsumerState<EmployeePickerScreen> {
               emptyMessage: 'Complete employee onboarding and verification in Delivery team, then try again.',
               itemBuilder: (_, person, _) => Card(
                 child: ListTile(
+                  leading: const CircleAvatar(
+                    child: Icon(Icons.delivery_dining),
+                  ),
                   title: Text('${person['name']}'),
                   subtitle: Text(
                     '${person['employee_code']} · ${person['phone']}\n${person['active_orders']} active orders',
                   ),
                   isThreeLine: true,
-                  trailing: const Icon(Icons.chevron_right),
+                  trailing: const Text(
+                    'Select',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
                   onTap: () => Navigator.pop(context, person),
                 ),
               ),

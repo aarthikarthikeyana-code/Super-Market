@@ -13,6 +13,7 @@ import 'state.dart';
 import 'widgets.dart';
 import 'paged_feed.dart';
 import 'loading.dart';
+import 'delivery_tracking.dart';
 
 class StorefrontScreen extends ConsumerStatefulWidget {
   const StorefrontScreen({super.key});
@@ -2361,6 +2362,79 @@ class _TrackingState extends ConsumerState<OrderTrackingScreen> {
                 const SizedBox(height: 16),
                 CodPaymentCard(order: order),
                 const SizedBox(height: 16),
+                if (order.status == 'Out for Delivery') ...[
+                  Card(
+                    color: const Color(0xFFE6F1E9),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Your delivery confirmation code',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          if (snapshot
+                                  .data!['delivery_confirmation']?['code'] !=
+                              null)
+                            Text(
+                              '${snapshot.data!['delivery_confirmation']['code']}',
+                              style: const TextStyle(
+                                fontSize: 38,
+                                letterSpacing: 10,
+                                fontWeight: FontWeight.w900,
+                                color: storeGreen,
+                              ),
+                            )
+                          else
+                            FilledButton(
+                              onPressed: _paying
+                                  ? null
+                                  : () async {
+                                      setState(() => _paying = true);
+                                      try {
+                                        await ref
+                                            .read(storeApiProvider)
+                                            .refreshDeliveryCode(order.id);
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          showStoreError(context, e);
+                                        }
+                                      } finally {
+                                        if (mounted) {
+                                          setState(() => _paying = false);
+                                          _reload();
+                                        }
+                                      }
+                                    },
+                              child: const Text('Get a fresh delivery code'),
+                            ),
+                          const SizedBox(height: 10),
+                          Text(
+                            '${order.paymentStatus == 'cod' ? 'Receive all items and pay ${money(order.total)} in cash before sharing this code.' : 'This order is already paid. Share this code after receiving all items.'} Your employee cannot view this code in their app.',
+                            style: const TextStyle(height: 1.6),
+                          ),
+                          if (snapshot
+                                  .data!['delivery_confirmation']?['expires_at'] !=
+                              null)
+                            Text(
+                              'Valid until ${DateTime.tryParse('${snapshot.data!['delivery_confirmation']['expires_at']}')?.toLocal().toString().split('.').first ?? ''}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.black54,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  DeliveryTrackingCard(orderId: order.id),
+                  const SizedBox(height: 16),
+                ],
                 if (order.canCancel)
                   OutlinedButton.icon(
                     onPressed: _paying ? null : _cancelCheckout,

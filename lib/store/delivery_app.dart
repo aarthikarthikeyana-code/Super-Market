@@ -11,6 +11,7 @@ import 'widgets.dart';
 import 'paged_feed.dart';
 import 'loading.dart';
 import 'cash_receipts.dart';
+import 'delivery_tracking.dart';
 
 void refreshDelivery(WidgetRef ref) {
   ref.read(storeApiProvider).feedChanges.value++;
@@ -93,6 +94,7 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
   }
 
   Future<void> _logout() async {
+    ref.read(deliveryTrackerProvider).stop();
     try {
       await ref.read(storeApiProvider).deliveryLogout();
     } catch (_) {
@@ -276,6 +278,47 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
               Text(
                 '${summary['assigned']} active deliveries · ${money(amount(summary['cash_to_collect']))} to collect',
               ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE6F1E9),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.route, color: storeGreen),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '1 Pick up  →  2 Navigate  →  3 Deliver\nCollect exact cash + customer’s 5-digit code.',
+                        style: TextStyle(height: 1.6, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ListenableBuilder(
+                listenable: ref.watch(deliveryTrackerProvider),
+                builder: (context, _) {
+                  final tracker = ref.read(deliveryTrackerProvider);
+                  if (tracker.orders.isEmpty) return const SizedBox.shrink();
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.my_location, color: storeGreen),
+                    title: Text(
+                      'Sharing ${tracker.orders.length} active trips',
+                    ),
+                    subtitle: Text(
+                      tracker.error ?? 'Keep location enabled. Sharing stops when each delivery closes.',
+                    ),
+                    trailing: TextButton(
+                      onPressed: tracker.stop,
+                      child: const Text('Stop'),
+                    ),
+                  );
+                },
+              ),
               if (summary['employee']['documents_verified'] != true)
                 const Padding(
                   padding: EdgeInsets.only(top: 8),
@@ -321,7 +364,9 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
           emptyTitle: _history
               ? 'No completed deliveries yet'
               : 'You are up to date',
-          emptyMessage: 'Orders assigned to you by the store will appear here.',
+          emptyMessage: _history
+              ? 'Completed and cancelled assignments appear here. Cash receipts are under My cash.'
+              : 'Ask your administrator to assign a packed order to your employee ID. Pull down to refresh, then open an order to pick it up.',
           itemBuilder: (_, order, _) => OrderSummaryCard(
             order: order,
             onTap: () => Navigator.push(
@@ -438,6 +483,9 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
           _order = order;
           _loadError = null;
         });
+        if (order.status != 'Out for Delivery') {
+          ref.read(deliveryTrackerProvider).finish(order.id);
+        }
       }
     } catch (e) {
       if (mounted) setState(() => _loadError = e.toString());
@@ -450,7 +498,10 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
     if (status == 'Delivered') {
       extra = await showDialog<Map<String, dynamic>>(
         context: context,
-        builder: (_) => OrderActionDialog(kind: 'cash', total: _order.total),
+        builder: (_) => OrderActionDialog(
+          kind: _order.paymentStatus == 'cod' ? 'cash' : 'delivery',
+          total: _order.total,
+        ),
       );
     }
     if (!mounted) return;
@@ -467,7 +518,7 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
         builder: (ctx) => AlertDialog(
           title: const Text('Start this delivery?'),
           content: const Text(
-            'Confirm you have picked up the packed items from your store.',
+            'Check every packed item and confirm pickup. You can share this trip’s device location with the store and customer. Location permission will be requested; the customer’s code appears when delivery starts.',
           ),
           actions: [
             TextButton(
@@ -492,6 +543,15 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
       });
       if (!mounted) return;
       if (mounted) setState(() => _order = order);
+      if (status == 'Out for Delivery') {
+        try {
+          await ref.read(deliveryTrackerProvider).start(order);
+        } catch (e) {
+          if (mounted) showStoreError(context, e);
+        }
+      } else {
+        ref.read(deliveryTrackerProvider).finish(order.id);
+      }
       refreshDelivery(ref);
     } catch (e) {
       if (mounted) showStoreError(context, e);
@@ -524,7 +584,7 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
             padding: const EdgeInsets.all(20),
             children: [
               Text(
-                _order.id,
+                'Delivery ${_order.shortId}',
                 style: const TextStyle(
                   fontSize: 19,
                   fontWeight: FontWeight.w800,
@@ -542,6 +602,53 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
               const SizedBox(height: 18),
               CodPaymentCard(order: _order),
               const SizedBox(height: 18),
+              OrderJourney(order: _order),
+              if (_order.status == 'Out for Delivery') ...[
+                ListenableBuilder(
+                  listenable: ref.watch(deliveryTrackerProvider),
+                  builder: (context, _) {
+                    final tracker = ref.read(deliveryTrackerProvider);
+                    final active = tracker.orders.contains(_order.id);
+                    return Card(
+                      child: ListTile(
+                        leading: Icon(
+                          active
+                              ? Icons.my_location
+                              : Icons.location_off_outlined,
+                          color: storeGreen,
+                        ),
+                        title: Text(
+                          active
+                              ? 'Trip location sharing is on'
+                              : 'Share this delivery trip',
+                        ),
+                        subtitle: Text(
+                          tracker.error ?? 'Share only during an active delivery. Android uses a visible trip notification. iOS/web need the app open.',
+                        ),
+                        trailing: IconButton(
+                          icon: Icon(
+                            active
+                                ? Icons.stop_circle_outlined
+                                : Icons.play_circle_outline,
+                          ),
+                          onPressed: () async {
+                            if (active) {
+                              tracker.finish(_order.id);
+                              return;
+                            }
+                            try {
+                              await tracker.start(_order);
+                            } catch (e) {
+                              if (context.mounted) showStoreError(context, e);
+                            }
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                DeliveryTrackingCard(orderId: _order.id, employee: true),
+              ],
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(18),
@@ -566,6 +673,25 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
                           'Instructions: ${_order.data['delivery_instructions']}',
                           style: const TextStyle(height: 1.5),
                         ),
+                      TextButton.icon(
+                        onPressed: () => openDeliveryLink(
+                          context,
+                          directionsTo('${_order.data['delivery_address']}'),
+                        ),
+                        icon: const Icon(Icons.navigation_outlined),
+                        label: const Text('Navigate with Google Maps'),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => openDeliveryLink(
+                          context,
+                          Uri(
+                            scheme: 'tel',
+                            path: '${_order.data['customer_phone']}',
+                          ),
+                        ),
+                        icon: const Icon(Icons.call_outlined),
+                        label: const Text('Call customer'),
+                      ),
                       TextButton.icon(
                         onPressed: () async {
                           await Clipboard.setData(
@@ -609,7 +735,7 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
                 FilledButton.icon(
                   onPressed: _busy ? null : () => _action('Delivered'),
                   icon: const Icon(Icons.payments_outlined),
-                  label: const Text('Collect cash & complete delivery'),
+                  label: const Text('Verify customer code & collect cash'),
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton(
@@ -623,7 +749,8 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
                 ),
               if (_order.paymentStatus == 'collected')
                 Text(
-                  _order.data['cash_handover'] == null
+                  _order.data['cash_handover'] == null &&
+                          _order.data['cash_received_directly'] != true
                       ? 'Cash received. Hand this amount over to your store administrator.'
                       : 'Cash handover acknowledged by your store.',
                   style: const TextStyle(color: storeGreen, height: 1.6),

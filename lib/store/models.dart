@@ -100,6 +100,27 @@ class StoreOrder {
   final Map<String, dynamic> data;
   StoreOrder(this.data);
   String get id => data['order_id'] ?? '';
+  String get shortId =>
+      id.length > 8 ? '#${id.substring(id.length - 8)}' : '#$id';
+  String get nextAction =>
+      {
+        'New': 'Next: accept & prepare the items',
+        'Preparing': 'Next: check items & mark packed',
+        'Packed': data['assigned_to'] == null
+            ? 'Next: assign a delivery employee'
+            : 'Waiting for employee pickup',
+        'Out for Delivery': 'Employee delivers · collect cash + customer code',
+        'Delivery Attempted': 'Needs attention · arrange retry or return',
+        'Delivered': paymentStatus != 'collected'
+            ? 'Delivery complete · paid online'
+            : data['cash_handover'] == null &&
+                  data['cash_received_directly'] != true
+            ? 'Delivery complete · cash handover pending'
+            : 'Delivery complete · cash received by store',
+        'Cancelled':
+            'Cancelled · ${data['cancellation_reason'] ?? 'No cash due'}',
+      }[status] ??
+      'Open order for details';
   String get status => data['status'] ?? '';
   String get paymentStatus => data['payment_status'] ?? '';
   double get total => amount(data['total_amount']);

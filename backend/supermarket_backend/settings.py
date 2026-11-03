@@ -111,7 +111,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated'],
     'DEFAULT_RENDERER_CLASSES': ['rest_framework.renderers.JSONRenderer'],
     'DEFAULT_THROTTLE_CLASSES': ['rest_framework.throttling.AnonRateThrottle', 'rest_framework.throttling.UserRateThrottle'],
-    'DEFAULT_THROTTLE_RATES': {'anon': '1000/hour', 'user': '3000/hour', 'login': '10/min', 'session': '20/hour'},
+    'DEFAULT_THROTTLE_RATES': {'anon': '1000/hour', 'user': '3000/hour', 'login': '10/min', 'session': '20/hour', 'delivery_code': '5/hour'},
     'EXCEPTION_HANDLER': 'api.errors.exception_handler',
 }
 CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME', '')

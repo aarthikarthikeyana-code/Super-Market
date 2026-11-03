@@ -8,6 +8,7 @@ from django.db.models import F, Sum
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from .models import Product, Order, OrderItem, OrderEvent, DeliveryPersonnel
+from . import delivery
 
 
 # Store policy excludes fresh produce, while allowing dried fruit, juices and oils.
@@ -116,10 +117,26 @@ def cancel_order(order_id, *, customer=None, reason='', stock_returned=False):
     return order
 
 
-@transaction.atomic
 def transition_order(order_id, next_status, note='', person_id=None, eta=None,
-                     *, cash_collected=False, cash_amount=None, actor=None):
+                     *, cash_collected=False, cash_amount=None, actor=None, delivery_code='', cash_received_by_store=False):
+    failure = None
+    with transaction.atomic():
+        try:
+            result = _transition_order(order_id, next_status, note, person_id, eta,
+                                      cash_collected=cash_collected, cash_amount=cash_amount,
+                                      actor=actor, delivery_code=delivery_code, cash_received_by_store=cash_received_by_store)
+        except delivery.InvalidDeliveryCode as exc:
+            failure = exc
+    if failure:
+        raise failure
+    return result
+
+
+def _transition_order(order_id, next_status, note='', person_id=None, eta=None,
+                      *, cash_collected=False, cash_amount=None, actor=None, delivery_code='', cash_received_by_store=False):
     order = Order.objects.select_for_update().get(order_id=order_id, customer__isnull=False)
+    if cash_received_by_store and (not actor or not actor.is_staff or next_status != 'Delivered'):
+        raise ValidationError({'cash_received_by_store': 'Only an administrator completing delivery can record cash received directly by the store.'})
     employee_actor = bool(actor and not actor.is_staff and order.assigned_to_id and order.assigned_to.user_id == actor.pk and order.assigned_to.ready_for_deliveries)
     if actor and not actor.is_staff:
         if not employee_actor or person_id is not None or next_status not in ['Out for Delivery', 'Delivery Attempted', 'Delivered'] or order.status not in ['Packed', 'Out for Delivery', 'Delivery Attempted', 'Delivered']:
@@ -138,12 +155,21 @@ def transition_order(order_id, next_status, note='', person_id=None, eta=None,
         raise ValidationError({'cash_collected': 'Record cash only when completing a delivery.'})
     if next_status == 'Delivery Attempted' and not note.strip():
         raise ValidationError({'delivery_note': 'Enter why delivery could not be completed.'})
+    if next_status == 'Delivered':
+        if order.payment_status == 'cod' and (not cash_collected or cash_amount != order.total_amount or not actor):
+            raise ValidationError({'cash_collected': 'Collect and confirm the exact cash amount first.'})
+        delivery.verify_code(order, delivery_code)
     old_person = order.assigned_to_id
     if person_id is not None:
+        if order.status == 'Out for Delivery' and person_id != order.assigned_to_id:
+            raise ValidationError({'assigned_to': 'Record an unsuccessful attempt before transferring an active delivery to another employee.'})
         person = DeliveryPersonnel.objects.select_for_update().filter(pk=person_id, is_active=True).first()
         if not person or not person.ready_for_deliveries:
             raise ValidationError({'assigned_to': 'Choose an active employee with login, verified documents and a valid driving licence where applicable.'})
         order.assigned_to = person
+        if old_person != person.pk:
+            order.delivery_code_nonce = None
+            order.delivery_code_expires_at = None
     if next_status in ['Out for Delivery', 'Delivered', 'Delivery Attempted']:
         person = DeliveryPersonnel.objects.select_for_update().filter(pk=order.assigned_to_id, is_active=True).first()
         if not person or not person.ready_for_deliveries:
@@ -154,7 +180,8 @@ def transition_order(order_id, next_status, note='', person_id=None, eta=None,
         order.cash_collected_amount = cash_amount
         order.cash_collected_at = timezone.now()
         order.cash_collected_by = actor
-        order.cash_collected_for = order.assigned_to
+        order.cash_collected_for = None if cash_received_by_store else order.assigned_to
+        order.cash_received_directly = cash_received_by_store
         order.payment_status = 'collected'
     if eta is not None:
         if eta <= timezone.now():
@@ -170,13 +197,21 @@ def transition_order(order_id, next_status, note='', person_id=None, eta=None,
             setattr(order, field, timezone.now())
         if next_status == 'Packed':
             order.items.update(is_packed=True)
+        if next_status == 'Out for Delivery':
+            delivery.issue_code(order)
+        if next_status == 'Delivered':
+            order.delivery_code_verified_at = timezone.now()
+            order.delivery_code_nonce = None
         if next_status == 'Delivery Attempted':
             order.delivery_attempts += 1
             order.estimated_delivery_at = None
     order.save()
-    message = note or ('Delivery person assigned.' if person_id else 'Order status updated.')
+    message = note or (f'Delivery assigned to {order.assigned_to.name}.' if person_id else 'Order status updated.')
     if changed and next_status == 'Delivered' and order.payment_status == 'collected':
-        message = f'Groceries delivered. INR {order.total_amount} collected in cash.' + (f' {note}' if note else '')
+        collector = order.assigned_to.name if employee_actor else 'store administrator'
+        message = f'Customer delivery code verified. INR {order.total_amount} collected by {collector}.' + (f' {note}' if note else '')
+        if cash_received_by_store:
+            message += ' Cash received directly by store.'
     OrderEvent.objects.create(order=order, status=order.status, note=message[:255])
     refresh_personnel_status(old_person)
     refresh_personnel_status(order.assigned_to_id)

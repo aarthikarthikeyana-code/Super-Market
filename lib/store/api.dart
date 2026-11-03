@@ -8,7 +8,8 @@ import 'models.dart';
 
 class StoreException implements Exception {
   final String message;
-  StoreException(this.message);
+  final int? statusCode;
+  StoreException(this.message, {this.statusCode});
   @override
   String toString() => message;
 }
@@ -163,7 +164,9 @@ class StoreApi {
       final body = e.response?.data;
       if (body is Map) {
         final detail = body['detail'];
-        if (detail != null) throw StoreException('$detail');
+        if (detail != null) {
+          throw StoreException('$detail', statusCode: e.response?.statusCode);
+        }
         throw StoreException(
           body.entries
               .map(
@@ -171,11 +174,13 @@ class StoreApi {
                     '${e.key}: ${e.value is List ? (e.value as List).join(' ') : e.value}',
               )
               .join('\n'),
+          statusCode: e.response?.statusCode,
         );
       }
       if (e.response?.statusCode == 404) {
         throw StoreException(
           'The store service is being updated. Please try again shortly.',
+          statusCode: e.response?.statusCode,
         );
       }
       throw StoreException(
@@ -433,6 +438,9 @@ class StoreApi {
     String status = 'All',
     bool employee = false,
     bool history = false,
+    String search = '',
+    String? assigned,
+    String? date,
   }) => _page(
     employee
         ? '/delivery/orders/'
@@ -445,6 +453,9 @@ class StoreApi {
     customer: !admin && !employee,
     employee: employee,
     filters: {
+      if (search.isNotEmpty) 'search': search,
+      if (assigned != null && assigned.isNotEmpty) 'assigned': assigned,
+      'date': ?date,
       if (status != 'All') 'status': status,
       if (employee) 'scope': history ? 'completed' : 'active',
     },
@@ -747,4 +758,49 @@ class StoreApi {
           await request('PATCH', '/admin/orders/$id/', admin: true, data: data),
         ),
       );
+
+  Future<StoreOrder> adminOrder(String id) async => StoreOrder(
+    Map<String, dynamic>.from(
+      await request('GET', '/admin/orders/$id/', admin: true),
+    ),
+  );
+
+  Future<void> assignPackedOrders(List<String> ids, int employeeId) async {
+    await request(
+      'POST',
+      '/admin/orders/assign/',
+      admin: true,
+      data: {'order_ids': ids, 'assigned_to': employeeId},
+    );
+  }
+
+  Future<Map<String, dynamic>> deliveryTracking(
+    String id, {
+    bool admin = false,
+    bool employee = false,
+  }) async => Map<String, dynamic>.from(
+    await request(
+      'GET',
+      '/orders/$id/tracking/',
+      admin: admin,
+      employee: employee,
+      customer: !admin && !employee,
+    ),
+  );
+
+  Future<void> shareDeliveryLocation(
+    String id,
+    Map<String, dynamic> location,
+  ) async {
+    await request(
+      'POST',
+      '/orders/$id/tracking/',
+      employee: true,
+      data: location,
+    );
+  }
+
+  Future<void> refreshDeliveryCode(String id) async {
+    await request('POST', '/orders/$id/delivery-code/', customer: true);
+  }
 }
