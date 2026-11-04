@@ -173,103 +173,68 @@ class _CustomerLoginScreenState extends ConsumerState<CustomerLoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Hero Grocery Illustration (~30% screen height)
+                        // Hero Area (Matching Reference Screen 2 & 3: Soft ambient illustration/badge)
                         Center(
                           child: Container(
-                            height: 190,
-                            width: double.infinity,
-                            margin: const EdgeInsets.only(top: 6, bottom: 20),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(24),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: storeForestGreen.withOpacity(0.08),
-                                  blurRadius: 14,
-                                  offset: const Offset(0, 4),
+                            margin: const EdgeInsets.only(top: 10, bottom: 24),
+                            child: Column(
+                              children: [
+                                Container(
+                                  width: 86,
+                                  height: 86,
+                                  decoration: BoxDecoration(
+                                    color: storeGlassMint,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: storePrimaryGreen.withOpacity(0.12),
+                                        blurRadius: 18,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(
+                                    _challenge == null
+                                        ? Icons.shopping_basket_rounded
+                                        : Icons.lock_outline_rounded,
+                                    size: 42,
+                                    color: storePrimaryGreen,
+                                  ),
                                 ),
                               ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(24),
-                              child: Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  Image.asset(
-                                    'assets/images/drawer_grocery_pantry.jpg',
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, _, _) => Container(
-                                      color: storeMint,
-                                      child: const Icon(
-                                        Icons.shopping_bag_outlined,
-                                        size: 64,
-                                        color: storeForestGreen,
-                                      ),
-                                    ),
-                                  ),
-                                  DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          Colors.transparent,
-                                          storeDeepGreen.withOpacity(0.7),
-                                        ],
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                      ),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    bottom: 14,
-                                    left: 16,
-                                    right: 16,
-                                    child: Row(
-                                      children: const [
-                                        Icon(
-                                          Icons.verified_rounded,
-                                          color: storeGold,
-                                          size: 18,
-                                        ),
-                                        SizedBox(width: 8),
-                                        Text(
-                                          '100% Genuine Grocery Essentials',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
                             ),
                           ),
                         ),
 
                         // Copy
-                        Text(
-                          _challenge == null
-                              ? 'Welcome to Agaram'
-                              : 'Verify your mobile',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
-                            color: storeInk,
+                        Center(
+                          child: Text(
+                            _challenge == null
+                                ? 'Welcome Back'
+                                : 'Verify OTP',
+                            style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w900,
+                              color: storeInk,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _challenge == null
-                              ? 'Sign in to shop faster, track orders and save your favourites.'
-                              : 'Enter the verification code sent to +91 ${_phoneController.text.trim()}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: storeGrey,
-                            height: 1.45,
+                        const SizedBox(height: 8),
+                        Center(
+                          child: Text(
+                            _challenge == null
+                                ? 'Login to continue shopping\nat Agaram Supermarket'
+                                : 'Enter the 5-digit OTP sent to\n+91 ${_phoneController.text.trim()}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              color: storeGrey,
+                              height: 1.45,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 28),
 
                         // Error Banner
                         if (_error != null)
@@ -307,16 +272,16 @@ class _CustomerLoginScreenState extends ConsumerState<CustomerLoginScreen> {
                         // Phone Input Field (Height 54-58px)
                         if (_challenge == null)
                           Container(
-                            height: 56,
+                            height: 54,
                             decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: storeBorder),
+                              color: Colors.white.withOpacity(0.92),
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(color: Colors.white, width: 1.5),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.02),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
+                                  color: const Color(0xFF087532).withOpacity(0.04),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 3),
                                 ),
                               ],
                             ),
@@ -330,7 +295,7 @@ class _CustomerLoginScreenState extends ConsumerState<CustomerLoginScreen> {
                               ],
                               style: const TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w800,
                                 color: storeInk,
                               ),
                               decoration: InputDecoration(
@@ -345,7 +310,7 @@ class _CustomerLoginScreenState extends ConsumerState<CustomerLoginScreen> {
                                         style: TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w800,
-                                          color: storeForestGreen,
+                                          color: storePrimaryGreen,
                                         ),
                                       ),
                                       SizedBox(width: 6),
@@ -369,7 +334,7 @@ class _CustomerLoginScreenState extends ConsumerState<CustomerLoginScreen> {
                                 focusedBorder: InputBorder.none,
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 16,
-                                  vertical: 16,
+                                  vertical: 14,
                                 ),
                               ),
                               validator: (v) {
@@ -526,9 +491,11 @@ class _CustomerLoginScreenState extends ConsumerState<CustomerLoginScreen> {
                           child: FilledButton(
                             onPressed: _busy ? null : _continue,
                             style: FilledButton.styleFrom(
-                              backgroundColor: storeForestGreen,
+                              backgroundColor: storeCtaGreen,
+                              elevation: 3,
+                              shadowColor: storePrimaryGreen.withOpacity(0.35),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(22),
                               ),
                             ),
                             child: _busy
@@ -545,11 +512,11 @@ class _CustomerLoginScreenState extends ConsumerState<CustomerLoginScreen> {
                                     children: [
                                       Text(
                                         _challenge == null
-                                            ? 'Continue'
-                                            : 'Verify & Continue',
+                                            ? 'Get OTP'
+                                            : 'Verify',
                                         style: const TextStyle(
-                                          fontSize: 15.5,
-                                          fontWeight: FontWeight.w800,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w900,
                                           color: Colors.white,
                                         ),
                                       ),
@@ -557,6 +524,7 @@ class _CustomerLoginScreenState extends ConsumerState<CustomerLoginScreen> {
                                       const Icon(
                                         Icons.arrow_forward_rounded,
                                         size: 18,
+                                        color: Colors.white,
                                       ),
                                     ],
                                   ),

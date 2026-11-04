@@ -320,25 +320,48 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
 
   Widget _buildSearchHeader() {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(8, 8, 12, 10),
+      decoration: BoxDecoration(
+        color: storeCream.withOpacity(0.95),
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withOpacity(0.8), width: 1),
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(10, 8, 12, 10),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              color: storeInk,
-              size: 22,
+          InkWell(
+            onTap: () => Navigator.pop(context),
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white, width: 1.2),
+              ),
+              child: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: storeInk,
+                size: 19,
+              ),
             ),
-            onPressed: () => Navigator.pop(context),
           ),
+          const SizedBox(width: 8),
           Expanded(
             child: Container(
-              height: 52,
+              height: 50,
               decoration: BoxDecoration(
-                color: const Color(0xFFF6F8F6),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: storeBorder),
+                color: Colors.white.withOpacity(0.95),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF087532).withOpacity(0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: TextField(
                 controller: _controller,
@@ -348,7 +371,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                 textInputAction: TextInputAction.search,
                 style: const TextStyle(
                   fontSize: 14.5,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   color: storeInk,
                 ),
                 decoration: InputDecoration(
@@ -356,7 +379,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                   hintStyle: const TextStyle(color: storeGrey, fontSize: 13.5),
                   prefixIcon: const Icon(
                     Icons.search_rounded,
-                    color: storeForestGreen,
+                    color: storePrimaryGreen,
                     size: 22,
                   ),
                   suffixIcon: Row(
@@ -367,7 +390,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                           icon: const Icon(
                             Icons.clear_rounded,
                             color: storeGrey,
-                            size: 20,
+                            size: 18,
                           ),
                           onPressed: () {
                             _controller.clear();
@@ -381,7 +404,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                   focusedBorder: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 14,
-                    vertical: 14,
+                    vertical: 13,
                   ),
                 ),
               ),

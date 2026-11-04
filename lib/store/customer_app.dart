@@ -166,6 +166,8 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
             ? null
             : AgaramBottomNavigation(
                 selectedIndex: _tab,
+                cartCount: cart.fold(0, (s, l) => s + l.quantity),
+                onCartPressed: () => setState(() => _showCart = true),
                 onItemSelected: (i) {
                   setState(() {
                     _tab = i;
@@ -222,25 +224,75 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 1. Hero Promotional Banner
-                  HeroBanner(
-                    imageUrl:
-                        browseCategories
-                            .where((c) => '${c['image_url'] ?? ''}'.isNotEmpty)
-                            .map((c) => '${c['image_url']}')
-                            .firstOrNull ??
-                        '',
-                    onShopNow: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            const SearchScreen(initialCategory: 'All'),
-                      ),
+                  // 0. Location Sub-header (as seen in Reference image screen 4)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.85),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white, width: 1.2),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: const BoxDecoration(
+                            color: storeGlassMint,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.location_on_rounded,
+                            color: storePrimaryGreen,
+                            size: 16,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                'Deliver to',
+                                style: TextStyle(
+                                  color: storeGrey,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                'Agaram Supermarket · Express Store',
+                                style: TextStyle(
+                                  color: storeInk,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: storeGlassMint,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'COD',
+                            style: TextStyle(
+                              color: storeDeepGreen,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 14),
 
-                  // 2. Search Bar – tapping opens dedicated SearchScreen
+                  // 1. Search Bar – tapping opens dedicated SearchScreen
                   SearchBarWidget(
                     controller: _searchInput,
                     readOnly: true,
@@ -259,11 +311,29 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                       );
                     },
                   ),
+                  const SizedBox(height: 14),
+
+                  // 2. Hero Promotional Banner
+                  HeroBanner(
+                    imageUrl:
+                        browseCategories
+                            .where((c) => '${c['image_url'] ?? ''}'.isNotEmpty)
+                            .map((c) => '${c['image_url']}')
+                            .firstOrNull ??
+                        '',
+                    onShopNow: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const SearchScreen(initialCategory: 'All'),
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 18),
 
-                  // 3. Grocery Category Section
+                  // 3. Grocery Category Grid (2 rows x 4 columns)
                   _groceryCategoriesRow(),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 20),
 
                   if (collections.isNotEmpty) ...[
                     Wrap(
@@ -287,27 +357,10 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                     ),
                     const SizedBox(height: 18),
                   ],
-                  // 5. Featured Essentials
-                  SectionHeader(
-                    title: 'Shop by category',
-                    action: 'See All >',
-                    onAction: () => setState(() => _tab = 1),
-                  ),
-                  const SizedBox(height: 10),
-                  FeaturedEssentialsRow(
-                    categories: browseCategories,
-                    onSelectCategory: (cat) => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => SearchScreen(initialCategory: cat),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
 
-                  // 6. Recommended for You
+                  // 4. Flash Deals / Essentials Header (matching reference UI)
                   SectionHeader(
-                    title: 'Groceries from our store',
+                    title: 'Flash Deals',
                     action: 'See All >',
                     onAction: () => setState(() => _category = 'All'),
                   ),
@@ -315,12 +368,12 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                 ],
               ),
             ),
-            padding: EdgeInsets.fromLTRB(16, 0, 16, cart.isEmpty ? 24 : 96),
+            padding: EdgeInsets.fromLTRB(14, 0, 14, cart.isEmpty ? 24 : 96),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: constraints.maxWidth > 700 ? 4 : 2,
-              mainAxisExtent: 278,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
+              mainAxisExtent: 260,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
             ),
             itemBuilder: (_, product, _) {
               final quantity = cartQuantityMap[product.id] ?? 0;
@@ -354,29 +407,37 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
               right: 16,
               child: InkWell(
                 onTap: () => setState(() => _showCart = true),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(24),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
                     vertical: 14,
                   ),
                   decoration: BoxDecoration(
-                    color: storeForestGreen,
-                    borderRadius: BorderRadius.circular(20),
+                    color: storeCtaGreen,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.2),
                     boxShadow: [
                       BoxShadow(
-                        color: storeDeepGreen.withOpacity(0.35),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
+                        color: storePrimaryGreen.withOpacity(0.35),
+                        blurRadius: 18,
+                        offset: const Offset(0, 6),
                       ),
                     ],
                   ),
                   child: Row(
                     children: [
-                      const Icon(
-                        Icons.shopping_bag_outlined,
-                        color: Colors.white,
-                        size: 20,
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.shopping_bag_outlined,
+                          color: Colors.white,
+                          size: 18,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -385,23 +446,23 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
-                            fontSize: 14,
+                            fontSize: 14.5,
                           ),
                         ),
                       ),
                       const Text(
                         'View Cart',
                         style: TextStyle(
-                          color: storeGold,
-                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
                           fontSize: 14,
                         ),
                       ),
                       const SizedBox(width: 4),
                       const Icon(
-                        Icons.chevron_right_rounded,
-                        color: storeGold,
-                        size: 20,
+                        Icons.arrow_forward_rounded,
+                        color: Colors.white,
+                        size: 18,
                       ),
                     ],
                   ),
@@ -416,7 +477,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
   Widget _groceryCategoriesRow() => DataView(
     value: ref.watch(catalogBrowseProvider),
     loading: const SizedBox(
-      height: 86,
+      height: 160,
       child: AppSkeleton(kind: SkeletonKind.summary, padded: false),
     ),
     onRetry: () {
@@ -426,31 +487,91 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
     builder: (data) {
       final categories = catalogEntries(data, 'categories');
       if (categories.isEmpty) return const SizedBox();
-      return SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (final entry in categories)
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: CategoryTile(
-                  title: '${entry['name']}',
-                  subtitle: '${entry['count']} products',
-                  imageUrl: '${entry['image_url'] ?? ''}',
-                  icon: Icons.shopping_basket_outlined,
-                  bgColor: storeMint,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          SearchScreen(initialCategory: entry['name']),
-                    ),
+
+      final displayCats = categories.take(8).toList();
+
+      return GridView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        shrinkWrap: true,
+        padding: EdgeInsets.zero,
+        itemCount: displayCats.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 4,
+          mainAxisSpacing: 14,
+          crossAxisSpacing: 10,
+          childAspectRatio: 0.76,
+        ),
+        itemBuilder: (context, i) {
+          final entry = displayCats[i];
+          final imgUrl = '${entry['image_url'] ?? ''}';
+          final name = '${entry['name'] ?? ''}';
+
+          return InkWell(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => SearchScreen(initialCategory: name),
+              ),
+            ),
+            borderRadius: BorderRadius.circular(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF087532).withOpacity(0.06),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: imgUrl.isEmpty
+                        ? Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: const BoxDecoration(
+                              color: storeGlassMint,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.shopping_basket_outlined,
+                              color: storePrimaryGreen,
+                              size: 22,
+                            ),
+                          )
+                        : ClipOval(
+                            child: ProductPhoto(
+                              imgUrl,
+                              height: 54,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
                   ),
                 ),
-              ),
-          ],
-        ),
+                const SizedBox(height: 6),
+                Text(
+                  name,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: storeInk,
+                    height: 1.15,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       );
     },
   );
@@ -495,8 +616,8 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                 showCheckmark: false,
                 avatar: Icon(
                   cat.$2,
-                  size: 17,
-                  color: isSelected ? Colors.white : storeForestGreen,
+                  size: 16,
+                  color: isSelected ? Colors.white : storePrimaryGreen,
                 ),
                 label: Text(cat.$1),
                 labelStyle: TextStyle(
@@ -504,13 +625,14 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                   fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                   fontSize: 12.5,
                 ),
-                selectedColor: storeForestGreen,
-                backgroundColor: cat.$3,
+                selectedColor: storeCtaGreen,
+                backgroundColor: isSelected ? storeCtaGreen : Colors.white.withOpacity(0.85),
                 selected: isSelected,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                   side: BorderSide(
-                    color: isSelected ? storeForestGreen : storeBorder,
+                    color: isSelected ? storeCtaGreen : Colors.white,
+                    width: 1.2,
                   ),
                 ),
                 onSelected: (_) => setState(() => _category = cat.$1),
@@ -672,27 +794,32 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
         children: [
           // 1. Profile Header Card
           Container(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: storeForestGreen,
-              borderRadius: BorderRadius.circular(20),
+              color: Colors.white.withOpacity(0.92),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white, width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: storeForestGreen.withOpacity(0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
+                  color: const Color(0xFF087532).withOpacity(0.06),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
             child: Row(
               children: [
-                const CircleAvatar(
-                  radius: 26,
-                  backgroundColor: Colors.white,
-                  child: Icon(
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: const BoxDecoration(
+                    color: storeGlassMint,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
                     Icons.person_rounded,
-                    color: storeForestGreen,
-                    size: 32,
+                    color: storePrimaryGreen,
+                    size: 30,
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -701,20 +828,20 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        name.isNotEmpty ? name : 'Your Account',
+                        name.isNotEmpty ? name : 'My Account',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: storeInk,
                           fontSize: 18,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
                       const SizedBox(height: 3),
                       Text(
                         phone,
                         style: const TextStyle(
-                          color: storeLightMint,
+                          color: storeGrey,
                           fontSize: 13,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
@@ -722,15 +849,16 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                 ),
                 InkWell(
                   onTap: _editProfileModal,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(16),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
-                      vertical: 7,
+                      vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
+                      color: storeGlassMint,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white, width: 1),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -738,13 +866,13 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                         Icon(
                           Icons.edit_outlined,
                           size: 14,
-                          color: storeForestGreen,
+                          color: storePrimaryGreen,
                         ),
                         SizedBox(width: 4),
                         Text(
                           'Edit Profile',
                           style: TextStyle(
-                            color: storeForestGreen,
+                            color: storeDeepGreen,
                             fontWeight: FontWeight.w800,
                             fontSize: 11.5,
                           ),
@@ -1024,26 +1152,33 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
               // Item rows
               for (final l in lines)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: storeBorder),
+                      color: Colors.white.withOpacity(0.92),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: Colors.white, width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF087532).withOpacity(0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         // Product photo container
                         Container(
-                          width: 64,
-                          height: 64,
-                          padding: const EdgeInsets.all(4),
+                          width: 68,
+                          height: 68,
+                          padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFAFCFA),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: storeBorder),
+                            color: const Color(0xFFF9FDFB),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.white, width: 1),
                           ),
                           child: ProductPhoto(
                             l.product.imageUrl,
@@ -1083,7 +1218,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                                     '₹${l.product.price.toStringAsFixed(2)}',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w900,
-                                      fontSize: 14,
+                                      fontSize: 14.5,
                                       color: storeInk,
                                     ),
                                   ),
@@ -1092,19 +1227,9 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                                     Text(
                                       '₹${l.product.mrp.toStringAsFixed(2)}',
                                       style: const TextStyle(
-                                        fontSize: 11,
+                                        fontSize: 10.5,
                                         color: storeGrey,
                                         decoration: TextDecoration.lineThrough,
-                                      ),
-                                    ),
-                                  const SizedBox(width: 6),
-                                  if (l.product.discountPercent > 0)
-                                    Text(
-                                      '${l.product.discountPercent}% OFF',
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        color: storeFreshGreen,
-                                        fontWeight: FontWeight.w800,
                                       ),
                                     ),
                                 ],
@@ -1126,7 +1251,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                                 child: Icon(
                                   Icons.delete_outline_rounded,
                                   size: 19,
-                                  color: storeGrey,
+                                  color: storeLightGrey,
                                 ),
                               ),
                             ),
@@ -1238,9 +1363,11 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                 }
               },
               style: FilledButton.styleFrom(
-                backgroundColor: storeForestGreen,
+                backgroundColor: storeCtaGreen,
+                elevation: 3,
+                shadowColor: storePrimaryGreen.withOpacity(0.3),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(22),
                 ),
               ),
               child: Row(
@@ -1712,26 +1839,34 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFFAFCFA),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: storeBorder),
+                color: const Color(0xFFF9FDFB),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: Colors.white, width: 1.5),
               ),
               child: ProductPhoto(p.imageUrl, height: 200, fit: BoxFit.contain),
             ),
             const SizedBox(height: 18),
             if (p.brand.isNotEmpty)
-              Text(
-                p.brand,
-                style: const TextStyle(
-                  color: storeFreshGreen,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
+              Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: storeGlassMint,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  p.brand,
+                  style: const TextStyle(
+                    color: storePrimaryGreen,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11.5,
+                  ),
                 ),
               ),
             Text(
               p.name,
               style: const TextStyle(
-                fontSize: 20,
+                fontSize: 21,
                 fontWeight: FontWeight.w900,
                 color: storeInk,
               ),
@@ -1745,13 +1880,13 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                   color: storeGrey,
                 ),
               ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Text(
                   '₹${p.price.toStringAsFixed(2)}',
                   style: const TextStyle(
-                    fontSize: 22,
+                    fontSize: 24,
                     fontWeight: FontWeight.w900,
                     color: storeInk,
                   ),
@@ -1774,37 +1909,46 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: storeMint,
-                      borderRadius: BorderRadius.circular(12),
+                      color: storeGlassMint,
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       '${p.discountPercent}% OFF',
                       style: const TextStyle(
                         fontSize: 11,
-                        color: storeForestGreen,
+                        color: storePrimaryGreen,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
                 const Spacer(),
-                Text(
-                  p.unit,
-                  style: const TextStyle(
-                    color: storeGrey,
-                    fontWeight: FontWeight.w600,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: storeBorder),
+                  ),
+                  child: Text(
+                    p.unit,
+                    style: const TextStyle(
+                      color: storeInk,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ],
             ),
             if (p.description.isNotEmpty) ...[
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               const Divider(color: storeBorder),
               const SizedBox(height: 8),
               const Text(
                 'About this product',
                 style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14.5,
                   color: storeInk,
                 ),
               ),
@@ -1818,15 +1962,17 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                 ),
               ),
             ],
-            const SizedBox(height: 22),
+            const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
-              height: 48,
+              height: 50,
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
-                  backgroundColor: storeForestGreen,
+                  backgroundColor: p.available ? storeCtaGreen : const Color(0xFFE0E5E2),
+                  elevation: p.available ? 2 : 0,
+                  shadowColor: storePrimaryGreen.withOpacity(0.3),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                 ),
                 onPressed: p.available
@@ -1838,7 +1984,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                 icon: const Icon(Icons.add_shopping_cart_rounded, size: 20),
                 label: Text(
                   p.available ? 'Add to Cart' : 'Out of stock',
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                 ),
               ),
             ),
@@ -2131,63 +2277,217 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
 class OrderPlacedScreen extends StatelessWidget {
   final StoreOrder order;
   const OrderPlacedScreen({super.key, required this.order});
+
   @override
   Widget build(BuildContext context) => Theme(
     data: storeTheme(),
     child: Scaffold(
-      appBar: AppBar(title: const Text('Order confirmed')),
+      backgroundColor: storeCream,
+      appBar: AppBar(
+        title: const Text(
+          'Order Placed',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(26),
-            child: Image.asset(
-              'assets/images/delivery-handover.png',
-              height: 200,
-              fit: BoxFit.cover,
+          const SizedBox(height: 12),
+          // Success check circle with soft glow
+          Center(
+            child: Container(
+              width: 90,
+              height: 90,
+              decoration: BoxDecoration(
+                color: storeGlassMint,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: storePrimaryGreen.withOpacity(0.18),
+                    blurRadius: 20,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.check_rounded,
+                color: storePrimaryGreen,
+                size: 52,
+              ),
             ),
           ),
-          const SizedBox(height: 24),
-          const Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: Color(0xFFE4EEDF),
-                child: Icon(Icons.check, color: storeGreen),
+          const SizedBox(height: 20),
+          const Center(
+            child: Text(
+              'Order Placed\nSuccessfully!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
+                color: storeInk,
+                height: 1.2,
               ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Your order is placed.',
-                  style: TextStyle(
-                    fontSize: 27,
-                    fontWeight: FontWeight.w800,
-                    color: storeGreen,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-          const SizedBox(height: 12),
-          const Text(
-            'Your store will prepare your groceries and assign a delivery person. We will keep you updated as your order moves.',
-            style: TextStyle(height: 1.6, color: Colors.black54),
+          const SizedBox(height: 10),
+          const Center(
+            child: Text(
+              'Your grocery order has been placed.\nWe will deliver it fresh to your doorstep.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: storeGrey,
+                fontSize: 13.5,
+                height: 1.4,
+              ),
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          // Order details card (matching reference screen 15)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.92),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF087532).withOpacity(0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Order ID',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: storeGrey,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      order.id,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        color: storeInk,
+                      ),
+                    ),
+                  ],
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Divider(color: storeBorder, height: 1),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: const [
+                    Text(
+                      'Payment Mode',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: storeGrey,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'Cash on Delivery (COD)',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: storeDeepGreen,
+                      ),
+                    ),
+                  ],
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Divider(color: storeBorder, height: 1),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Total Amount',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: storeInk,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      money(order.total),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: storePrimaryGreen,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 18),
-          Text(
-            order.id,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 16),
-          CodPaymentCard(order: order),
-          const SizedBox(height: 20),
-          const Text(
-            'Delivering to',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${order.data['customer_name']}\n${order.data['delivery_address']}',
-            style: const TextStyle(height: 1.6),
+
+          // Delivery Address Card
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.85),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white, width: 1.2),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: storeGlassMint,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.location_on_rounded,
+                    color: storePrimaryGreen,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${order.data['customer_name'] ?? 'Customer'}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                          color: storeInk,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${order.data['delivery_address'] ?? ''}',
+                        style: const TextStyle(
+                          color: storeGrey,
+                          fontSize: 12.5,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 24),
         ],
@@ -2207,13 +2507,37 @@ class OrderPlacedScreen extends StatelessWidget {
                     builder: (_) => OrderTrackingScreen(orderId: order.id),
                   ),
                 ),
-                icon: const Icon(Icons.local_shipping_outlined),
-                label: const Text('Track my order'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: storeCtaGreen,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                ),
+                icon: const Icon(Icons.local_shipping_outlined, size: 20),
+                label: const Text(
+                  'View / Track Order',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                ),
               ),
               const SizedBox(height: 8),
-              TextButton(
+              OutlinedButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Continue shopping'),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: storeBorder, width: 1.2),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                ),
+                child: const Text(
+                  'Continue Shopping',
+                  style: TextStyle(
+                    color: storeInk,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14.5,
+                  ),
+                ),
               ),
             ],
           ),

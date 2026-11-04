@@ -411,7 +411,7 @@ class _DeliveryTrackingCardState extends ConsumerState<DeliveryTrackingCard> {
                           width: 38,
                           height: 38,
                           child: const Icon(
-                            Icons.home_pin,
+                            Icons.location_on,
                             color: Color(0xFFD94A4A),
                             size: 36,
                           ),

@@ -1,37 +1,57 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'models.dart';
 import 'loading.dart';
 
-const storeForestGreen = Color(0xFF0B5A3C);
-const storeDeepGreen = Color(0xFF06452F);
-const storeFreshGreen = Color(0xFF138B5A);
-const storeMint = Color(0xFFE8F3EC);
-const storeLightMint = Color(0xFFF2F8F4);
-const storeCream = Color(0xFFFFFDF7);
-const storeInk = Color(0xFF17201C);
-const storeGrey = Color(0xFF69716D);
-const storeGold = Color(0xFFE5A93C);
-const storeYellow = Color(0xFFF5A623);
-const storeOrange = Color(0xFFE67E22);
-const storeBorder = Color(0xFFE5EBE6);
-const storeRed = Color(0xFFE53935);
+// =============================================================================
+// AGARAM PREMIUM GROCERY DESIGN SYSTEM (MINT + CREAM + GLASSMORPHISM)
+// Matches the visual reference: soft cream base, frosted glass cards,
+// subtle green glow, clean typography and refined grocery palette.
+// =============================================================================
 
-// Backward compatibility alias
-const storeGreen = storeForestGreen;
+// Background & Surface Colors
+const storeCream = Color(0xFFFFFDF7);          // Main base cream
+const storeWarmWhite = Color(0xFFFFFCF6);      // Warm off-white
+const storePaleMint = Color(0xFFEFFAF3);       // Very pale mint for ambient gradients
+const storeGlassMint = Color(0xFFE9F7EE);      // Translucent mint
+const storeSoftSage = Color(0xFFDCEFE3);       // Soft sage accent
+const storeMint = Color(0xFFE8F3EC);           // Chip & pill surface
+const storeLightMint = Color(0xFFF2F8F4);      // Soft tint surface
+const storeBorder = Color(0xFFE5EBE6);         // Subtle border
+const storeBorderGlass = Color(0x99FFFFFF);    // Frosted 60% white glass border
+
+// Primary & Accent Grocery Greens
+const storePrimaryGreen = Color(0xFF159447);   // Primary brand green
+const storeForestGreen = Color(0xFF0B5A3C);    // Deep forest text/headers
+const storeDeepGreen = Color(0xFF087532);      // Deep CTA grocery green
+const storeCtaGreen = Color(0xFF119B4C);       // Vibrant button CTA
+const storeFreshGreen = Color(0xFF39B968);     // Highlight / savings green
+const storeGreen = storePrimaryGreen;          // Backward compatibility alias
+
+// Text & Neutral Colors
+const storeInk = Color(0xFF17201C);            // Primary text
+const storeGrey = Color(0xFF68736D);           // Secondary text
+const storeLightGrey = Color(0xFF9EABA4);      // Tertiary helper text
+
+// Accent Badges & Status Colors
+const storeGold = Color(0xFFE5A93C);           // Warm grocery badge / star
+const storeYellow = Color(0xFFF5A623);         // Highlight
+const storeOrange = Color(0xFFE67E22);         // Attention / out for delivery
+const storeRed = Color(0xFFE53935);            // Destructive / cancel / out of stock
 
 ThemeData storeTheme() => ThemeData(
   useMaterial3: true,
   fontFamilyFallback: const ['NotoSansTamil'],
   scaffoldBackgroundColor: storeCream,
   colorScheme: ColorScheme.fromSeed(
-    seedColor: storeForestGreen,
-    primary: storeForestGreen,
-    surface: Colors.white,
+    seedColor: storePrimaryGreen,
+    primary: storePrimaryGreen,
+    surface: storeCream,
   ),
   appBarTheme: const AppBarTheme(
-    backgroundColor: storeCream,
+    backgroundColor: Colors.transparent,
     foregroundColor: storeInk,
     centerTitle: true,
     elevation: 0,
@@ -39,53 +59,55 @@ ThemeData storeTheme() => ThemeData(
   ),
   navigationBarTheme: NavigationBarThemeData(
     height: 72,
-    backgroundColor: Colors.white,
-    indicatorColor: storeMint,
+    backgroundColor: Colors.white.withOpacity(0.85),
+    indicatorColor: storeGlassMint,
     labelTextStyle: WidgetStateProperty.resolveWith(
       (states) => TextStyle(
         fontSize: 11,
         fontWeight: states.contains(WidgetState.selected)
             ? FontWeight.w800
-            : FontWeight.w500,
+            : FontWeight.w600,
         color: states.contains(WidgetState.selected)
-            ? storeForestGreen
+            ? storeDeepGreen
             : storeGrey,
       ),
     ),
   ),
   inputDecorationTheme: InputDecorationTheme(
     filled: true,
-    fillColor: Colors.white,
+    fillColor: Colors.white.withOpacity(0.85),
     border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(30),
-      borderSide: const BorderSide(color: storeBorder),
+      borderRadius: BorderRadius.circular(20),
+      borderSide: BorderSide(color: Colors.white.withOpacity(0.9), width: 1.2),
     ),
     enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(30),
-      borderSide: const BorderSide(color: storeBorder),
+      borderRadius: BorderRadius.circular(20),
+      borderSide: const BorderSide(color: storeBorder, width: 1),
     ),
     focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(30),
-      borderSide: const BorderSide(color: storeForestGreen, width: 1.5),
+      borderRadius: BorderRadius.circular(20),
+      borderSide: const BorderSide(color: storePrimaryGreen, width: 1.5),
     ),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
   ),
   filledButtonTheme: FilledButtonThemeData(
     style: FilledButton.styleFrom(
-      backgroundColor: storeForestGreen,
+      backgroundColor: storeCtaGreen,
       foregroundColor: Colors.white,
       minimumSize: const Size(48, 48),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+      elevation: 2,
+      shadowColor: storePrimaryGreen.withOpacity(0.3),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
     ),
   ),
   cardTheme: CardThemeData(
     elevation: 0,
-    color: Colors.white,
+    color: Colors.white.withOpacity(0.88),
     margin: EdgeInsets.zero,
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
-      side: const BorderSide(color: storeBorder),
+      borderRadius: BorderRadius.circular(20),
+      side: const BorderSide(color: storeBorderGlass, width: 1),
     ),
   ),
 );
@@ -1005,7 +1027,56 @@ class OrderActionDialogState extends State<OrderActionDialog> {
 
 // =============================================================================
 // AGARAM SUPERMARKET – NEW CUSTOMER COMPONENT SUITE
+// Redesigned to visually match the uploaded reference: soft frosted cream
+// background, glassmorphism pills, ambient shadows, refined typography.
 // =============================================================================
+
+class GlassContainer extends StatelessWidget {
+  final Widget child;
+  final double borderRadius;
+  final EdgeInsetsGeometry padding;
+  final Color? color;
+  final Border? border;
+  final List<BoxShadow>? boxShadow;
+  final double blur;
+
+  const GlassContainer({
+    super.key,
+    required this.child,
+    this.borderRadius = 22,
+    this.padding = const EdgeInsets.all(16),
+    this.color,
+    this.border,
+    this.boxShadow,
+    this.blur = 12,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            color: color ?? Colors.white.withOpacity(0.82),
+            borderRadius: BorderRadius.circular(borderRadius),
+            border: border ?? Border.all(color: Colors.white.withOpacity(0.85), width: 1.2),
+            boxShadow: boxShadow ?? [
+              BoxShadow(
+                color: const Color(0xFF087532).withOpacity(0.04),
+                blurRadius: 18,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
 
 class AgaramAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onMenuPressed;
@@ -1029,69 +1100,142 @@ class AgaramAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: storeCream,
+      decoration: BoxDecoration(
+        color: storeCream.withOpacity(0.92),
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withOpacity(0.8), width: 1),
+        ),
+      ),
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 4,
-        left: 8,
-        right: 8,
-        bottom: 6,
+        left: 12,
+        right: 12,
+        bottom: 8,
       ),
       child: Row(
         children: [
-          IconButton(
-            tooltip: showBackButton ? 'Back' : 'Open menu',
-            icon: Icon(
-              showBackButton
-                  ? Icons.arrow_back_ios_new_rounded
-                  : Icons.menu_rounded,
-              color: storeInk,
-              size: 24,
+          InkWell(
+            onTap: showBackButton ? onBackPressed : onMenuPressed,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white, width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF087532).withOpacity(0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Icon(
+                showBackButton
+                    ? Icons.arrow_back_ios_new_rounded
+                    : Icons.menu_rounded,
+                color: storeInk,
+                size: 20,
+              ),
             ),
-            onPressed: showBackButton ? onBackPressed : onMenuPressed,
           ),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: const [
-                Text(
-                  'AGARAM',
-                  style: TextStyle(
-                    color: storeForestGreen,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2.2,
-                    fontSize: 17,
-                  ),
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: storeGlassMint,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.shopping_basket_rounded,
+                        color: storePrimaryGreen,
+                        size: 15,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'AGARAM',
+                      style: TextStyle(
+                        color: storeDeepGreen,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.8,
+                        fontSize: 17,
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
+                const Text(
                   'SUPERMARKET',
                   style: TextStyle(
-                    color: storeFreshGreen,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 2.6,
+                    color: storePrimaryGreen,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2.4,
                     fontSize: 8.5,
                   ),
                 ),
               ],
             ),
           ),
-          IconButton(
-            tooltip: 'My shopping cart',
-            onPressed: onCartPressed,
-            icon: Badge(
-              isLabelVisible: cartCount > 0,
-              label: Text(
-                '$cartCount',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 10,
-                  color: Colors.white,
-                ),
+          InkWell(
+            onTap: onCartPressed,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white, width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF087532).withOpacity(0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              backgroundColor: storeOrange,
-              child: const Icon(
-                Icons.shopping_cart_outlined,
-                color: storeInk,
-                size: 24,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  const Icon(
+                    Icons.shopping_cart_outlined,
+                    color: storeInk,
+                    size: 20,
+                  ),
+                  if (cartCount > 0)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: storeRed,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          '$cartCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w900,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -1104,81 +1248,127 @@ class AgaramAppBar extends StatelessWidget implements PreferredSizeWidget {
 class AgaramBottomNavigation extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onItemSelected;
+  final int cartCount;
+  final VoidCallback? onCartPressed;
 
   const AgaramBottomNavigation({
     super.key,
     required this.selectedIndex,
     required this.onItemSelected,
+    this.cartCount = 0,
+    this.onCartPressed,
   });
 
   @override
   Widget build(BuildContext context) {
-    final items = const [
-      (Icons.home_outlined, Icons.home_rounded, 'Home'),
-      (Icons.grid_view_outlined, Icons.grid_view_rounded, 'Categories'),
-      (Icons.local_offer_outlined, Icons.local_offer_rounded, 'Offers'),
-      (Icons.inventory_2_outlined, Icons.inventory_2_rounded, 'Orders'),
-      (Icons.person_outline_rounded, Icons.person_rounded, 'Account'),
-    ];
-
     return Container(
+      margin: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.of(context).padding.bottom + 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: const Border(top: BorderSide(color: storeBorder, width: 0.8)),
+        color: Colors.white.withOpacity(0.96),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
+            color: const Color(0xFF087532).withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      padding: EdgeInsets.only(
-        top: 6,
-        bottom: MediaQuery.of(context).padding.bottom + 6,
-      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: List.generate(items.length, (index) {
-          final isSelected = selectedIndex == index;
-          final item = items[index];
-          return InkWell(
-            onTap: () => onItemSelected(index),
-            borderRadius: BorderRadius.circular(20),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: EdgeInsets.symmetric(
-                horizontal: isSelected ? 14 : 10,
-                vertical: 6,
-              ),
-              decoration: BoxDecoration(
-                color: isSelected ? storeMint : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isSelected ? item.$2 : item.$1,
-                    size: 22,
-                    color: isSelected ? storeForestGreen : storeGrey,
+        children: [
+          _navItem(
+            icon: Icons.home_rounded,
+            outlineIcon: Icons.home_outlined,
+            label: 'Home',
+            isSelected: selectedIndex == 0,
+            onTap: () => onItemSelected(0),
+          ),
+          _navItem(
+            icon: Icons.grid_view_rounded,
+            outlineIcon: Icons.grid_view_outlined,
+            label: 'Categories',
+            isSelected: selectedIndex == 1,
+            onTap: () => onItemSelected(1),
+          ),
+          // Center Shopping Cart icon with red badge
+          InkWell(
+            onTap: onCartPressed ?? () => onItemSelected(2),
+            borderRadius: BorderRadius.circular(24),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              child: Badge(
+                isLabelVisible: cartCount > 0,
+                label: Text(
+                  '$cartCount',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 10,
+                    color: Colors.white,
                   ),
-                  if (isSelected) ...[
-                    const SizedBox(width: 6),
-                    Text(
-                      item.$3,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: storeForestGreen,
-                      ),
-                    ),
-                  ],
-                ],
+                ),
+                backgroundColor: storeRed,
+                offset: const Offset(6, -4),
+                child: const Icon(
+                  Icons.shopping_cart_outlined,
+                  color: storeInk,
+                  size: 24,
+                ),
               ),
             ),
-          );
-        }),
+          ),
+          _navItem(
+            icon: Icons.inventory_2_rounded,
+            outlineIcon: Icons.inventory_2_outlined,
+            label: 'Orders',
+            isSelected: selectedIndex == 3,
+            onTap: () => onItemSelected(3),
+          ),
+          _navItem(
+            icon: Icons.person_rounded,
+            outlineIcon: Icons.person_outline_rounded,
+            label: 'Account',
+            isSelected: selectedIndex == 4,
+            onTap: () => onItemSelected(4),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _navItem({
+    required IconData icon,
+    required IconData outlineIcon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isSelected ? icon : outlineIcon,
+              size: 22,
+              color: isSelected ? storePrimaryGreen : storeGrey,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? storePrimaryGreen : storeGrey,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1226,253 +1416,217 @@ class AgaramDrawer extends StatelessWidget {
       child: SafeArea(
         child: Column(
           children: [
-            // Top curved header
+            // Top Frosted Glass Brand Header
             Container(
-              margin: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              margin: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(24),
                 gradient: const LinearGradient(
-                  colors: [storeDeepGreen, storeForestGreen],
+                  colors: [Color(0xFFEFFAF3), Color(0xFFE2F3E7)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
+                border: Border.all(color: Colors.white, width: 1.5),
                 boxShadow: [
                   BoxShadow(
-                    color: storeDeepGreen.withOpacity(0.2),
-                    blurRadius: 12,
+                    color: storeDeepGreen.withOpacity(0.08),
+                    blurRadius: 16,
                     offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(22),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: Opacity(
-                        opacity: 0.22,
-                        child: Image.asset(
-                          'assets/images/drawer_grocery_pantry.jpg',
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const SizedBox(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'AGARAM',
+                            style: TextStyle(
+                              color: storeDeepGreen,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 2.2,
+                              fontSize: 20,
+                            ),
+                          ),
+                          Text(
+                            'SUPERMARKET',
+                            style: TextStyle(
+                              color: storePrimaryGreen,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 2.6,
+                              fontSize: 9,
+                            ),
+                          ),
+                        ],
+                      ),
+                      InkWell(
+                        onTap: () => Navigator.pop(context),
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.8),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            color: storeInk,
+                            size: 18,
+                          ),
                         ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  if (!isLoggedIn)
+                    InkWell(
+                      onTap: () {
+                        Navigator.pop(context);
+                        onLoginPressed();
+                      },
+                      borderRadius: BorderRadius.circular(18),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 13,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: Colors.white, width: 1.2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: storeDeepGreen.withOpacity(0.08),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: const BoxDecoration(
+                                color: storeGlassMint,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.person_rounded,
+                                color: storePrimaryGreen,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: const [
                                   Text(
-                                    'AGARAM',
+                                    'Login / Sign In',
                                     style: TextStyle(
-                                      color: Colors.white,
+                                      color: storeDeepGreen,
                                       fontWeight: FontWeight.w900,
-                                      letterSpacing: 2.2,
-                                      fontSize: 19,
+                                      fontSize: 15,
                                     ),
                                   ),
+                                  SizedBox(height: 2),
                                   Text(
-                                    'SUPERMARKET',
+                                    'Access orders & wishlist',
                                     style: TextStyle(
-                                      color: storeGold,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 2.6,
-                                      fontSize: 9,
+                                      color: storeGrey,
+                                      fontSize: 11,
                                     ),
                                   ),
                                 ],
                               ),
-                              CircleAvatar(
-                                radius: 16,
-                                backgroundColor: Colors.white24,
-                                child: IconButton(
-                                  padding: EdgeInsets.zero,
-                                  icon: const Icon(
-                                    Icons.close_rounded,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                  onPressed: () => Navigator.pop(context),
-                                ),
+                            ),
+                            const Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 14,
+                              color: storePrimaryGreen,
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    InkWell(
+                      onTap: () {
+                        Navigator.pop(context);
+                        onSelectAccount();
+                      },
+                      borderRadius: BorderRadius.circular(18),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.85),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: Colors.white, width: 1.2),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: const BoxDecoration(
+                                color: storeGlassMint,
+                                shape: BoxShape.circle,
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          // First prominent action button
-                          if (!isLoggedIn)
-                            InkWell(
-                              onTap: () {
-                                Navigator.pop(context);
-                                onLoginPressed();
-                              },
-                              borderRadius: BorderRadius.circular(18),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 14,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(18),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.08),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  children: [
-                                    const CircleAvatar(
-                                      radius: 20,
-                                      backgroundColor: storeMint,
-                                      child: Icon(
-                                        Icons.person_rounded,
-                                        color: storeForestGreen,
-                                        size: 22,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: const [
-                                          Text(
-                                            'Login / Sign In',
-                                            style: TextStyle(
-                                              color: storeForestGreen,
-                                              fontWeight: FontWeight.w900,
-                                              fontSize: 15.5,
-                                            ),
-                                          ),
-                                          SizedBox(height: 2),
-                                          Text(
-                                            'Access orders, wishlist & addresses',
-                                            style: TextStyle(
-                                              color: storeGrey,
-                                              fontSize: 11,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const Icon(
-                                      Icons.arrow_forward_ios_rounded,
-                                      size: 16,
-                                      color: storeForestGreen,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                          else
-                            InkWell(
-                              onTap: () {
-                                Navigator.pop(context);
-                                onSelectAccount();
-                              },
-                              borderRadius: BorderRadius.circular(18),
-                              child: Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.18),
-                                  borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(color: Colors.white24),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const CircleAvatar(
-                                      radius: 22,
-                                      backgroundColor: Colors.white,
-                                      child: Icon(
-                                        Icons.person_rounded,
-                                        color: storeForestGreen,
-                                        size: 26,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            displayName,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 15,
-                                            ),
-                                          ),
-                                          if (phone.isNotEmpty)
-                                            Text(
-                                              phone,
-                                              style: const TextStyle(
-                                                color: Colors.white70,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          const SizedBox(height: 2),
-                                          const Text(
-                                            'View Profile →',
-                                            style: TextStyle(
-                                              color: storeGold,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 11,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              child: const Icon(
+                                Icons.person_rounded,
+                                color: storePrimaryGreen,
+                                size: 24,
                               ),
                             ),
-                        ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    displayName,
+                                    style: const TextStyle(
+                                      color: storeInk,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 14.5,
+                                    ),
+                                  ),
+                                  if (phone.isNotEmpty)
+                                    Text(
+                                      phone,
+                                      style: const TextStyle(
+                                        color: storeGrey,
+                                        fontSize: 11.5,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              color: storeGrey,
+                              size: 20,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ],
-                ),
+                ],
               ),
             ),
 
             // Navigation Menu List
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                 children: [
-                  _drawerRow(
-                    icon: Icons.admin_panel_settings_outlined,
-                    label: 'Admin login',
-                    onTap: () {
-                      Navigator.pop(context);
-                      onAdminLogin();
-                    },
-                  ),
-                  _drawerRow(
-                    icon: Icons.delivery_dining,
-                    label: 'Delivery employee login',
-                    onTap: () {
-                      Navigator.pop(context);
-                      onDeliveryLogin();
-                    },
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: Divider(color: storeBorder, height: 1),
-                  ),
                   _drawerRow(
                     icon: Icons.grid_view_outlined,
                     label: 'Categories',
@@ -1519,7 +1673,7 @@ class AgaramDrawer extends StatelessWidget {
                   ),
                   _drawerRow(
                     icon: Icons.help_outline_rounded,
-                    label: 'Help',
+                    label: 'Help & FAQ',
                     onTap: () {
                       Navigator.pop(context);
                       onSelectHelp();
@@ -1527,10 +1681,35 @@ class AgaramDrawer extends StatelessWidget {
                   ),
                   _drawerRow(
                     icon: Icons.phone_outlined,
-                    label: 'Contact',
+                    label: 'Contact Store',
                     onTap: () {
                       Navigator.pop(context);
                       onSelectContact();
+                    },
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Divider(color: storeBorder, height: 1),
+                  ),
+                  // Staff logins softened
+                  _drawerRow(
+                    icon: Icons.admin_panel_settings_outlined,
+                    label: 'Admin Portal',
+                    iconColor: storeGrey,
+                    textColor: storeGrey,
+                    onTap: () {
+                      Navigator.pop(context);
+                      onAdminLogin();
+                    },
+                  ),
+                  _drawerRow(
+                    icon: Icons.delivery_dining,
+                    label: 'Delivery Portal',
+                    iconColor: storeGrey,
+                    textColor: storeGrey,
+                    onTap: () {
+                      Navigator.pop(context);
+                      onDeliveryLogin();
                     },
                   ),
                   if (isLoggedIn && onLogout != null) ...[
@@ -1562,25 +1741,32 @@ class AgaramDrawer extends StatelessWidget {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
-    Color iconColor = storeForestGreen,
+    Color iconColor = storePrimaryGreen,
     Color textColor = storeInk,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: ListTile(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        leading: Icon(icon, color: iconColor, size: 21),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: iconColor, size: 18),
+        ),
         title: Text(
           label,
           style: TextStyle(
             color: textColor,
-            fontWeight: FontWeight.w600,
-            fontSize: 14.5,
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
           ),
         ),
         trailing: const Icon(
           Icons.chevron_right_rounded,
-          color: storeGrey,
+          color: storeLightGrey,
           size: 19,
         ),
         onTap: onTap,
@@ -1597,40 +1783,58 @@ class HeroBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: Container(
-        height: 195,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [storeDeepGreen, storeForestGreen],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
+    return Container(
+      height: 160,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFF6E5), Color(0xFFFFFCF5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        border: Border.all(color: Colors.white, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF5A623).withOpacity(0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
         child: Stack(
-          fit: StackFit.expand,
           children: [
+            // Right-aligned grocery illustration
             Positioned(
-              right: 0,
-              top: 0,
-              bottom: 0,
-              width: 200,
-              child: imageUrl.isEmpty
-                  ? const Icon(
-                      Icons.shopping_basket_outlined,
-                      color: storeMint,
-                      size: 100,
-                    )
-                  : ProductPhoto(imageUrl, height: 195, fit: BoxFit.contain),
+              right: 12,
+              top: 10,
+              bottom: 10,
+              width: 150,
+              child: Image.asset(
+                'assets/images/hero_grocery_banner.jpg',
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) => Container(
+                  decoration: const BoxDecoration(
+                    color: storeGlassMint,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.shopping_basket_rounded,
+                    color: storeGold,
+                    size: 70,
+                  ),
+                ),
+              ),
             ),
+            // Left content with readable gradient backdrop
             Positioned.fill(
-              child: DecoratedBox(
+              child: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      storeDeepGreen.withOpacity(0.96),
-                      storeDeepGreen.withOpacity(0.85),
+                      const Color(0xFFFFF6E5),
+                      const Color(0xFFFFF6E5).withOpacity(0.85),
                       Colors.transparent,
                     ],
                     stops: const [0.0, 0.55, 1.0],
@@ -1639,105 +1843,77 @@ class HeroBanner extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+              padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: storeGold.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Text(
+                      'MONTHLY GROCERY DEALS',
+                      style: TextStyle(
+                        color: Color(0xFF996B00),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
                   const Text(
-                    'Your One-Stop\nGrocery Store',
+                    'Essential Groceries\nFor Your Home',
                     style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      height: 1.15,
+                      color: storeInk,
+                      fontSize: 16.5,
+                      height: 1.2,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Groceries from our store\nPay cash on delivery',
-                    style: TextStyle(
-                      color: storeLightMint,
-                      fontSize: 11,
-                      height: 1.35,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const Spacer(),
-                  Row(
-                    children: [
-                      InkWell(
-                        onTap: onShopNow,
-                        borderRadius: BorderRadius.circular(30),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: storeGold,
-                            borderRadius: BorderRadius.circular(30),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.12),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Text(
-                                'Shop Now',
-                                style: TextStyle(
-                                  color: storeInk,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 12.5,
-                                ),
-                              ),
-                              SizedBox(width: 4),
-                              Icon(
-                                Icons.chevron_right_rounded,
-                                size: 16,
-                                color: storeInk,
-                              ),
-                            ],
-                          ),
-                        ),
+                  const SizedBox(height: 10),
+                  InkWell(
+                    onTap: onShopNow,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 7,
                       ),
-                      const SizedBox(width: 14),
-                      // Carousel Indicator dots
-                      Row(
-                        children: [
-                          Container(
-                            width: 16,
-                            height: 5,
-                            decoration: BoxDecoration(
-                              color: storeMint,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Container(
-                            width: 5,
-                            height: 5,
-                            decoration: const BoxDecoration(
-                              color: Colors.white54,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Container(
-                            width: 5,
-                            height: 5,
-                            decoration: const BoxDecoration(
-                              color: Colors.white54,
-                              shape: BoxShape.circle,
-                            ),
+                      decoration: BoxDecoration(
+                        color: storeCtaGreen,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: storeCtaGreen.withOpacity(0.25),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),
-                    ],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Text(
+                            'Shop Now',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                          SizedBox(width: 4),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 13,
+                            color: Colors.white,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -1772,15 +1948,15 @@ class SearchBarWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 56,
+      height: 52,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: storeBorder, width: 1.2),
+        color: Colors.white.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 10,
+            color: const Color(0xFF087532).withOpacity(0.04),
+            blurRadius: 14,
             offset: const Offset(0, 3),
           ),
         ],
@@ -1788,7 +1964,7 @@ class SearchBarWidget extends StatelessWidget {
       child: Row(
         children: [
           const SizedBox(width: 14),
-          const Icon(Icons.search_rounded, color: storeForestGreen, size: 24),
+          const Icon(Icons.search_rounded, color: storePrimaryGreen, size: 22),
           const SizedBox(width: 10),
           Expanded(
             child: InkWell(
@@ -1809,7 +1985,7 @@ class SearchBarWidget extends StatelessWidget {
                       onChanged: onChanged,
                       style: const TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                         color: storeInk,
                       ),
                       decoration: InputDecoration(
@@ -1832,8 +2008,8 @@ class SearchBarWidget extends StatelessWidget {
               tooltip: 'Voice search',
               icon: const Icon(
                 Icons.mic_none_rounded,
-                color: storeForestGreen,
-                size: 23,
+                color: storePrimaryGreen,
+                size: 21,
               ),
               onPressed: onVoiceTap,
             ),
@@ -1842,19 +2018,20 @@ class SearchBarWidget extends StatelessWidget {
               padding: const EdgeInsets.only(right: 6),
               child: InkWell(
                 onTap: onFilterTap,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(16),
                 child: Container(
-                  width: 42,
-                  height: 42,
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
-                    color: storeMint,
+                    color: storeGlassMint,
                     borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white, width: 1),
                   ),
                   child: const Center(
                     child: Icon(
                       Icons.tune_rounded,
-                      color: storeForestGreen,
-                      size: 20,
+                      color: storeDeepGreen,
+                      size: 18,
                     ),
                   ),
                 ),
@@ -1889,32 +2066,43 @@ class CategoryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
       child: SizedBox(
-        width: 72,
+        width: 76,
         child: Column(
           children: [
             Container(
-              width: 58,
-              height: 58,
+              width: 62,
+              height: 62,
               decoration: BoxDecoration(
-                color: bgColor,
-                borderRadius: BorderRadius.circular(18),
+                color: Colors.white.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white, width: 1.5),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
+                    color: const Color(0xFF087532).withOpacity(0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
               child: Center(
                 child: imageUrl.isEmpty
-                    ? Icon(icon, color: storeForestGreen, size: 28)
-                    : ProductPhoto(imageUrl, height: 58, fit: BoxFit.contain),
+                    ? Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: storeGlassMint,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(icon, color: storePrimaryGreen, size: 24),
+                      )
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: ProductPhoto(imageUrl, height: 58, fit: BoxFit.contain),
+                      ),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 7),
             Text(
               title,
               textAlign: TextAlign.center,
@@ -1962,23 +2150,25 @@ class SectionHeader extends StatelessWidget {
           child: Text(
             title,
             style: const TextStyle(
-              fontSize: 17,
+              fontSize: 18,
               fontWeight: FontWeight.w800,
               color: storeInk,
+              letterSpacing: -0.2,
             ),
           ),
         ),
         if (onAction != null)
           InkWell(
             onTap: onAction,
+            borderRadius: BorderRadius.circular(12),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
               child: Text(
                 action,
                 style: const TextStyle(
                   fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: storeForestGreen,
+                  fontWeight: FontWeight.w800,
+                  color: storePrimaryGreen,
                 ),
               ),
             ),
@@ -2004,42 +2194,54 @@ class FeaturedEssentialsRow extends StatelessWidget {
     if (items.isEmpty) return const SizedBox();
 
     return SizedBox(
-      height: 98,
+      height: 104,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: items.length,
         separatorBuilder: (_, _) => const SizedBox(width: 10),
         itemBuilder: (context, i) {
           final item = items[i];
+          final hasImage = '${item['image_url'] ?? ''}'.isNotEmpty;
           return InkWell(
             onTap: () => onSelectCategory('${item['name']}'),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
             child: Container(
-              width: 82,
+              width: 84,
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: storeBorder),
+                color: Colors.white.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white, width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF087532).withOpacity(0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: storeMint,
-                    child: '${item['image_url'] ?? ''}'.isEmpty
-                        ? const Icon(
-                            Icons.shopping_basket_outlined,
-                            color: storeForestGreen,
-                            size: 20,
-                          )
-                        : ClipOval(
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: const BoxDecoration(
+                      color: storeGlassMint,
+                      shape: BoxShape.circle,
+                    ),
+                    child: hasImage
+                        ? ClipOval(
                             child: ProductPhoto(
                               '${item['image_url']}',
-                              height: 40,
+                              height: 46,
                               fit: BoxFit.contain,
                             ),
+                          )
+                        : const Icon(
+                            Icons.shopping_basket_rounded,
+                            color: storePrimaryGreen,
+                            size: 22,
                           ),
                   ),
                   const SizedBox(height: 6),
@@ -2092,173 +2294,192 @@ class ProductCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: storeBorder),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFEFF5F1), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+            color: const Color(0xFF087532).withOpacity(0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top Image Container with Wishlist button
-            Stack(
-              children: [
-                Container(
-                  height: 118,
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFAFCFA),
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(16),
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. Image Container with generous padding & floating wishlist
+              Stack(
+                children: [
+                  Container(
+                    height: 124,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF7FAF8),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                  ),
-                  child: ProductPhoto(
-                    product.imageUrl,
-                    height: 102,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-                Positioned(
-                  top: 6,
-                  right: 6,
-                  child: GestureDetector(
-                    onTap: onToggleWishlist,
-                    child: Container(
-                      padding: const EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.9),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        isWishlisted
-                            ? Icons.favorite_rounded
-                            : Icons.favorite_border_rounded,
-                        color: isWishlisted ? storeRed : storeGrey,
-                        size: 17,
+                    padding: const EdgeInsets.all(8),
+                    child: Center(
+                      child: ProductPhoto(
+                        product.imageUrl,
+                        height: 108,
+                        fit: BoxFit.contain,
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: GestureDetector(
+                      onTap: onToggleWishlist,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.92),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.06),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          isWishlisted
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
+                          color: isWishlisted ? storeRed : storeLightGrey,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
 
-            // Product Details
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      product.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: storeInk,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      product.unit,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: storeGrey,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const Spacer(),
-                    // Price row: Selling Price + MRP + Discount %
-                    Row(
-                      children: [
-                        Text(
-                          '₹${product.price.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            color: storeInk,
-                          ),
-                        ),
-                        const SizedBox(width: 5),
-                        if (product.discountPercent > 0)
-                          Text(
-                            '₹${product.mrp.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: storeGrey,
-                              decoration: TextDecoration.lineThrough,
-                            ),
-                          ),
-                        const Spacer(),
-                        if (product.discountPercent > 0)
-                          Text(
-                            '${product.discountPercent}% OFF',
-                            style: const TextStyle(
-                              fontSize: 9.5,
-                              color: storeFreshGreen,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    // Add Button or Quantity Selector
-                    if (cartQuantity > 0)
-                      QuantitySelector(
-                        quantity: cartQuantity,
-                        onIncrement: onIncrement ?? onAddToCart,
-                        onDecrement: onDecrement ?? () {},
-                      )
-                    else
-                      SizedBox(
-                        width: double.infinity,
-                        height: 32,
-                        child: OutlinedButton(
-                          onPressed: product.available ? onAddToCart : null,
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(
-                              color: storeForestGreen,
-                              width: 1.2,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            padding: EdgeInsets.zero,
-                          ),
-                          child: Text(
-                            product.available ? '+ ADD' : 'Out of Stock',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w800,
-                              color: product.available
-                                  ? storeForestGreen
-                                  : storeGrey,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+              // 2. Product Title (Clear, 2 lines, tight spacing)
+              Text(
+                product.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: storeInk,
+                  height: 1.2,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 3),
+
+              // 3. Unit / Pack Size
+              Text(
+                product.unit.isNotEmpty ? product.unit : 'Standard Pack',
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: storeGrey,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 6),
+
+              // 4. Price & Discount Badges Row
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    '₹${product.price.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: storeInk,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  if (product.discountPercent > 0) ...[
+                    Text(
+                      '₹${product.mrp.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: storeLightGrey,
+                        decoration: TextDecoration.lineThrough,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: storeGlassMint,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '${product.discountPercent}% OFF',
+                        style: const TextStyle(
+                          fontSize: 9,
+                          color: storePrimaryGreen,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // 5. Large prominent Add Button / Quantity Selector
+              if (cartQuantity > 0)
+                QuantitySelector(
+                  quantity: cartQuantity,
+                  onIncrement: onIncrement ?? onAddToCart,
+                  onDecrement: onDecrement ?? () {},
+                )
+              else
+                SizedBox(
+                  width: double.infinity,
+                  height: 36,
+                  child: FilledButton(
+                    onPressed: product.available ? onAddToCart : null,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: product.available
+                          ? storeCtaGreen
+                          : const Color(0xFFE2E7E4),
+                      foregroundColor: product.available
+                          ? Colors.white
+                          : storeGrey,
+                      elevation: product.available ? 2 : 0,
+                      shadowColor: storePrimaryGreen.withOpacity(0.3),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (product.available)
+                          const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                        const SizedBox(width: 2),
+                        Text(
+                          product.available ? 'Add' : 'Out of Stock',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: product.available
+                                ? Colors.white
+                                : storeGrey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -2280,17 +2501,23 @@ class QuantitySelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 32,
+      height: 34,
       decoration: BoxDecoration(
-        color: storeMint,
+        color: storeCtaGreen,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: storeForestGreen, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: storeCtaGreen.withOpacity(0.25),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
-            icon: const Icon(Icons.remove, size: 15, color: storeForestGreen),
+            icon: const Icon(Icons.remove, size: 15, color: Colors.white),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 28),
             onPressed: onDecrement,
@@ -2298,13 +2525,13 @@ class QuantitySelector extends StatelessWidget {
           Text(
             '$quantity',
             style: const TextStyle(
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w900,
               fontSize: 13,
-              color: storeForestGreen,
+              color: Colors.white,
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.add, size: 15, color: storeForestGreen),
+            icon: const Icon(Icons.add, size: 15, color: Colors.white),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 28),
             onPressed: onIncrement,
@@ -2321,30 +2548,31 @@ class FreeDeliveryBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: storeMint,
-        borderRadius: BorderRadius.circular(14),
+        color: storeGlassMint,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white, width: 1.2),
       ),
       child: Row(
         children: const [
           Icon(
             Icons.local_shipping_outlined,
-            color: storeForestGreen,
-            size: 19,
+            color: storePrimaryGreen,
+            size: 20,
           ),
           SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Free delivery',
+              'Free delivery on all grocery orders',
               style: TextStyle(
-                color: storeForestGreen,
+                color: storeDeepGreen,
                 fontWeight: FontWeight.w700,
-                fontSize: 12,
+                fontSize: 12.5,
               ),
             ),
           ),
-          Icon(Icons.chevron_right_rounded, color: storeForestGreen, size: 18),
+          Icon(Icons.chevron_right_rounded, color: storePrimaryGreen, size: 18),
         ],
       ),
     );
@@ -2371,11 +2599,18 @@ class PriceDetailsCard extends StatelessWidget {
     final total = subtotal + finalDelivery;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: storeBorder),
+        color: Colors.white.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF087532).withOpacity(0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2383,7 +2618,7 @@ class PriceDetailsCard extends StatelessWidget {
           const Text(
             'Price Details',
             style: TextStyle(
-              fontSize: 15,
+              fontSize: 16,
               fontWeight: FontWeight.w800,
               color: storeInk,
             ),
@@ -2398,7 +2633,7 @@ class PriceDetailsCard extends StatelessWidget {
             _row(
               'You save',
               '-₹${discount.toStringAsFixed(2)}',
-              valueColor: storeFreshGreen,
+              valueColor: storePrimaryGreen,
             ),
           ],
           const SizedBox(height: 8),
@@ -2407,7 +2642,7 @@ class PriceDetailsCard extends StatelessWidget {
             finalDelivery == 0
                 ? 'FREE'
                 : '₹${finalDelivery.toStringAsFixed(2)}',
-            valueColor: finalDelivery == 0 ? storeFreshGreen : storeInk,
+            valueColor: finalDelivery == 0 ? storePrimaryGreen : storeInk,
           ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
@@ -2439,7 +2674,7 @@ class PriceDetailsCard extends StatelessWidget {
           style: TextStyle(
             fontSize: fontSize,
             color: isBold ? storeInk : storeGrey,
-            fontWeight: isBold ? FontWeight.w800 : FontWeight.w500,
+            fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
           ),
         ),
         Text(
@@ -2475,33 +2710,38 @@ class OrderCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: storeBorder),
+        color: Colors.white.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF087532).withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(22),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              // Product thumbnail preview
               Container(
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: storeMint,
-                  borderRadius: BorderRadius.circular(12),
+                  color: storeGlassMint,
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Icon(
                   Icons.shopping_bag_outlined,
-                  color: storeForestGreen,
+                  color: storePrimaryGreen,
                   size: 24,
                 ),
               ),
               const SizedBox(width: 12),
-              // Details
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2509,7 +2749,7 @@ class OrderCard extends StatelessWidget {
                     Text(
                       'Order #${order.id}',
                       style: const TextStyle(
-                        fontSize: 13.5,
+                        fontSize: 14,
                         fontWeight: FontWeight.w800,
                         color: storeInk,
                       ),
@@ -2526,17 +2766,16 @@ class OrderCard extends StatelessWidget {
                     ),
                     Text(
                       dateStr,
-                      style: const TextStyle(fontSize: 11, color: storeGrey),
+                      style: const TextStyle(fontSize: 11, color: storeLightGrey),
                     ),
                   ],
                 ),
               ),
-              // Status Pill
               _statusPill(status),
               const SizedBox(width: 6),
               const Icon(
                 Icons.chevron_right_rounded,
-                color: storeGrey,
+                color: storeLightGrey,
                 size: 20,
               ),
             ],
@@ -2553,8 +2792,8 @@ class OrderCard extends StatelessWidget {
 
     switch (status) {
       case 'Delivered':
-        bg = const Color(0xFFE8F8F0);
-        fg = storeFreshGreen;
+        bg = const Color(0xFFE9F7EE);
+        fg = storePrimaryGreen;
         icon = Icons.check_circle_outline_rounded;
         break;
       case 'Out for Delivery':
@@ -2577,12 +2816,12 @@ class OrderCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: fg),
+          Icon(icon, size: 13, color: fg),
           const SizedBox(width: 4),
           Text(
             status,
@@ -2629,19 +2868,26 @@ class EmptyCartWidget extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              height: 150,
-              child: Image.asset(
-                'assets/images/empty_cart_grocery.jpg',
-                fit: BoxFit.contain,
-                errorBuilder: (_, _, _) => const Icon(
-                  Icons.shopping_bag_outlined,
-                  size: 64,
-                  color: storeForestGreen,
+            Container(
+              width: 130,
+              height: 130,
+              decoration: const BoxDecoration(
+                color: storeGlassMint,
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Image.asset(
+                  'assets/images/empty_cart_grocery.jpg',
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, _, _) => const Icon(
+                    Icons.shopping_bag_outlined,
+                    size: 56,
+                    color: storePrimaryGreen,
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             const Text(
               'Your cart is empty',
               style: TextStyle(
@@ -2652,21 +2898,21 @@ class EmptyCartWidget extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Add your essentials and they will appear here.',
+              'Add your daily essentials and they will appear here.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: storeGrey, fontSize: 13, height: 1.4),
+              style: TextStyle(color: storeGrey, fontSize: 13.5, height: 1.4),
             ),
             const SizedBox(height: 24),
             FilledButton(
               onPressed: onStartShopping,
               style: FilledButton.styleFrom(
-                backgroundColor: storeForestGreen,
+                backgroundColor: storeCtaGreen,
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 28,
+                  horizontal: 32,
                   vertical: 14,
                 ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(20),
                 ),
               ),
               child: const Text('Start Shopping'),
