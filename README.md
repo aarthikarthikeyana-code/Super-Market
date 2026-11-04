@@ -254,3 +254,48 @@ correct reporting periods, cash accounting, publication, permissions, derived
 filters and bounded previews with 1,005 orders. Phone layouts are checked at
 360 and 320 logical pixels, including larger text. Preview images are rendered
 from an empty isolated database and do not represent live store balances.
+
+### Admin presentation rebuild
+
+The admin workspace now shares `lib/store/admin_design_system.dart`: a compact
+mint/cream palette, semantic badges, bundled Tamil typography, lightweight card
+surfaces and a floating five-destination navigation dock. Existing dashboard,
+product catalogue/editor, order queues/details, delivery control/team, employee
+onboarding/picker, cash accounts/receipts, reports, requests and More tools use
+this presentation. Product images retain their backend URLs and use contain fit.
+The employee picker opens as a searchable sheet. Product save and cash receipt
+actions stay visible outside the scrollable content.
+
+More uses tool tiles instead of grouped menu rows. Categories and brands continue
+to browse existing product text facets. Store settings remain read-only and the
+unused delivery-slots entry is omitted. Charts show existing aggregate counts
+and cash reconciliation; no sales time series, trends or sample records are added.
+Recorded sales are labelled all-time, matching the current dashboard API.
+
+This rebuild changes Flutter presentation only, with no API/schema/migration
+changes. Authentication, pagination, product payloads, stock validation,
+translation suggestions, order transitions, verification codes and exact cash
+reconciliation still use the existing services and handlers. Migration and Git
+push remain manual.
+
+Validation: Flutter analysis and six temporary widget checks covering the admin
+shell/navigation, actual public product values/images, stock/publication callback
+payloads, editor payload preservation, delivered/cancelled filters, required-field
+validation, and empty/error layouts at 320/360/412 logical pixels. Temporary tests
+and their temporary dependency are removed after checking. Previews under
+`artifacts/admin-saas/` use existing public catalogue data or explicitly empty
+private-data states; they do not show actual admin balances or private records.
+Private backend review was declined, so live login, order mutation, assignment
+and cash handover were not exercised against real accounts. Verify those flows
+with an authorized admin/employee session before release.
+
+Admin workflow refinement: Products, Orders, Delivery and Cash reuse the supplied
+dashboard artwork in compact decorative headers. Order and delivery cards show
+actual backend item thumbnails. Closed order views omit active-stage controls;
+batch selection is opt-in and opens the packed queue. Required product fields
+remain visible, while brand/SKU/description and arrival/message editing are
+expandable. Preparation/packing uses one fixed bottom action; delivery completion
+remains under admin assistance with the existing verification requirements.
+Three additional temporary widget checks cover filtering, selection mode,
+required-field validation, full-width headers and 320/360/412-pixel layouts with
+normal and larger text. Private-data previews use explicit empty states only.

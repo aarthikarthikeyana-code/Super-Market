@@ -212,17 +212,15 @@ class _AppSkeletonState extends State<AppSkeleton>
         );
         break;
       case SkeletonKind.list:
-      default:
-        content = Column(
-          children: List.generate(widget.count, (_) => _row()),
-        );
+        content = Column(children: List.generate(widget.count, (_) => _row()));
         break;
     }
 
     return FadeTransition(
-      opacity: Tween<double>(begin: 0.45, end: 0.95).animate(
-        CurvedAnimation(parent: _pulse, curve: Curves.easeInOut),
-      ),
+      opacity: Tween<double>(
+        begin: 0.45,
+        end: 0.95,
+      ).animate(CurvedAnimation(parent: _pulse, curve: Curves.easeInOut)),
       child: widget.padded
           ? Padding(padding: const EdgeInsets.all(16), child: content)
           : content,

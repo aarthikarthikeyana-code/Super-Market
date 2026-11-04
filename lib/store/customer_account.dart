@@ -351,7 +351,45 @@ class _StructuredAddressFieldsState
             ? (candidate != null ? candidateSource : a.source)
             : 'map',
       );
+      // Amazon/Zomato style: automatically fetch street, area, city, pincode from pin
+      _fetchAddressDetailsForPoint(result);
     }
+  }
+
+  Future<void> _fetchAddressDetailsForPoint(LatLng point) async {
+    try {
+      final details = await ref
+          .read(storeApiProvider)
+          .reverseGeocode(point.latitude, point.longitude);
+      if (!mounted) return;
+      if (details['line1'] != null && details['line1'].toString().isNotEmpty) {
+        if (a.line1.text.trim().isEmpty) {
+          a.line1.text = details['line1'].toString();
+        }
+      }
+      if (details['line2'] != null && details['line2'].toString().isNotEmpty) {
+        if (a.line2.text.trim().isEmpty) {
+          a.line2.text = details['line2'].toString();
+        }
+      }
+      if (details['city'] != null && details['city'].toString().isNotEmpty) {
+        a.city.text = details['city'].toString();
+      }
+      if (details['state'] != null && details['state'].toString().isNotEmpty) {
+        a.state.text = details['state'].toString();
+      }
+      if (details['pincode'] != null && details['pincode'].toString().isNotEmpty) {
+        a.pincode.text = details['pincode'].toString();
+      }
+      if (details['landmark'] != null && details['landmark'].toString().isNotEmpty) {
+        if (a.landmark.text.trim().isEmpty) {
+          a.landmark.text = details['landmark'].toString();
+        }
+      }
+      setState(() {
+        _postalHint = 'Address and pincode automatically detected from GPS location.';
+      });
+    } catch (_) {}
   }
 
   @override

@@ -20,67 +20,78 @@ class OperationsProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = product;
+    final out = p.stock <= 0 || !p.inStock;
     return OpsPanel(
+      padding: const EdgeInsets.all(12),
       child: Column(
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  width: 70,
-                  height: 78,
-                  child: ProductPhoto(p.imageUrl, height: 78),
+              Container(
+                width: 68,
+                height: 84,
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: opsBaseCream,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: ProductPhoto(
+                  p.imageUrl,
+                  height: 76,
+                  fit: BoxFit.contain,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       p.tamilName.isNotEmpty ? p.tamilName : p.englishName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                     if (p.englishName.isNotEmpty &&
                         p.englishName != p.tamilName)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 3),
-                        child: Text(
-                          p.englishName,
-                          style: const TextStyle(fontSize: 11, color: opsMuted),
-                        ),
+                      Text(
+                        p.englishName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11, color: opsMuted),
                       ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 3),
                     Text(
                       [
                         if (p.brand.isNotEmpty) p.brand,
-                        p.category,
                         p.unit,
-                      ].join(' · '),
+                      ].where((s) => s.isNotEmpty).join(' · '),
                       style: const TextStyle(fontSize: 10, color: opsMuted),
                     ),
-                    const SizedBox(height: 9),
+                    if (p.sku.isNotEmpty)
+                      Text(
+                        'SKU: ${p.sku}',
+                        style: const TextStyle(fontSize: 10, color: opsMuted),
+                      ),
+                    const SizedBox(height: 6),
                     Wrap(
-                      spacing: 10,
-                      runSpacing: 6,
+                      spacing: 8,
+                      runSpacing: 4,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
                           money(p.price),
                           style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
-                        OpsPill(
-                          p.published ? 'Published' : 'Hidden',
-                          warning: !p.published,
-                        ),
+                        AdminStatusBadge(p.published ? 'Published' : 'Hidden'),
                       ],
                     ),
                   ],
@@ -88,60 +99,54 @@ class OperationsProductCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(
-                p.stock <= 0 ? Icons.error_outline : Icons.inventory_2_outlined,
-                size: 15,
-                color: p.stock <= 5 ? opsWarning : opsMuted,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'Stock ${p.stock % 1 == 0 ? p.stock.toInt() : p.stock}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: p.stock <= 5 ? opsWarning : opsMuted,
-                ),
-              ),
-              if (!p.inStock)
-                const Text(
-                  ' · Unavailable',
-                  style: TextStyle(fontSize: 11, color: opsRed),
-                ),
-            ],
-          ),
-          const Divider(height: 22),
+          const SizedBox(height: 4),
           Row(
             children: [
               Expanded(
-                child: TextButton.icon(
-                  onPressed: onEdit,
-                  icon: const Icon(Icons.edit_outlined, size: 15),
-                  label: const Text('Edit', style: TextStyle(fontSize: 11)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Stock: ${p.stock % 1 == 0 ? p.stock.toInt() : p.stock}',
+                      style: const TextStyle(fontSize: 11, color: opsMuted),
+                    ),
+                    Text(
+                      out
+                          ? 'Out of stock'
+                          : p.stock <= 5
+                          ? 'Low stock'
+                          : 'In stock',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: out
+                            ? opsRed
+                            : p.stock <= 5
+                            ? opsWarning
+                            : opsForestGreen,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Expanded(
-                child: TextButton.icon(
-                  onPressed: onStock,
-                  icon: const Icon(Icons.inventory_2_outlined, size: 15),
-                  label: const Text('Stock', style: TextStyle(fontSize: 11)),
-                ),
+              IconButton(
+                tooltip: 'Edit product',
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined, size: 18),
               ),
-              Expanded(
-                child: TextButton.icon(
-                  onPressed: onPublication,
-                  icon: Icon(
-                    p.published
-                        ? Icons.visibility_off_outlined
-                        : Icons.publish_outlined,
-                    size: 15,
-                  ),
-                  label: Text(
-                    p.published ? 'Hide' : 'Publish',
-                    style: const TextStyle(fontSize: 11),
-                  ),
+              IconButton(
+                tooltip: 'Update stock',
+                onPressed: onStock,
+                icon: const Icon(Icons.inventory_2_outlined, size: 18),
+              ),
+              IconButton(
+                tooltip: p.published ? 'Hide product' : 'Publish product',
+                onPressed: onPublication,
+                icon: Icon(
+                  p.published
+                      ? Icons.visibility_off_outlined
+                      : Icons.publish_outlined,
+                  size: 18,
                 ),
               ),
             ],
@@ -168,14 +173,37 @@ class OperationsRequests extends ConsumerWidget {
             emptyTitle: 'No search requests',
             emptyMessage: 'Recorded product requests will appear here.',
             itemBuilder: (_, row, _) => OpsPanel(
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.manage_search, color: opsGreen),
-                title: Text('${row['item_name']}'),
-                subtitle: Text(
-                  '${row['customer_phone']}\n${opsTime(row['requested_at'])}',
-                ),
-                trailing: OpsPill('${row['status']}'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const AdminIcon(
+                        Icons.manage_search,
+                        color: opsInfo,
+                        background: opsInfoBg,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '${row['item_name']}',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      Flexible(child: AdminStatusBadge('${row['status']}')),
+                    ],
+                  ),
+                  const Divider(height: 20),
+                  Text(
+                    '${row['customer_phone']}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    opsTime(row['requested_at']),
+                    style: const TextStyle(fontSize: 11, color: opsMuted),
+                  ),
+                ],
               ),
             ),
           ),
@@ -189,106 +217,108 @@ class OperationsMore extends StatelessWidget {
   final void Function(String) onOpen;
   const OperationsMore({super.key, required this.onOpen});
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
-    children: [
-      const Text(
-        'More',
-        style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
-      ),
-      const SizedBox(height: 4),
-      const Text(
-        'Your store, organised.',
-        style: TextStyle(color: opsMuted, fontSize: 12),
-      ),
-      for (final group in <(String, List<(String, String, IconData)>)>[
-        (
-          'PEOPLE',
-          [
-            ('Employees', 'team', Icons.badge_outlined),
-            ('Employee Availability', 'team', Icons.groups_outlined),
-          ],
-        ),
-        (
-          'INVENTORY',
-          [
-            ('Categories', 'categories', Icons.category_outlined),
-            ('Brands', 'brands', Icons.sell_outlined),
-            ('Stock Management', 'inventory', Icons.inventory_2_outlined),
-            ('Low Stock', 'low', Icons.warning_amber_rounded),
-          ],
-        ),
-        (
-          'OPERATIONS',
-          [
-            ('COD Cash Handover', 'cash', Icons.payments_outlined),
-            ('Delivery Slots', 'slots', Icons.schedule),
-            ('Search Requests', 'requests', Icons.manage_search),
-            ('Cancelled Orders', 'cancelled', Icons.cancel_outlined),
-          ],
-        ),
-        (
-          'INSIGHTS',
-          [
-            ('Sales Reports', 'reports', Icons.bar_chart),
-            ('Order Reports', 'reports', Icons.receipt_long_outlined),
-            ('Inventory Reports', 'reports', Icons.inventory_outlined),
-            ('Delivery Reports', 'reports', Icons.route),
-          ],
-        ),
-        (
-          'SYSTEM',
-          [
-            ('Store Settings', 'settings', Icons.settings_outlined),
-            ('Admin Profile', 'profile', Icons.person_outline),
-            ('Logout', 'logout', Icons.logout),
-          ],
-        ),
-      ]) ...[
-        Padding(
-          padding: const EdgeInsets.only(top: 24, bottom: 10),
-          child: Text(
-            group.$1,
-            style: const TextStyle(
-              fontSize: 10,
-              color: opsMuted,
-              letterSpacing: 1.3,
-              fontWeight: FontWeight.w800,
+  Widget build(BuildContext context) => CustomScrollView(
+    slivers: [
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        sliver: SliverList.list(
+          children: [
+            const Text(
+              'Store tools',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
             ),
-          ),
-        ),
-        OpsPanel(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          child: Column(
-            children: [
-              for (var i = 0; i < group.$2.length; i++) ...[
-                if (i > 0) const Divider(height: 1),
-                ListTile(
-                  dense: true,
-                  leading: Icon(
-                    group.$2[i].$3,
-                    size: 20,
-                    color: group.$2[i].$2 == 'logout' ? opsRed : opsGreen,
+            const SizedBox(height: 4),
+            const Text(
+              'People, inventory and operations in one place.',
+              style: TextStyle(fontSize: 12, color: opsMuted),
+            ),
+            for (final group
+                in <(String, Color, Color, List<(String, String, IconData)>)>[
+                  (
+                    'People',
+                    opsInfo,
+                    opsInfoBg,
+                    [
+                      ('Employees', 'team', Icons.badge_outlined),
+                      ('Employee availability', 'team', Icons.groups_outlined),
+                    ],
                   ),
-                  title: Text(
-                    group.$2[i].$1,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  (
+                    'Inventory',
+                    opsForestGreen,
+                    opsMint,
+                    [
+                      ('Categories', 'categories', Icons.category_outlined),
+                      ('Brands', 'brands', Icons.sell_outlined),
+                      (
+                        'Stock management',
+                        'inventory',
+                        Icons.inventory_2_outlined,
+                      ),
+                      ('Low stock', 'low', Icons.warning_amber_rounded),
+                    ],
                   ),
-                  trailing: const Icon(
-                    Icons.chevron_right,
-                    size: 18,
-                    color: opsMuted,
+                  (
+                    'Operations',
+                    opsWarning,
+                    opsWarningBg,
+                    [
+                      ('COD cash handover', 'cash', Icons.payments_outlined),
+                      ('Search requests', 'requests', Icons.manage_search),
+                      ('Cancelled orders', 'cancelled', Icons.cancel_outlined),
+                    ],
                   ),
-                  onTap: () => onOpen(group.$2[i].$2),
+                  (
+                    'Insights',
+                    opsInfo,
+                    opsInfoBg,
+                    [
+                      ('Sales reports', 'reports', Icons.bar_chart),
+                      ('Order reports', 'reports', Icons.receipt_long_outlined),
+                      (
+                        'Inventory reports',
+                        'reports',
+                        Icons.inventory_outlined,
+                      ),
+                      ('Delivery reports', 'reports', Icons.route),
+                    ],
+                  ),
+                  (
+                    'System',
+                    opsForestGreen,
+                    Color(0xFFE7F8F5),
+                    [
+                      ('Store settings', 'settings', Icons.settings_outlined),
+                      ('Admin profile', 'profile', Icons.person_outline),
+                      ('Logout', 'logout', Icons.logout),
+                    ],
+                  ),
+                ]) ...[
+              const SizedBox(height: 20),
+              OpsHeading(group.$1),
+              LayoutBuilder(
+                builder: (_, c) => Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (final tool in group.$4)
+                      SizedBox(
+                        width: (c.maxWidth - 10) / 2,
+                        child: AdminToolTile(
+                          label: tool.$1,
+                          icon: tool.$3,
+                          color: tool.$2 == 'logout' ? opsRed : group.$2,
+                          background: tool.$2 == 'logout' ? opsRedBg : group.$3,
+                          onTap: () => onOpen(tool.$2),
+                        ),
+                      ),
+                  ],
                 ),
-              ],
+              ),
             ],
-          ),
+          ],
         ),
-      ],
+      ),
     ],
   );
 }
@@ -311,17 +341,11 @@ class _OperationsDeliveryControlState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
-          padding: EdgeInsets.fromLTRB(18, 12, 18, 6),
-          child: Text(
-            'Delivery Control',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
-          ),
-        ),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 18),
-          child: Text(
-            'Track trips, check assignments and resolve delivery issues.',
-            style: TextStyle(fontSize: 12, color: opsMuted),
+          padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: AdminWorkflowBanner(
+            title: 'Delivery control',
+            subtitle:
+                'Follow pickups, check trips and resolve delivery issues.',
           ),
         ),
         SingleChildScrollView(
@@ -343,9 +367,29 @@ class _OperationsDeliveryControlState
                           : stage == 'Delivery Attempted'
                           ? 'Needs attention'
                           : 'In progress',
-                      style: const TextStyle(fontSize: 11),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: _stage == stage
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: _stage == stage
+                            ? Colors.white
+                            : const Color(0xFF15211A),
+                      ),
                     ),
                     selected: _stage == stage,
+                    selectedColor: const Color(0xFF16A05D),
+                    backgroundColor: Colors.white,
+                    surfaceTintColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: BorderSide(
+                        color: _stage == stage
+                            ? const Color(0xFF16A05D)
+                            : const Color(0xFFDDE8E1),
+                      ),
+                    ),
+                    showCheckmark: false,
                     onSelected: (_) => setState(() => _stage = stage),
                   ),
                 ),
@@ -359,6 +403,14 @@ class _OperationsDeliveryControlState
             load: (cursor) =>
                 api.orderPage(cursor: cursor, admin: true, status: _stage),
             identity: (o) => o.id,
+            endContent: const OpsPanel(
+              color: opsMint,
+              child: OpsEmpty(
+                'Queue reviewed',
+                'Pull down for the latest assignments and trip updates.',
+                icon: Icons.route_outlined,
+              ),
+            ),
             emptyTitle: _stage == 'Out for Delivery'
                 ? 'No active deliveries'
                 : 'No orders in this stage',
@@ -368,7 +420,7 @@ class _OperationsDeliveryControlState
                     order: order,
                     onTap: () => widget.onOrder(order),
                   )
-                : OrderSummaryCard(
+                : AdminOrderCard(
                     order: order,
                     onTap: () => widget.onOrder(order),
                   ),
@@ -391,20 +443,10 @@ class OperationsCashControl extends ConsumerWidget {
       load: (cursor) => api.employeePage(cursor: cursor, cashPending: true),
       identity: (p) => '${p['id']}',
       header: const Padding(
-        padding: EdgeInsets.only(bottom: 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Cash Handover',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Count the cash in person. Choose the delivered orders, enter the exact amount received and confirm the store receipt.',
-              style: TextStyle(color: opsMuted, fontSize: 12, height: 1.6),
-            ),
-          ],
+        padding: EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: AdminWorkflowBanner(
+          title: 'Cash handover',
+          subtitle: 'Count cash, select delivered orders and confirm the exact receipt.',
         ),
       ),
       emptyTitle: 'No pending collections',
@@ -492,101 +534,222 @@ class OperationsReports extends ConsumerWidget {
     onRetry: () => ref.invalidate(adminDashboardProvider),
     builder: (data) {
       final inventory = Map<String, dynamic>.from(data['inventory'] ?? {});
+      final collected = amount(data['cash_collected']);
+      final received = amount(data['cash_received_by_store']);
+      final count = amount(data['orders_placed']);
       return ListView(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(16),
         children: [
           const Text(
-            'Operations Reports',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+            'Reports & analytics',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
-            'Recorded totals to date · updated ${opsTime(data['generated_at'])}',
+            'All time · updated ${opsTime(data['generated_at'])}',
             style: const TextStyle(fontSize: 11, color: opsMuted),
           ),
+          const SizedBox(height: 16),
+          LayoutBuilder(
+            builder: (_, c) => Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (final metric in <(String, String, IconData, Color, Color)>[
+                  (
+                    'Recorded sales',
+                    opsMoney(data['revenue']),
+                    Icons.bar_chart,
+                    opsForestGreen,
+                    opsMint,
+                  ),
+                  (
+                    'Orders received',
+                    '${data['orders_placed'] ?? '—'}',
+                    Icons.receipt_long_outlined,
+                    opsInfo,
+                    opsInfoBg,
+                  ),
+                  (
+                    'Received by store',
+                    opsMoney(data['cash_received_by_store']),
+                    Icons.account_balance_outlined,
+                    opsForestGreen,
+                    Color(0xFFE7F8F5),
+                  ),
+                  (
+                    'Cash with employees',
+                    opsMoney(data['cash_with_employees']),
+                    Icons.payments_outlined,
+                    opsWarning,
+                    opsWarningBg,
+                  ),
+                ])
+                  SizedBox(
+                    width: (c.maxWidth - 10) / 2,
+                    child: AdminMetricCard(
+                      label: metric.$1,
+                      value: metric.$2,
+                      icon: metric.$3,
+                      color: metric.$4,
+                      background: metric.$5,
+                    ),
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: 20),
-          const OpsHeading('Sales & cash'),
           OpsPanel(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const OpsHeading('Cash reconciliation'),
+                _reportRow('Cash collected', opsMoney(data['cash_collected'])),
                 _reportRow(
-                  'Revenue from paid / collected orders',
-                  money(amount(data['revenue'])),
-                ),
-                _reportRow(
-                  'Cash collected',
-                  money(amount(data['cash_collected'])),
-                ),
-                _reportRow(
-                  'Cash received by store',
-                  money(amount(data['cash_received_by_store'])),
+                  'Received by store',
+                  opsMoney(data['cash_received_by_store']),
                 ),
                 _reportRow(
                   'Cash with employees',
-                  money(amount(data['cash_with_employees'])),
+                  opsMoney(data['cash_with_employees']),
                 ),
-                _reportRow(
-                  'COD still to collect',
-                  money(amount(data['cash_due'])),
+                _reportRow('COD still to collect', opsMoney(data['cash_due'])),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: collected > 0
+                        ? (received / collected).clamp(0, 1)
+                        : 0,
+                    minHeight: 8,
+                    backgroundColor: opsMint,
+                    color: opsGreen,
+                  ),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  collected > 0
+                      ? '${(received / collected * 100).clamp(0, 100).toStringAsFixed(1)}% of collected cash received by store'
+                      : data['cash_collected'] == null
+                      ? 'Cash balances not available yet'
+                      : 'No collections recorded',
+                  style: const TextStyle(fontSize: 11, color: opsMuted),
+                ),
+                if (amount(data['cash_unallocated']) > 0)
+                  Text(
+                    '${opsMoney(data['cash_unallocated'])} requires reconciliation',
+                    style: const TextStyle(fontSize: 11, color: opsRed),
+                  ),
               ],
             ),
           ),
-          const SizedBox(height: 22),
-          const OpsHeading('Orders & delivery'),
+          const SizedBox(height: 20),
+          const OpsHeading('Order breakdown'),
           OpsPanel(
             child: Column(
               children: [
-                for (final row in <(String, String, String)>[
-                  ('All orders received', 'orders_placed', 'All'),
-                  ('Cancelled orders', 'cancelled_orders', 'Cancelled'),
-                  ('New orders', 'new_orders', 'New'),
-                  ('Preparing', 'preparing', 'Preparing'),
-                  ('Packed', 'packed', 'Packed'),
-                  ('On the way', 'active_deliveries', 'Out for Delivery'),
-                  ('Delivered', 'delivered', 'Delivered'),
+                for (final row in <(String, String, String, Color)>[
+                  ('New orders', 'new_orders', 'New', opsInfo),
+                  ('Preparing', 'preparing', 'Preparing', opsWarning),
+                  ('Packed', 'packed', 'Packed', opsInfo),
                   (
-                    'Delivery attempted',
+                    'On the way',
+                    'active_deliveries',
+                    'Out for Delivery',
+                    opsForestGreen,
+                  ),
+                  ('Delivered', 'delivered', 'Delivered', opsGreen),
+                  (
+                    'Attempted',
                     'delivery_attempted',
                     'Delivery Attempted',
+                    opsWarning,
                   ),
+                  ('Cancelled', 'cancelled_orders', 'Cancelled', opsRed),
                 ])
-                  ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
+                  InkWell(
                     onTap: () => onOrders(row.$3),
-                    title: Text(row.$1, style: const TextStyle(fontSize: 12)),
-                    trailing: Text(
-                      '${data[row.$2] ?? 0}',
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  row.$1,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                              Text(
+                                '${data[row.$2] ?? '—'}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Icon(
+                                Icons.chevron_right,
+                                size: 15,
+                                color: opsMuted,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          LinearProgressIndicator(
+                            value: count > 0
+                                ? (amount(data[row.$2]) / count).clamp(0, 1)
+                                : 0,
+                            minHeight: 4,
+                            color: row.$4,
+                            backgroundColor: opsBaseCream,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
               ],
             ),
           ),
-          const SizedBox(height: 22),
-          const OpsHeading('Inventory'),
-          OpsPanel(
-            child: Column(
+          const SizedBox(height: 20),
+          const OpsHeading('Inventory health'),
+          LayoutBuilder(
+            builder: (_, c) => Wrap(
+              spacing: 10,
+              runSpacing: 10,
               children: [
-                for (final row in <(String, String, String)>[
-                  ('Published products', 'published', 'published'),
-                  ('Hidden products', 'hidden', 'hidden'),
-                  ('Low stock', 'low_stock', 'low'),
-                  ('Out of stock', 'out_of_stock', 'out'),
+                for (final row in <(String, String, String, Color, Color)>[
+                  (
+                    'Published',
+                    'published',
+                    'published',
+                    opsForestGreen,
+                    opsMint,
+                  ),
+                  ('Hidden', 'hidden', 'hidden', opsMuted, Color(0xFFEDF1EE)),
+                  ('Low stock', 'low_stock', 'low', opsWarning, opsWarningBg),
+                  ('Out of stock', 'out_of_stock', 'out', opsRed, opsRedBg),
                 ])
-                  ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    onTap: () => onInventory(row.$3),
-                    title: Text(row.$1, style: const TextStyle(fontSize: 12)),
-                    trailing: Text(
-                      '${inventory[row.$2] ?? 0}',
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                  SizedBox(
+                    width: (c.maxWidth - 10) / 2,
+                    child: AdminMetricCard(
+                      label: row.$1,
+                      value: '${inventory[row.$2] ?? '—'}',
+                      icon: Icons.inventory_2_outlined,
+                      color: row.$4,
+                      background: row.$5,
+                      onTap: () => onInventory(row.$3),
                     ),
                   ),
               ],
             ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Sales include paid and cash-collected orders. Charts show recorded aggregates; no estimated trends.',
+            style: TextStyle(fontSize: 11, color: opsMuted),
           ),
         ],
       );

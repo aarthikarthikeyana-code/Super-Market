@@ -405,6 +405,20 @@ class StoreApi {
         await request('GET', '/address/pincode/$pincode/'),
       );
 
+  Future<Map<String, dynamic>> reverseGeocode(double lat, double lon) async =>
+      Map<String, dynamic>.from(
+        await request(
+          'GET',
+          Uri(
+            path: '/address/reverse-geocode/',
+            queryParameters: {
+              'lat': lat.toStringAsFixed(6),
+              'lon': lon.toStringAsFixed(6),
+            },
+          ).toString(),
+        ),
+      );
+
   Future<StorePage<StoreProduct>> productPage({
     String? cursor,
     String search = '',

@@ -85,6 +85,17 @@ def address_pincode(request, pincode):
     return Response(gateways.lookup_pincode(pincode))
 
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def reverse_geocode(request):
+    try:
+        lat = float(request.query_params.get('lat', ''))
+        lon = float(request.query_params.get('lon', ''))
+    except (ValueError, TypeError):
+        raise ValidationError({'detail': 'Valid lat and lon query parameters are required.'})
+    return Response(gateways.reverse_geocode(lat, lon))
+
+
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])

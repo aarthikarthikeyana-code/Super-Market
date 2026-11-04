@@ -316,7 +316,7 @@ class _DeliveryTrackingCardState extends ConsumerState<DeliveryTrackingCard> {
             longitude.abs() <= 180
         ? LatLng(latitude, longitude)
         : null;
-    final mapPoints = [...locations, ?home];
+    final validLocations = locations.where((p) => p.latitude != 0 && p.longitude != 0).toList(); final mapPoints = <LatLng>[...validLocations, if (home != null) home];
     final last = points.isEmpty ? null : points.last;
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -353,9 +353,9 @@ class _DeliveryTrackingCardState extends ConsumerState<DeliveryTrackingCard> {
                 options: MapOptions(
                   initialCenter: locations.isNotEmpty ? locations.last : home!,
                   initialZoom: 14,
-                  initialCameraFit: mapPoints.length > 1
+                  initialCameraFit: (mapPoints.whereType<LatLng>().length > 1)
                       ? CameraFit.bounds(
-                          bounds: LatLngBounds.fromPoints(mapPoints),
+                          bounds: LatLngBounds.fromPoints(mapPoints.whereType<LatLng>().toList()),
                           padding: const EdgeInsets.all(35),
                           maxZoom: 16,
                         )
@@ -400,7 +400,7 @@ class _DeliveryTrackingCardState extends ConsumerState<DeliveryTrackingCard> {
                           child: const CircleAvatar(
                             backgroundColor: storeGreen,
                             child: Icon(
-                              Icons.delivery_dining,
+                              Icons.two_wheeler_rounded,
                               color: Colors.white,
                             ),
                           ),
@@ -436,7 +436,7 @@ class _DeliveryTrackingCardState extends ConsumerState<DeliveryTrackingCard> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                 child: Text(
-                  'Recorded GPS fixes · accuracy ±${(last?['accuracy'] as num?)?.round() ?? '?'} m. The line connects recorded fixes.',
+                  'Recorded GPS fixes · accuracy ±${(last['accuracy'] as num?)?.round() ?? '?'} m. The line connects recorded fixes.',
                   style: const TextStyle(fontSize: 12, color: Colors.black54),
                 ),
               ),

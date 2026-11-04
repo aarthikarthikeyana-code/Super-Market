@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'state.dart';
+import 'admin_dashboard.dart';
 import 'models.dart';
 import 'widgets.dart';
 import 'paged_feed.dart';
@@ -251,11 +252,11 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
   }
 
   Widget _heading(String label) => Padding(
-    padding: const EdgeInsets.only(top: 22, bottom: 14),
+    padding: const EdgeInsets.only(top: 16, bottom: 12),
     child: Text(
       label,
       style: const TextStyle(
-        fontSize: 21,
+        fontSize: 17,
         fontWeight: FontWeight.w800,
         color: storeGreen,
       ),
@@ -349,386 +350,414 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
               : 'Manage delivery employee',
         ),
       ),
-      body: Form(
-        key: _form,
-        child: ListView(
-          controller: _scroll,
-          padding: const EdgeInsets.all(20),
-          children: [
-            const Text(
-              'Create a login, record work details, then verify and activate.',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.black54,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                for (var i = 0; i < 3; i++)
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: Column(
-                        children: [
-                          Container(
-                            height: 5,
-                            decoration: BoxDecoration(
-                              color: i <= _setupStep
-                                  ? storeGreen
-                                  : const Color(0xFFE0E6E1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            [
-                              '1 Login',
-                              '2 Work details',
-                              '3 Verify & activate',
-                            ][i],
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: i == _setupStep
-                                  ? FontWeight.w800
-                                  : FontWeight.w400,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            if (_person?['employee_code'] != null)
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.badge_outlined, color: storeGreen),
-                  title: SelectableText(
-                    '${_person!['employee_code']}',
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  subtitle: Text(
-                    _person!['ready_for_deliveries'] == true
-                        ? 'Verified · ready for delivery assignments'
-                        : 'Complete onboarding and verification before dispatch',
-                  ),
-                ),
-              ),
-            if (_setupStep == 0) ...[
-              _heading('1. Employee contact & login'),
-              _field('name', 'Full name', required: true, length: 100),
-              _field('phone', 'Mobile number', required: true, phone: true),
-              _field('email', 'Email (optional)'),
-              _field(
-                'password',
-                _person?['has_login'] == true
-                    ? 'New password (leave blank to keep)'
-                    : 'Create employee password',
-                secret: true,
-                required: _person?['has_login'] != true,
-              ),
-              Text(
-                'Employee ID or mobile number + password is required. Password resets sign out existing employee sessions.',
-                style: TextStyle(fontSize: 12, color: Colors.black54),
-              ),
-            ],
-            if (_setupStep == 1) ...[
-              _heading('2. Address & work details'),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 12),
-                child: Text(
-                  'Private staff records help your store contact the employee and check delivery readiness. Customers only see their assigned employee’s name and phone.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.black54,
-                    height: 1.5,
-                  ),
-                ),
-              ),
-              _field('address', 'Full address', required: true, lines: 3),
-              _field('city', 'City / town', required: true),
-              _field('pincode', 'Pincode', required: true, length: 6),
-              _heading('Emergency contact'),
-              _field(
-                'emergency_contact_name',
-                'Emergency contact name',
-                required: true,
-              ),
-              _field(
-                'emergency_contact_phone',
-                'Emergency contact mobile',
-                required: true,
-                phone: true,
-              ),
-              _heading('Work and vehicle'),
-              _date('joining_date', 'Joining date'),
-              DropdownButtonFormField<String>(
-                initialValue: _vehicle,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Delivery mode'),
-                items: [
-                  for (final entry in {
-                    'walking': 'Walking',
-                    'bicycle': 'Bicycle',
-                    'motorcycle': 'Motorcycle / scooter',
-                    'car': 'Car',
-                    'van': 'Van',
-                  }.entries)
-                    DropdownMenuItem(
-                      value: entry.key,
-                      child: Text(entry.value),
-                    ),
-                ],
-                onChanged: _busy ? null : (v) => setState(() => _vehicle = v!),
-              ),
-              const SizedBox(height: 14),
-              if (_motor) ...[
-                _field(
-                  'vehicle_number',
-                  'Vehicle registration number',
-                  required: true,
-                ),
-                _field(
-                  'licence_number',
-                  'Driving licence number',
-                  required: true,
-                ),
-                _date(
-                  'licence_expiry',
-                  'Driving licence expiry',
-                  required: true,
-                ),
-              ],
-            ],
-            if (_setupStep == 2) ...[
-              _heading('3. Verify identity & activate'),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Review employee details',
-                        style: TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${_fields['name']!.text}\n${_fields['phone']!.text}\n${_fields['city']!.text} · ${_fields['pincode']!.text}',
-                        style: const TextStyle(fontSize: 12, height: 1.7),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Role: Delivery employee${_person?['employee_code'] == null ? ' · ID generated after saving' : ' · ${_person!['employee_code']}'}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
-                initialValue: _idType,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'ID proof type'),
-                items: [
-                  for (final entry in {
-                    '': 'Not provided yet',
-                    'masked_aadhaar': 'Masked Aadhaar (optional)',
-                    'voter_id': 'Voter ID',
-                    'passport': 'Passport',
-                    'driving_licence': 'Driving licence',
-                    'other': 'Other government ID',
-                  }.entries)
-                    DropdownMenuItem(
-                      value: entry.key,
-                      child: Text(entry.value),
-                    ),
-                ],
-                onChanged: _busy ? null : (v) => setState(() => _idType = v!),
-              ),
-              const SizedBox(height: 14),
-              _field(
-                'id_last_four',
-                'ID last four characters (optional)',
-                length: 4,
-              ),
+      body: AdminCanvas(
+        child: Form(
+          key: _form,
+          child: ListView(
+            controller: _scroll,
+            padding: const EdgeInsets.all(16),
+            children: [
               const Text(
-                'Use masked Aadhaar or another accepted ID. Do not enter a full Aadhaar number. Upload document photos only with employee consent.',
+                'Create a login, record work details, then verify and activate.',
                 style: TextStyle(
-                  height: 1.5,
                   fontSize: 12,
                   color: Colors.black54,
+                  height: 1.5,
                 ),
-              ),
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _consent,
-                title: const Text(
-                  'Employee consent recorded for storing onboarding documents',
-                ),
-                onChanged: _busy
-                    ? null
-                    : (v) => setState(() {
-                        _consent = v!;
-                        if (!_consent) _verified = false;
-                      }),
-              ),
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _verified,
-                title: const Text(
-                  'I have checked the original ID and applicable vehicle documents',
-                ),
-                subtitle: const Text(
-                  'New or removed document copies require another admin check.',
-                ),
-                onChanged: _busy || !_consent
-                    ? null
-                    : (v) => setState(() => _verified = v!),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _active,
-                title: const Text('Employee account active'),
-                subtitle: const Text(
-                  'Reassign open orders and receive cash before deactivating.',
-                ),
-                onChanged: _busy ? null : (v) => setState(() => _active = v),
               ),
               const SizedBox(height: 18),
-              FilledButton(
-                onPressed: _busy ? null : _save,
-                child: Text(
-                  _busy
-                      ? 'Please wait…'
-                      : _person == null
-                      ? 'Create employee account'
-                      : 'Save employee details',
-                ),
-              ),
-              if (_person?['has_login'] == true)
-                OutlinedButton.icon(
-                  onPressed: _busy
-                      ? null
-                      : () => Navigator.pop(context, _person),
-                  icon: const Icon(Icons.login),
-                  label: const Text('Open employee sign-in'),
-                ),
-              _heading('Private document photos'),
-              if (_person == null)
-                const Text(
-                  'Save the employee account first, then upload private document photos.',
-                )
-              else ...[
-                DropdownButtonFormField<String>(
-                  initialValue: _kind,
-                  isExpanded: true,
-                  items: [
-                    for (final entry in employeeDocuments.entries)
-                      DropdownMenuItem(
-                        value: entry.key,
-                        child: Text(
-                          entry.value,
-                          overflow: TextOverflow.ellipsis,
+              OpsPanel(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    for (var i = 0; i < 3; i++)
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 34,
+                              height: 34,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: i <= _setupStep
+                                    ? opsForestGreen
+                                    : opsMint,
+                                borderRadius: BorderRadius.circular(11),
+                              ),
+                              child: i < _setupStep
+                                  ? const Icon(
+                                      Icons.check,
+                                      size: 18,
+                                      color: Colors.white,
+                                    )
+                                  : Text(
+                                      '${i + 1}',
+                                      style: TextStyle(
+                                        color: i <= _setupStep
+                                            ? Colors.white
+                                            : opsForestGreen,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              [
+                                'Credentials',
+                                'Address & vehicle',
+                                'Verification',
+                              ][i],
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: i == _setupStep
+                                    ? FontWeight.w800
+                                    : FontWeight.w500,
+                                color: i == _setupStep
+                                    ? opsForestGreen
+                                    : opsMuted,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                   ],
-                  onChanged: _busy ? null : (v) => setState(() => _kind = v!),
                 ),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _upload,
-                  icon: const Icon(Icons.upload_file_outlined),
-                  label: const Text('Upload document photo'),
-                ),
-                for (final document in _person!['documents'] ?? [])
-                  Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.lock_outline),
-                      title: Text(
-                        employeeDocuments[document['kind']] ?? document['kind'],
-                      ),
-                      subtitle: const Text('Private · admin access only'),
-                      onTap: _busy ? null : () => _view(document),
-                      trailing: IconButton(
-                        tooltip: 'Delete private document',
-                        onPressed: _busy ? null : () => _delete(document),
-                        icon: const Icon(Icons.delete_outline),
+              ),
+              const SizedBox(height: 16),
+              if (_person?['employee_code'] != null)
+                Card(
+                  child: ListTile(
+                    leading: const Icon(
+                      Icons.badge_outlined,
+                      color: storeGreen,
+                    ),
+                    title: SelectableText(
+                      '${_person!['employee_code']}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
+                    subtitle: Text(
+                      _person!['ready_for_deliveries'] == true
+                          ? 'Verified · ready for delivery assignments'
+                          : 'Complete onboarding and verification before dispatch',
+                    ),
                   ),
-                _heading('Cash handovers'),
+                ),
+              if (_setupStep == 0) ...[
+                _heading('1. Employee contact & login'),
+                _field('name', 'Full name', required: true, length: 100),
+                _field('phone', 'Mobile number', required: true, phone: true),
+                _field('email', 'Email (optional)'),
+                _field(
+                  'password',
+                  _person?['has_login'] == true
+                      ? 'New password (leave blank to keep)'
+                      : 'Create employee password',
+                  secret: true,
+                  required: _person?['has_login'] != true,
+                ),
                 Text(
-                  '${money(amount(_person!['cash_to_handover']))} to receive from this employee',
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _busy
-                      ? null
-                      : () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  EmployeeCashScreen(person: _person!),
-                            ),
-                          );
-                          await _reloadDocuments();
-                        },
-                  icon: const Icon(Icons.payments_outlined),
-                  label: const Text('Manage cash handovers'),
+                  'Employee ID or mobile number + password is required. Password resets sign out existing employee sessions.',
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
                 ),
               ],
-            ],
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                if (_setupStep > 0)
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _busy
-                          ? null
-                          : () {
-                              setState(() => _setupStep--);
-                              _scroll.jumpTo(0);
-                            },
-                      child: const Text('Back'),
+              if (_setupStep == 1) ...[
+                _heading('2. Address & work details'),
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    'Private staff records help your store contact the employee and check delivery readiness. Customers only see their assigned employee’s name and phone.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.black54,
+                      height: 1.5,
                     ),
                   ),
-                if (_setupStep > 0) const SizedBox(width: 12),
-                if (_setupStep < 2)
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: _busy
-                          ? null
-                          : () {
-                              if (_form.currentState!.validate()) {
-                                setState(() => _setupStep++);
-                                _scroll.jumpTo(0);
-                              }
-                            },
-                      child: Text(
-                        _setupStep == 0
-                            ? 'Continue to work details'
-                            : 'Continue to verification',
+                ),
+                _field('address', 'Full address', required: true, lines: 3),
+                _field('city', 'City / town', required: true),
+                _field('pincode', 'Pincode', required: true, length: 6),
+                _heading('Emergency contact'),
+                _field(
+                  'emergency_contact_name',
+                  'Emergency contact name',
+                  required: true,
+                ),
+                _field(
+                  'emergency_contact_phone',
+                  'Emergency contact mobile',
+                  required: true,
+                  phone: true,
+                ),
+                _heading('Work and vehicle'),
+                _date('joining_date', 'Joining date'),
+                DropdownButtonFormField<String>(
+                  initialValue: _vehicle,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Delivery mode'),
+                  items: [
+                    for (final entry in {
+                      'walking': 'Walking',
+                      'bicycle': 'Bicycle',
+                      'motorcycle': 'Motorcycle / scooter',
+                      'car': 'Car',
+                      'van': 'Van',
+                    }.entries)
+                      DropdownMenuItem(
+                        value: entry.key,
+                        child: Text(entry.value),
+                      ),
+                  ],
+                  onChanged: _busy
+                      ? null
+                      : (v) => setState(() => _vehicle = v!),
+                ),
+                const SizedBox(height: 14),
+                if (_motor) ...[
+                  _field(
+                    'vehicle_number',
+                    'Vehicle registration number',
+                    required: true,
+                  ),
+                  _field(
+                    'licence_number',
+                    'Driving licence number',
+                    required: true,
+                  ),
+                  _date(
+                    'licence_expiry',
+                    'Driving licence expiry',
+                    required: true,
+                  ),
+                ],
+              ],
+              if (_setupStep == 2) ...[
+                _heading('3. Verify identity & activate'),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Review employee details',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${_fields['name']!.text}\n${_fields['phone']!.text}\n${_fields['city']!.text} · ${_fields['pincode']!.text}',
+                          style: const TextStyle(fontSize: 12, height: 1.7),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Role: Delivery employee${_person?['employee_code'] == null ? ' · ID generated after saving' : ' · ${_person!['employee_code']}'}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  initialValue: _idType,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'ID proof type'),
+                  items: [
+                    for (final entry in {
+                      '': 'Not provided yet',
+                      'masked_aadhaar': 'Masked Aadhaar (optional)',
+                      'voter_id': 'Voter ID',
+                      'passport': 'Passport',
+                      'driving_licence': 'Driving licence',
+                      'other': 'Other government ID',
+                    }.entries)
+                      DropdownMenuItem(
+                        value: entry.key,
+                        child: Text(entry.value),
+                      ),
+                  ],
+                  onChanged: _busy ? null : (v) => setState(() => _idType = v!),
+                ),
+                const SizedBox(height: 14),
+                _field(
+                  'id_last_four',
+                  'ID last four characters (optional)',
+                  length: 4,
+                ),
+                const Text(
+                  'Use masked Aadhaar or another accepted ID. Do not enter a full Aadhaar number. Upload document photos only with employee consent.',
+                  style: TextStyle(
+                    height: 1.5,
+                    fontSize: 12,
+                    color: Colors.black54,
+                  ),
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _consent,
+                  title: const Text(
+                    'Employee consent recorded for storing onboarding documents',
+                  ),
+                  onChanged: _busy
+                      ? null
+                      : (v) => setState(() {
+                          _consent = v!;
+                          if (!_consent) _verified = false;
+                        }),
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _verified,
+                  title: const Text(
+                    'I have checked the original ID and applicable vehicle documents',
+                  ),
+                  subtitle: const Text(
+                    'New or removed document copies require another admin check.',
+                  ),
+                  onChanged: _busy || !_consent
+                      ? null
+                      : (v) => setState(() => _verified = v!),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _active,
+                  title: const Text('Employee account active'),
+                  subtitle: const Text(
+                    'Reassign open orders and receive cash before deactivating.',
+                  ),
+                  onChanged: _busy ? null : (v) => setState(() => _active = v),
+                ),
+                const SizedBox(height: 18),
+                FilledButton(
+                  onPressed: _busy ? null : _save,
+                  child: Text(
+                    _busy
+                        ? 'Please wait…'
+                        : _person == null
+                        ? 'Create employee account'
+                        : 'Save employee details',
+                  ),
+                ),
+                if (_person?['has_login'] == true)
+                  OutlinedButton.icon(
+                    onPressed: _busy
+                        ? null
+                        : () => Navigator.pop(context, _person),
+                    icon: const Icon(Icons.login),
+                    label: const Text('Open employee sign-in'),
+                  ),
+                _heading('Private document photos'),
+                if (_person == null)
+                  const Text(
+                    'Save the employee account first, then upload private document photos.',
+                  )
+                else ...[
+                  DropdownButtonFormField<String>(
+                    initialValue: _kind,
+                    isExpanded: true,
+                    items: [
+                      for (final entry in employeeDocuments.entries)
+                        DropdownMenuItem(
+                          value: entry.key,
+                          child: Text(
+                            entry.value,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: _busy ? null : (v) => setState(() => _kind = v!),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _upload,
+                    icon: const Icon(Icons.upload_file_outlined),
+                    label: const Text('Upload document photo'),
+                  ),
+                  for (final document in _person!['documents'] ?? [])
+                    Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.lock_outline),
+                        title: Text(
+                          employeeDocuments[document['kind']] ??
+                              document['kind'],
+                        ),
+                        subtitle: const Text('Private · admin access only'),
+                        onTap: _busy ? null : () => _view(document),
+                        trailing: IconButton(
+                          tooltip: 'Delete private document',
+                          onPressed: _busy ? null : () => _delete(document),
+                          icon: const Icon(Icons.delete_outline),
+                        ),
                       ),
                     ),
+                  _heading('Cash handovers'),
+                  Text(
+                    '${money(amount(_person!['cash_to_handover']))} to receive from this employee',
                   ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _busy
+                        ? null
+                        : () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    EmployeeCashScreen(person: _person!),
+                              ),
+                            );
+                            await _reloadDocuments();
+                          },
+                    icon: const Icon(Icons.payments_outlined),
+                    label: const Text('Manage cash handovers'),
+                  ),
+                ],
               ],
-            ),
-            const SizedBox(height: 32),
-          ],
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  if (_setupStep > 0)
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _busy
+                            ? null
+                            : () {
+                                setState(() => _setupStep--);
+                                _scroll.jumpTo(0);
+                              },
+                        child: const Text('Back'),
+                      ),
+                    ),
+                  if (_setupStep > 0) const SizedBox(width: 12),
+                  if (_setupStep < 2)
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: _busy
+                            ? null
+                            : () {
+                                if (_form.currentState!.validate()) {
+                                  setState(() => _setupStep++);
+                                  _scroll.jumpTo(0);
+                                }
+                              },
+                        child: Text(
+                          _setupStep == 0
+                              ? 'Continue to work details'
+                              : 'Continue to verification',
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 32),
+            ],
+          ),
         ),
       ),
     ),
@@ -818,7 +847,7 @@ class _EmployeeCashState extends ConsumerState<EmployeeCashScreen> {
               Text(
                 order.shortId,
                 style: const TextStyle(
-                  fontSize: 22,
+                  fontSize: 18,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -875,226 +904,243 @@ class _EmployeeCashState extends ConsumerState<EmployeeCashScreen> {
       canPop: !_busy,
       child: Scaffold(
         appBar: AppBar(title: Text('${widget.person['name']} | cash')),
-        body: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
-              child: Card(
+        bottomNavigationBar: _view != 0
+            ? null
+            : SafeArea(
+                top: false,
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Employee cash account',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          for (final entry in <(String, String)>[
-                            ('With employee', 'cash_to_handover'),
-                            ('Received by store', 'cash_received_by_store'),
-                            ('Total collected', 'cash_collected'),
-                          ])
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.only(right: 7),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Text(
-                                        _ledger[entry.$2] == null
-                                            ? (entry.$2 == 'cash_to_handover' &&
-                                                      _cashTotal != null
-                                                  ? money(amount(_cashTotal))
-                                                  : 'Loading')
-                                            : money(amount(_ledger[entry.$2])),
-                                        style: const TextStyle(
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.w900,
-                                          color: storeGreen,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 5),
-                                    Text(
-                                      entry.$1,
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.black54,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      if (_ledger['pending_orders'] != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 10),
-                          child: Text(
-                            '${_ledger['pending_orders']} delivered orders awaiting handover',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Colors.black54,
-                            ),
-                          ),
-                        ),
-                    ],
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: FilledButton.icon(
+                    onPressed: _busy || _selected.isEmpty ? null : _receive,
+                    icon: const Icon(Icons.payments_outlined, size: 18),
+                    label: Text(
+                      _busy
+                          ? 'Recording receipt…'
+                          : 'Receive ${money(total)} · ${_selected.length} selected',
+                    ),
                   ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              child: Row(
-                children: [
-                  for (var i = 0; i < 3; i++) ...[
-                    if (i > 0) const SizedBox(width: 6),
-                    Expanded(
-                      child: ChoiceChip(
-                        label: Text(
-                          ['To receive', 'Delivered', 'Receipts'][i],
-                          style: const TextStyle(fontSize: 11),
+        body: AdminCanvas(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Employee cash account',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                        selected: _view == i,
-                        onSelected: _busy
-                            ? null
-                            : (_) => setState(() => _view = i),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            Expanded(
-              child: _view == 2
-                  ? CashReceiptList(employeeId: widget.person['id'] as int)
-                  : _view == 1
-                  ? PagedFeed<StoreOrder>(
-                      queryKey: (
-                        'employeeDelivered',
-                        widget.person['id'],
-                        api.adminToken,
-                        _revision,
-                      ),
-                      changes: api.feedChanges,
-                      load: (cursor) => api.orderPage(
-                        cursor: cursor,
-                        admin: true,
-                        status: 'Delivered',
-                        assigned: '${widget.person['id']}',
-                      ),
-                      identity: (order) => order.id,
-                      emptyTitle: 'No delivered orders yet',
-                      emptyMessage: 'Delivered orders assigned to this employee will appear here.',
-                      itemBuilder: (_, order, _) => OrderSummaryCard(
-                        order: order,
-                        onTap: () => _showDelivered(order),
-                      ),
-                    )
-                  : PagedFeed<Map<String, dynamic>>(
-                      queryKey: (
-                        'cashDue',
-                        widget.person['id'],
-                        api.adminToken,
-                        _revision,
-                      ),
-                      changes: api.feedChanges,
-                      load: (cursor) =>
-                          api.cashDuePage(widget.person['id'], cursor),
-                      identity: (o) => '${o['order_id']}',
-                      onMetadata: (data) {
-                        if (mounted) {
-                          setState(() {
-                            _cashTotal = '${data['cash_to_handover']}';
-                            _ledger = data;
-                          });
-                        }
-                      },
-                      header: Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        const SizedBox(height: 12),
+                        Row(
                           children: [
-                            const Text(
-                              'Count physical cash, select the delivered orders it covers, then confirm receipt. Already received cash is excluded.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                height: 1.6,
+                            for (final entry in <(String, String)>[
+                              ('With employee', 'cash_to_handover'),
+                              ('Received by store', 'cash_received_by_store'),
+                              ('Total collected', 'cash_collected'),
+                            ])
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(right: 7),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          _ledger[entry.$2] == null
+                                              ? (entry.$2 ==
+                                                            'cash_to_handover' &&
+                                                        _cashTotal != null
+                                                    ? money(amount(_cashTotal))
+                                                    : 'Loading')
+                                              : money(
+                                                  amount(_ledger[entry.$2]),
+                                                ),
+                                          style: const TextStyle(
+                                            fontSize: 17,
+                                            fontWeight: FontWeight.w900,
+                                            color: storeGreen,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 5),
+                                      Text(
+                                        entry.$1,
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (_ledger['pending_orders'] != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 10),
+                            child: Text(
+                              '${_ledger['pending_orders']} delivered orders awaiting handover',
+                              style: const TextStyle(
+                                fontSize: 11,
                                 color: Colors.black54,
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            Text(
-                              '${_selected.length} selected | ${money(total)}',
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Row(
+                  children: [
+                    for (var i = 0; i < 3; i++) ...[
+                      if (i > 0) const SizedBox(width: 6),
+                      Expanded(
+                        child: ChoiceChip(
+                          label: Text(
+                            ['To receive', 'Delivered', 'Receipts'][i],
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          selected: _view == i,
+                          onSelected: _busy
+                              ? null
+                              : (_) => setState(() => _view = i),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _view == 2
+                    ? CashReceiptList(employeeId: widget.person['id'] as int)
+                    : _view == 1
+                    ? PagedFeed<StoreOrder>(
+                        queryKey: (
+                          'employeeDelivered',
+                          widget.person['id'],
+                          api.adminToken,
+                          _revision,
+                        ),
+                        changes: api.feedChanges,
+                        load: (cursor) => api.orderPage(
+                          cursor: cursor,
+                          admin: true,
+                          status: 'Delivered',
+                          assigned: '${widget.person['id']}',
+                        ),
+                        identity: (order) => order.id,
+                        emptyTitle: 'No delivered orders yet',
+                        emptyMessage: 'Delivered orders assigned to this employee will appear here.',
+                        itemBuilder: (_, order, _) => AdminOrderCard(
+                          order: order,
+                          onTap: () => _showDelivered(order),
+                        ),
+                      )
+                    : PagedFeed<Map<String, dynamic>>(
+                        queryKey: (
+                          'cashDue',
+                          widget.person['id'],
+                          api.adminToken,
+                          _revision,
+                        ),
+                        changes: api.feedChanges,
+                        load: (cursor) =>
+                            api.cashDuePage(widget.person['id'], cursor),
+                        identity: (o) => '${o['order_id']}',
+                        onMetadata: (data) {
+                          if (mounted) {
+                            setState(() {
+                              _cashTotal = '${data['cash_to_handover']}';
+                              _ledger = data;
+                            });
+                          }
+                        },
+                        header: Padding(
+                          padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Count physical cash, select the delivered orders it covers, then confirm receipt. Already received cash is excluded.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  height: 1.6,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                '${_selected.length} selected | ${money(total)}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+                          ),
+                        ),
+                        emptyTitle: 'No cash handover is outstanding',
+                        emptyMessage: 'Open Delivered to review orders or Receipts to check cash already received.',
+                        itemBuilder: (_, order, _) => Card(
+                          child: CheckboxListTile(
+                            controlAffinity: ListTileControlAffinity.leading,
+                            value: _selected.containsKey(order['order_id']),
+                            onChanged:
+                                _busy ||
+                                    (_selected.length >= 200 &&
+                                        !_selected.containsKey(
+                                          order['order_id'],
+                                        ))
+                                ? null
+                                : (selected) => setState(() {
+                                    if (selected == true) {
+                                      _selected[order['order_id']] =
+                                          (amount(order['amount']) * 100)
+                                              .round();
+                                    } else {
+                                      _selected.remove(order['order_id']);
+                                    }
+                                    _receiptKey = newUuid();
+                                  }),
+                            title: Text(
+                              '${order['customer_name'] ?? ''}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${order['order_id']}\n${List<Map<String, dynamic>>.from(order['items'] ?? []).map((item) => '${productLabel(item)} x ${item['quantity']}').join(', ')}',
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            secondary: Text(
+                              money(amount(order['amount'])),
                               style: const TextStyle(
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
-                            const SizedBox(height: 10),
-                            SizedBox(
-                              width: double.infinity,
-                              child: FilledButton(
-                                onPressed: _busy || _selected.isEmpty
-                                    ? null
-                                    : _receive,
-                                child: Text(
-                                  _busy
-                                      ? 'Recording receipt...'
-                                      : 'Receive selected cash',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      emptyTitle: 'No cash handover is outstanding',
-                      emptyMessage: 'Open Delivered to review orders or Receipts to check cash already received.',
-                      itemBuilder: (_, order, _) => Card(
-                        child: CheckboxListTile(
-                          controlAffinity: ListTileControlAffinity.leading,
-                          value: _selected.containsKey(order['order_id']),
-                          onChanged:
-                              _busy ||
-                                  (_selected.length >= 200 &&
-                                      !_selected.containsKey(order['order_id']))
-                              ? null
-                              : (selected) => setState(() {
-                                  if (selected == true) {
-                                    _selected[order['order_id']] =
-                                        (amount(order['amount']) * 100).round();
-                                  } else {
-                                    _selected.remove(order['order_id']);
-                                  }
-                                  _receiptKey = newUuid();
-                                }),
-                          title: Text(
-                            '${order['customer_name'] ?? ''}',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          subtitle: Text(
-                            '${order['order_id']}\n${List<Map<String, dynamic>>.from(order['items'] ?? []).map((item) => '${productLabel(item)} x ${item['quantity']}').join(', ')}',
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 11),
-                          ),
-                          secondary: Text(
-                            money(amount(order['amount'])),
-                            style: const TextStyle(fontWeight: FontWeight.w800),
                           ),
                         ),
                       ),
-                    ),
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );

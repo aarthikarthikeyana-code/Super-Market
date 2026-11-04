@@ -30,7 +30,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   bool _unassignedOnly = false, _todayOnly = false;
   Map<String, dynamic> _stageCounts = {};
   final Set<String> _selectedOrders = {};
-  bool _batchBusy = false;
+  bool _batchBusy = false, _selectOrders = false;
   String? _quickOrderId;
   String _productFilter = 'all', _productSearch = '';
   String? _productCategory, _productBrand;
@@ -124,57 +124,24 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
             ? AdminSignInScreen(onSuccess: _loginSuccess)
             : Scaffold(
                 appBar: _header(),
-                body: switch (_tab) {
-                  0 => _overview(),
-                  1 => _orders(),
-                  2 => _products(),
-                  3 => OperationsDeliveryControl(onOrder: _openOrder),
-                  4 => OperationsMore(onOpen: _openMore),
-                  5 => _team(),
-                  6 => OperationsCashControl(onReceive: _receiveCash),
-                  _ => OperationsReports(
-                    onOrders: _showOrders,
-                    onInventory: _showInventory,
-                  ),
-                },
-                floatingActionButton: _tab == 2
-                    ? FloatingActionButton.extended(
-                        onPressed: () => _editProduct(),
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add product'),
-                      )
-                    : _tab == 5
-                    ? FloatingActionButton.extended(
-                        onPressed: () => _editPerson(),
-                        icon: const Icon(Icons.person_add_alt_1_rounded),
-                        label: const Text('Create Employee'),
-                      )
-                    : null,
-                bottomNavigationBar: NavigationBar(
-                  selectedIndex: _tab <= 4 ? _tab : 4,
-                  onDestinationSelected: (i) => setState(() => _tab = i),
-                  destinations: const [
-                    NavigationDestination(
-                      icon: Icon(Icons.space_dashboard_outlined),
-                      label: 'Dashboard',
+                body: AdminCanvas(
+                  child: switch (_tab) {
+                    0 => _overview(),
+                    1 => _orders(),
+                    2 => _products(),
+                    3 => OperationsDeliveryControl(onOrder: _openOrder),
+                    4 => OperationsMore(onOpen: _openMore),
+                    5 => _team(),
+                    6 => OperationsCashControl(onReceive: _receiveCash),
+                    _ => OperationsReports(
+                      onOrders: _showOrders,
+                      onInventory: _showInventory,
                     ),
-                    NavigationDestination(
-                      icon: Icon(Icons.receipt_long_outlined),
-                      label: 'Orders',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.inventory_2_outlined),
-                      label: 'Products',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.route_outlined),
-                      label: 'Delivery',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.grid_view_outlined),
-                      label: 'More',
-                    ),
-                  ],
+                  },
+                ),
+                bottomNavigationBar: AdminBottomNavigation(
+                  selected: _tab <= 4 ? _tab : 4,
+                  onSelected: (index) => setState(() => _tab = index),
                 ),
               ),
       ),
@@ -186,66 +153,42 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     final data = snapshot.asData?.value;
     final alerts = List<Map<String, dynamic>>.from(data?['alerts'] ?? []);
     final profile = Map<String, dynamic>.from(data?['admin_profile'] ?? {});
-    final live = data != null && !snapshot.hasError && !snapshot.isLoading;
     return AppBar(
       automaticallyImplyLeading: false,
-      toolbarHeight: 70,
-      titleSpacing: 18,
+      titleSpacing: 16,
+      toolbarHeight: 60,
       title: Row(
         children: [
+          const AdminIcon(Icons.storefront_rounded, size: 34),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Agaram',
+                  'AGARAM',
                   style: TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -.5,
+                    fontSize: 15,
+                    letterSpacing: 1,
+                    fontWeight: FontWeight.w800,
+                    color: opsForestGreen,
                   ),
                 ),
-                const SizedBox(height: 2),
                 Text(
-                  _tab == 0
-                      ? 'Store Operations'
-                      : const [
-                          'Store Operations',
-                          'Orders',
-                          'Products',
-                          'Delivery Control',
-                          'More',
-                          'Delivery Team',
-                          'Cash Handover',
-                          'Reports',
-                        ][_tab],
+                  const [
+                    'Operations dashboard',
+                    'Order management',
+                    'Product catalogue',
+                    'Delivery control',
+                    'Store tools',
+                    'Delivery team',
+                    'Cash handover',
+                    'Reports & analytics',
+                  ][_tab],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 10, color: opsMuted),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
-            decoration: BoxDecoration(
-              color: live ? opsMint : const Color(0xFFEEEFEA),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.circle, size: 5, color: live ? opsGreen : opsMuted),
-                const SizedBox(width: 4),
-                Text(
-                  snapshot.hasError
-                      ? 'Retry'
-                      : live
-                      ? 'Live data'
-                      : 'Syncing',
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: live ? opsGreen : opsMuted,
-                    fontWeight: FontWeight.w700,
-                  ),
                 ),
               ],
             ),
@@ -255,49 +198,40 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       actions: [
         IconButton(
           tooltip: 'Search orders',
-          visualDensity: VisualDensity.compact,
-          constraints: const BoxConstraints(minWidth: 34),
           onPressed: () {
             setState(() => _tab = 1);
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) _orderSearchFocus.requestFocus();
             });
           },
-          icon: const Icon(Icons.search, size: 21),
+          icon: const Icon(Icons.search_rounded, size: 21),
         ),
         IconButton(
           tooltip: 'Operational alerts',
-          visualDensity: VisualDensity.compact,
-          constraints: const BoxConstraints(minWidth: 34),
           onPressed: _showAlerts,
           icon: Badge(
             isLabelVisible: alerts.isNotEmpty,
             label: Text('${alerts.length}'),
-            child: const Icon(Icons.notifications_none, size: 21),
+            child: const Icon(Icons.notifications_none_rounded, size: 21),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.only(right: 12),
-          child: IconButton(
-            tooltip: 'Admin profile',
-            visualDensity: VisualDensity.compact,
-            onPressed: _showProfile,
-            icon: CircleAvatar(
-              radius: 15,
-              backgroundColor: opsMint,
-              child: Text(
-                profile['name'] == null
-                    ? 'AD'
-                    : opsInitial('${profile['name']}'),
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: opsGreen,
-                ),
+        IconButton(
+          tooltip: 'Admin profile',
+          onPressed: _showProfile,
+          icon: CircleAvatar(
+            radius: 15,
+            backgroundColor: opsGlassMint,
+            child: Text(
+              profile['name'] == null ? 'A' : opsInitial('${profile['name']}'),
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: opsForestGreen,
               ),
             ),
           ),
         ),
+        const SizedBox(width: 6),
       ],
     );
   }
@@ -319,6 +253,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       _orderSearch = '';
       _orderSearchInput.clear();
       _selectedOrders.clear();
+      _selectOrders = false;
       _assignmentEmployee = employee;
     });
   }
@@ -337,7 +272,12 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   Future<void> _receiveCash(Map<String, dynamic> person) async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => EmployeeCashScreen(person: person)),
+      MaterialPageRoute(
+        builder: (_) => Theme(
+          data: operationsTheme(),
+          child: EmployeeCashScreen(person: person),
+        ),
+      ),
     );
     if (mounted) refreshCommerce(ref);
   }
@@ -349,49 +289,163 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       final profile = Map<String, dynamic>.from(data['admin_profile'] ?? {});
       await showModalBottomSheet<void>(
         context: context,
-        showDragHandle: true,
-        builder: (ctx) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        builder: (ctx) => Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFFFFFDF9),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          child: SafeArea(
+            top: false,
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Admin Profile',
-                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 16),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(
-                    backgroundColor: opsMint,
-                    child: Icon(
-                      Icons.admin_panel_settings_outlined,
-                      color: opsGreen,
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDDE8E1),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  title: Text('${profile['name'] ?? 'Admin'}'),
-                  subtitle: Text('${profile['email'] ?? ''}'),
+                ),
+                const SizedBox(height: 20),
+                // Modern Avatar
+                Container(
+                  width: 76,
+                  height: 76,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFE9F8EF), Color(0xFFDDF3E6)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    border: Border.all(
+                      color: const Color(0xFF16A05D).withOpacity(0.3),
+                      width: 2,
+                    ),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.person_outline_rounded,
+                      size: 38,
+                      color: Color(0xFF0D6F47),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 12),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.sync),
-                  title: const Text('Refresh store data'),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    refreshCommerce(ref);
-                  },
+                Text(
+                  '${profile['name'] ?? 'Administrator'}',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF15211A),
+                  ),
                 ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.logout, color: opsRed),
-                  title: const Text('Logout'),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _logout();
-                  },
+                const SizedBox(height: 4),
+                Text(
+                  '${profile['email'] ?? ''}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF69756F),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE5F8EC),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'Store administrator',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0D6F47),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // Action options
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFFDDE8E1)),
+                  ),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEAF3FF),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.sync_rounded,
+                            color: Color(0xFF1976D2),
+                            size: 20,
+                          ),
+                        ),
+                        title: const Text(
+                          'Refresh Store Data',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        trailing: const Icon(
+                          Icons.chevron_right_rounded,
+                          color: Color(0xFF69756F),
+                        ),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          refreshCommerce(ref);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Logout button
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFD32F2F),
+                      side: const BorderSide(color: Color(0xFFFFCDD2)),
+                      backgroundColor: const Color(0xFFFFEBEE),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    icon: const Icon(
+                      Icons.power_settings_new_rounded,
+                      size: 20,
+                    ),
+                    label: const Text(
+                      'Logout',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _logout();
+                    },
+                  ),
                 ),
               ],
             ),
@@ -557,25 +611,41 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                       shrinkWrap: true,
                       children: [
                         for (final value in values)
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(value),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              setState(() {
-                                _tab = 2;
-                                _productFilter = 'all';
-                                _productSearch = '';
-                                _productSearchInput.clear();
-                                _productCategory = action == 'categories'
-                                    ? value
-                                    : null;
-                                _productBrand = action == 'brands'
-                                    ? value
-                                    : null;
-                              });
-                            },
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Card(
+                              child: ListTile(
+                                leading: AdminIcon(
+                                  action == 'categories'
+                                      ? Icons.category_outlined
+                                      : Icons.sell_outlined,
+                                  color: action == 'categories'
+                                      ? opsForestGreen
+                                      : opsInfo,
+                                  background: action == 'categories'
+                                      ? opsMint
+                                      : opsInfoBg,
+                                ),
+                                title: Text(value),
+                                subtitle: const Text('Browse products'),
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  setState(() {
+                                    _tab = 2;
+                                    _productFilter = 'all';
+                                    _productSearch = '';
+                                    _productSearchInput.clear();
+                                    _productCategory = action == 'categories'
+                                        ? value
+                                        : null;
+                                    _productBrand = action == 'brands'
+                                        ? value
+                                        : null;
+                                  });
+                                },
+                              ),
+                            ),
                           ),
                       ],
                     ),
@@ -591,11 +661,17 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                 ] else ...[
                   ListTile(
                     contentPadding: EdgeInsets.zero,
+                    leading: const AdminIcon(Icons.storefront_outlined),
                     title: const Text('Store'),
                     subtitle: Text('${store['name'] ?? 'No data yet'}'),
                   ),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
+                    leading: const AdminIcon(
+                      Icons.payments_outlined,
+                      background: opsInfoBg,
+                      color: opsInfo,
+                    ),
                     title: const Text('Payment'),
                     subtitle: Text(
                       store['cash_on_delivery'] == true
@@ -605,6 +681,11 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                   ),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
+                    leading: const AdminIcon(
+                      Icons.local_shipping_outlined,
+                      background: opsWarningBg,
+                      color: opsWarning,
+                    ),
                     title: const Text('Delivery charge'),
                     subtitle: Text(
                       store['delivery_charge'] == null
@@ -675,70 +756,152 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
         brand: _productBrand,
       ),
       identity: (p) => p.id,
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 100),
-      header: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Products',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _productSearchInput,
-            decoration: const InputDecoration(
-              hintText: 'Search Tamil name, reference or brand',
-              prefixIcon: Icon(Icons.search),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const AdminWorkflowBanner(
+              title: 'Your product catalogue',
+              subtitle: 'Add products, check stock and control availability.',
             ),
-            onChanged: (value) {
-              _productDebounce?.cancel();
-              _productDebounce = Timer(const Duration(milliseconds: 350), () {
-                if (mounted) setState(() => _productSearch = value.trim());
-              });
-            },
-          ),
-          const SizedBox(height: 10),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
+            const SizedBox(height: 12),
+            Row(
               children: [
-                for (final filter in <(String, String)>[
-                  ('All', 'all'),
-                  ('Published', 'published'),
-                  ('Hidden', 'hidden'),
-                  ('Low Stock', 'low'),
-                  ('Out of Stock', 'out'),
-                ])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 7),
-                    child: ChoiceChip(
-                      label: Text(
-                        filter.$1,
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                      selected: _productFilter == filter.$2,
-                      onSelected: (_) =>
-                          setState(() => _productFilter = filter.$2),
+                const Expanded(
+                  child: Text(
+                    'Products',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF15211A),
                     ),
                   ),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF16A05D),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text(
+                    'Add Product',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                  ),
+                  onPressed: () => _editProduct(),
+                ),
               ],
             ),
-          ),
-          if (_productCategory != null || _productBrand != null)
-            InputChip(
-              label: Text(_productCategory ?? _productBrand!),
-              onDeleted: () => setState(() {
-                _productCategory = null;
-                _productBrand = null;
-              }),
+            const SizedBox(height: 14),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFDDE8E1)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: TextField(
+                controller: _productSearchInput,
+                decoration: const InputDecoration(
+                  hintText: 'Search products by name, SKU...',
+                  hintStyle: TextStyle(fontSize: 13, color: Color(0xFF69756F)),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: Color(0xFF69756F),
+                    size: 20,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                ),
+                onChanged: (value) {
+                  _productDebounce?.cancel();
+                  _productDebounce = Timer(
+                    const Duration(milliseconds: 350),
+                    () {
+                      if (mounted) {
+                        setState(() => _productSearch = value.trim());
+                      }
+                    },
+                  );
+                },
+              ),
             ),
-          const SizedBox(height: 16),
-        ],
+            const SizedBox(height: 12),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final filter in <(String, String)>[
+                    ('All', 'all'),
+                    ('Published', 'published'),
+                    ('Hidden', 'hidden'),
+                    ('Low Stock', 'low'),
+                    ('Out of Stock', 'out'),
+                  ])
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(
+                          filter.$1,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: _productFilter == filter.$2
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: _productFilter == filter.$2
+                                ? Colors.white
+                                : const Color(0xFF15211A),
+                          ),
+                        ),
+                        selected: _productFilter == filter.$2,
+                        selectedColor: const Color(0xFF16A05D),
+                        backgroundColor: Colors.white,
+                        surfaceTintColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          side: BorderSide(
+                            color: _productFilter == filter.$2
+                                ? const Color(0xFF16A05D)
+                                : const Color(0xFFDDE8E1),
+                          ),
+                        ),
+                        showCheckmark: false,
+                        onSelected: (_) =>
+                            setState(() => _productFilter = filter.$2),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (_productCategory != null || _productBrand != null)
+              InputChip(
+                label: Text(_productCategory ?? _productBrand!),
+                onDeleted: () => setState(() {
+                  _productCategory = null;
+                  _productBrand = null;
+                }),
+              ),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
       emptyTitle: 'No products in this view',
       emptyMessage: 'Add real products or choose a different filter.',
-      emptyAction: 'Add product',
-      onEmptyAction: () => _editProduct(),
       itemBuilder: (_, product, _) => OperationsProductCard(
         product: product,
         onEdit: () => _editProduct(product),
@@ -842,277 +1005,254 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
 
   Widget _orders() {
     final api = ref.watch(storeApiProvider);
-    return Column(
-      children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(18, 8, 18, 4),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Orders',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+    return PagedFeed<StoreOrder>(
+      queryKey: (
+        'adminOrders',
+        api.adminToken,
+        _orderFilter,
+        _orderSearch,
+        _unassignedOnly,
+        _todayOnly,
+      ),
+      changes: api.feedChanges,
+      load: (cursor) => api.orderPage(
+        cursor: cursor,
+        admin: true,
+        status: _orderFilter,
+        search: _orderSearch,
+        assigned: _unassignedOnly ? 'unassigned' : null,
+        date: _todayOnly
+            ? DateTime.now().toIso8601String().split('T').first
+            : null,
+      ),
+      onMetadata: (metadata) {
+        final counts = Map<String, dynamic>.from(
+          metadata['stage_counts'] ?? {},
+        );
+        counts['All'] = counts.values.fold<int>(
+          0,
+          (sum, value) => sum + (value as num).toInt(),
+        );
+        counts['Active'] =
+            (counts['All'] as int) -
+            ((counts['Delivered'] as num?)?.toInt() ?? 0) -
+            ((counts['Cancelled'] as num?)?.toInt() ?? 0);
+        if (mounted && counts.toString() != _stageCounts.toString()) {
+          setState(() => _stageCounts = counts);
+        }
+      },
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const AdminWorkflowBanner(
+              title: 'Manage orders',
+              subtitle: 'Prepare, pack and assign. Your team handles delivery.',
             ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
-          child: Row(
-            children: [
-              for (final stage in ['Active', 'Delivered', 'Cancelled']) ...[
-                if (stage != 'Active') const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton.tonal(
-                    onPressed: () => _showOrders(stage),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: _orderFilter == stage
-                          ? opsGreen
-                          : opsMint,
-                      foregroundColor: _orderFilter == stage
-                          ? Colors.white
-                          : opsGreen,
-                      padding: const EdgeInsets.symmetric(horizontal: 5),
-                    ),
-                    child: Text(
-                      stage == 'Delivered'
-                          ? 'Delivered (${_stageCounts['Delivered'] ?? 0})'
-                          : stage,
-                      style: const TextStyle(fontSize: 11),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                for (final group in ['Active', 'Delivered', 'Cancelled']) ...[
+                  if (group != 'Active') const SizedBox(width: 6),
+                  Expanded(
+                    child: FilledButton.tonal(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _orderGroup == group
+                            ? opsForestGreen
+                            : Colors.white,
+                        foregroundColor: _orderGroup == group
+                            ? Colors.white
+                            : opsMuted,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 10,
+                        ),
+                      ),
+                      onPressed: () => _showOrders(group),
+                      child: Text(group, style: const TextStyle(fontSize: 12)),
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
-          ),
-        ),
-        if (_assignmentEmployee != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18),
-            child: InputChip(
-              label: Text('Assign to ${_assignmentEmployee!['name']}'),
-              onDeleted: () => setState(() => _assignmentEmployee = null),
             ),
-          ),
-        if ([
-          'Delivered Today',
-          'Today Attention',
-          'Delayed',
-          'Cash Handover Complete',
-          'Pending Handover',
-          'Cash Review',
-        ].contains(_orderFilter))
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: InputChip(
-                label: Text(_orderFilter),
-                onDeleted: () => _showOrders('Active'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _orderSearchInput,
+              focusNode: _orderSearchFocus,
+              decoration: const InputDecoration(
+                hintText: 'Search order, customer or mobile',
+                prefixIcon: Icon(Icons.search, size: 20),
               ),
+              onChanged: (value) {
+                _searchDebounce?.cancel();
+                _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+                  if (mounted) {
+                    setState(() {
+                      _orderSearch = value.trim();
+                      _selectedOrders.clear();
+                    });
+                  }
+                });
+              },
             ),
-          ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-          child: TextField(
-            controller: _orderSearchInput,
-            focusNode: _orderSearchFocus,
-            decoration: const InputDecoration(
-              hintText: 'Search order, customer, phone or address',
-              prefixIcon: Icon(Icons.search),
-            ),
-            onChanged: (value) {
-              _searchDebounce?.cancel();
-              _searchDebounce = Timer(const Duration(milliseconds: 350), () {
-                if (mounted) {
-                  setState(() {
-                    _orderSearch = value.trim();
-                    _selectedOrders.clear();
-                  });
-                }
-              });
-            },
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(
-            children: [
-              FilterChip(
-                label: const Text('Needs employee'),
-                selected: _unassignedOnly,
-                onSelected: (v) => setState(() {
-                  _unassignedOnly = v;
-                  _orderFilter = 'Active';
-                  _selectedOrders.clear();
-                }),
+            if (_assignmentEmployee != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: InputChip(
+                  label: Text('Assign to ${_assignmentEmployee!['name']}'),
+                  onDeleted: () => setState(() => _assignmentEmployee = null),
+                ),
               ),
-              const SizedBox(width: 8),
-              FilterChip(
-                label: const Text('Today'),
-                selected: _todayOnly,
-                onSelected: (v) => setState(() {
-                  _todayOnly = v;
-                  _selectedOrders.clear();
-                }),
+            if (_orderGroup == 'Active') ...[
+              const SizedBox(height: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final stage in <(String, String)>[
+                      ('All active', 'Active'),
+                      ('New', 'New'),
+                      ('Preparing', 'Preparing'),
+                      ('Packed', 'Packed'),
+                      ('Assigned', 'Assigned'),
+                      ('On delivery', 'Out for Delivery'),
+                      ('Attempted', 'Delivery Attempted'),
+                      ('Delayed', 'Delayed'),
+                    ])
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: ChoiceChip(
+                          label: Text(
+                            _stageCounts.containsKey(stage.$2)
+                                ? '${stage.$1} (${_stageCounts[stage.$2]})'
+                                : stage.$1,
+                          ),
+                          selected: _orderFilter == stage.$2,
+                          onSelected: (_) => setState(() {
+                            _orderFilter = stage.$2;
+                            _selectedOrders.clear();
+                            _selectOrders = false;
+                          }),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ],
-          ),
-        ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-          child: Row(
-            children: [
-              for (final status in [
-                'Active',
-                'All',
-                'New',
-                'Preparing',
-                'Packed',
-                'Assigned',
-                'Out for Delivery',
-                'Delivery Attempted',
-                'Delivered',
-                'Cancelled',
-              ])
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(
-                      _stageCounts.containsKey(status)
-                          ? '$status (${_stageCounts[status]})'
-                          : status,
-                    ),
-                    selected: _orderFilter == status,
-                    onSelected: (_) => setState(() {
-                      _orderFilter = status;
+              Wrap(
+                spacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  FilterChip(
+                    label: const Text('Needs employee'),
+                    selected: _unassignedOnly,
+                    onSelected: (value) => setState(() {
+                      _unassignedOnly = value;
+                      _orderFilter = 'Active';
                       _selectedOrders.clear();
                     }),
                   ),
-                ),
+                  FilterChip(
+                    label: const Text('Today'),
+                    selected: _todayOnly,
+                    onSelected: (value) => setState(() {
+                      _todayOnly = value;
+                      _selectedOrders.clear();
+                    }),
+                  ),
+                  TextButton.icon(
+                    onPressed: _batchBusy
+                        ? null
+                        : () => setState(() {
+                            _selectOrders = !_selectOrders;
+                            _selectedOrders.clear();
+                            if (_selectOrders) _orderFilter = 'Packed';
+                          }),
+                    icon: Icon(
+                      _selectOrders ? Icons.close : Icons.checklist_rounded,
+                      size: 16,
+                    ),
+                    label: Text(
+                      _selectOrders ? 'Cancel selection' : 'Select orders',
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
             ],
-          ),
-        ),
-        if (_selectedOrders.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-            child: Row(
-              children: [
-                Expanded(
+            if (![
+              'Active',
+              'New',
+              'Preparing',
+              'Packed',
+              'Assigned',
+              'Out for Delivery',
+              'Delivered',
+              'Cancelled',
+            ].contains(_orderFilter))
+              InputChip(
+                label: Text(
+                  _orderFilter == 'Today Attention'
+                      ? 'Needs attention · today'
+                      : _orderFilter,
+                ),
+                onDeleted: () => _showOrders(_orderGroup),
+              ),
+            if (_selectedOrders.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: SizedBox(
+                  width: double.infinity,
                   child: FilledButton.icon(
                     onPressed: _batchBusy ? null : _assignSelected,
-                    icon: const Icon(Icons.group_add_outlined),
+                    icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
                     label: Text(
                       _batchBusy
-                          ? 'Assigning...'
+                          ? 'Assigning…'
                           : 'Assign ${_selectedOrders.length} packed orders',
                     ),
                   ),
                 ),
-                IconButton(
-                  onPressed: _batchBusy
-                      ? null
-                      : () => setState(_selectedOrders.clear),
-                  tooltip: 'Clear selection',
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
-          ),
-        Expanded(
-          child: PagedFeed<StoreOrder>(
-            queryKey: (
-              'adminOrders',
-              api.adminToken,
-              _orderFilter,
-              _orderSearch,
-              _unassignedOnly,
-              _todayOnly,
-            ),
-            changes: api.feedChanges,
-            load: (cursor) => api.orderPage(
-              cursor: cursor,
-              admin: true,
-              status: _orderFilter,
-              search: _orderSearch,
-              assigned: _unassignedOnly ? 'unassigned' : null,
-              date: _todayOnly
-                  ? DateTime.now().toIso8601String().split('T').first
-                  : null,
-            ),
-            onMetadata: (metadata) {
-              final counts = Map<String, dynamic>.from(
-                metadata['stage_counts'] ?? {},
-              );
-              counts['All'] = counts.values.fold<int>(
-                0,
-                (sum, value) => sum + (value as num).toInt(),
-              );
-              counts['Active'] =
-                  (counts['All'] as int) -
-                  ((counts['Delivered'] as num?)?.toInt() ?? 0) -
-                  ((counts['Cancelled'] as num?)?.toInt() ?? 0);
-              if (mounted && counts.toString() != _stageCounts.toString()) {
-                setState(() => _stageCounts = counts);
-              }
-            },
-            header: const Padding(
-              padding: EdgeInsets.only(bottom: 12),
-              child: Text(
-                'Prepare > Pack > Assign. Select packed orders to assign a batch. Employees handle pickup, delivery and cash.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.black54,
-                  height: 1.5,
-                ),
               ),
-            ),
-            identity: (o) => o.id,
-            emptyTitle: 'No orders in this stage',
-            emptyMessage: 'Choose another stage or pull down to refresh.',
-            itemBuilder: (_, order, _) => order.status == 'Packed'
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        width: 34,
-                        child: Checkbox(
-                          value: _selectedOrders.contains(order.id),
-                          onChanged: _batchBusy
-                              ? null
-                              : (value) {
-                                  if (value == true &&
-                                      _selectedOrders.length >= 50) {
-                                    showStoreError(
-                                      context,
-                                      StoreException(
-                                        'Assign up to 50 packed orders at a time.',
-                                      ),
-                                    );
-                                    return;
-                                  }
-                                  setState(() {
-                                    if (value == true) {
-                                      _selectedOrders.add(order.id);
-                                    } else {
-                                      _selectedOrders.remove(order.id);
-                                    }
-                                  });
-                                },
-                        ),
-                      ),
-                      Expanded(
-                        child: OrderSummaryCard(
-                          order: order,
-                          onTap: () => _openOrder(order),
-                          actionLabel: _orderActionLabel(order),
-                          onAction: _quickOrderId == null
-                              ? () => _quickOrder(order)
-                              : null,
-                        ),
-                      ),
-                    ],
-                  )
-                : OrderSummaryCard(
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+      identity: (o) => o.id,
+      emptyTitle: 'No orders in this stage',
+      emptyMessage: 'Choose another stage or pull down to refresh.',
+      itemBuilder: (_, order, _) => _selectOrders && order.status == 'Packed'
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 34,
+                  child: Checkbox(
+                    value: _selectedOrders.contains(order.id),
+                    onChanged: _batchBusy
+                        ? null
+                        : (value) {
+                            if (value == true && _selectedOrders.length >= 50) {
+                              showStoreError(
+                                context,
+                                StoreException(
+                                  'Assign up to 50 packed orders at a time.',
+                                ),
+                              );
+                              return;
+                            }
+                            setState(() {
+                              if (value == true) {
+                                _selectedOrders.add(order.id);
+                              } else {
+                                _selectedOrders.remove(order.id);
+                              }
+                            });
+                          },
+                  ),
+                ),
+                Expanded(
+                  child: AdminOrderCard(
                     order: order,
                     onTap: () => _openOrder(order),
                     actionLabel: _orderActionLabel(order),
@@ -1120,11 +1260,28 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                         ? () => _quickOrder(order)
                         : null,
                   ),
-          ),
-        ),
-      ],
+                ),
+              ],
+            )
+          : AdminOrderCard(
+              order: order,
+              onTap: () => _openOrder(order),
+              actionLabel: _orderActionLabel(order),
+              onAction: _quickOrderId == null ? () => _quickOrder(order) : null,
+            ),
     );
   }
+
+  String get _orderGroup => _orderFilter == 'Cancelled'
+      ? 'Cancelled'
+      : [
+          'Delivered',
+          'Delivered Today',
+          'Cash Handover Complete',
+          'Pending Handover',
+        ].contains(_orderFilter)
+      ? 'Delivered'
+      : 'Active';
 
   String _orderActionLabel(StoreOrder order) => switch (order.status) {
     'New' => 'Start Preparing',
@@ -1132,13 +1289,13 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     'Packed' =>
       order.data['assigned_to'] == null
           ? 'Assign Employee'
-          : 'View employee pickup',
+          : 'Waiting for pickup',
     'Out for Delivery' => 'Track delivery',
     'Delivered' =>
       order.paymentStatus == 'collected' &&
               order.data['cash_handover'] == null &&
               order.data['cash_received_directly'] != true
-          ? 'Verify Cash'
+          ? 'Receive cash'
           : 'Completed · view record',
     'Cancelled' => 'View cancellation',
     _ => 'Review order',
@@ -1212,11 +1369,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     }
     if (order.status == 'Packed' && order.data['assigned_to'] == null) {
       final person =
-          _assignmentEmployee ??
-          await Navigator.push<Map<String, dynamic>>(
-            context,
-            MaterialPageRoute(builder: (_) => const EmployeePickerScreen()),
-          );
+          _assignmentEmployee ?? await showAdminEmployeePicker(context);
       if (person == null || !mounted) return;
       setState(() => _quickOrderId = order.id);
       try {
@@ -1231,7 +1384,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       }
       return;
     }
-    if (_orderActionLabel(order) == 'Verify Cash' &&
+    if (_orderActionLabel(order) == 'Receive cash' &&
         order.data['assigned_to'] != null) {
       try {
         final person = await ref
@@ -1249,11 +1402,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   Future<void> _assignSelected() async {
     if (_batchBusy || _selectedOrders.isEmpty) return;
     final employee =
-        _assignmentEmployee ??
-        await Navigator.push<Map<String, dynamic>>(
-          context,
-          MaterialPageRoute(builder: (_) => const EmployeePickerScreen()),
-        );
+        _assignmentEmployee ?? await showAdminEmployeePicker(context);
     if (employee == null || !mounted) return;
     setState(() => _batchBusy = true);
     try {
@@ -1289,119 +1438,204 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       queryKey: ('adminTeam', api.adminToken, _teamSearch),
       changes: api.feedChanges,
       load: (cursor) => api.employeePage(cursor: cursor, search: _teamSearch),
-      header: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Your delivery team',
-            style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final metric in <(String, String)>[
-                ('Available', 'available'),
-                ('On delivery', 'on_delivery'),
-                ('Inactive', 'inactive'),
-              ])
-                OpsPill(
-                  '${metric.$1} ${ref.watch(adminDashboardProvider).asData?.value['team']?[metric.$2] ?? 0}',
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Delivery team',
+                    style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800),
+                  ),
                 ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            '1. Create login & contact details\n2. Check identity and activate\n3. Open a packed order and assign an employee',
-            style: TextStyle(height: 1.7, color: Colors.black54),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _teamSearchInput,
-            decoration: const InputDecoration(
-              hintText: 'Search employee, ID or mobile',
-              prefixIcon: Icon(Icons.search),
+                FilledButton.icon(
+                  onPressed: () => _editPerson(),
+                  icon: const Icon(Icons.add, size: 17),
+                  label: const Text('Employee'),
+                ),
+              ],
             ),
-            onChanged: (s) {
-              _teamDebounce?.cancel();
-              _teamDebounce = Timer(const Duration(milliseconds: 350), () {
-                if (mounted) setState(() => _teamSearch = s.trim());
-              });
-            },
-          ),
-          const SizedBox(height: 16),
-        ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                for (final metric in <(String, String, IconData, Color, Color)>[
+                  (
+                    'Available',
+                    'available',
+                    Icons.person_outline,
+                    opsForestGreen,
+                    opsMint,
+                  ),
+                  (
+                    'On delivery',
+                    'on_delivery',
+                    Icons.route_outlined,
+                    opsInfo,
+                    opsInfoBg,
+                  ),
+                  (
+                    'Inactive',
+                    'inactive',
+                    Icons.person_off_outlined,
+                    opsMuted,
+                    Color(0xFFEDF1EE),
+                  ),
+                ])
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: AdminMetricCard(
+                        label: metric.$1,
+                        value:
+                            '${ref.watch(adminDashboardProvider).asData?.value['team']?[metric.$2] ?? '—'}',
+                        icon: metric.$3,
+                        color: metric.$4,
+                        background: metric.$5,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _teamSearchInput,
+              decoration: const InputDecoration(
+                hintText: 'Search name, employee ID or mobile',
+                prefixIcon: Icon(Icons.search, size: 20),
+              ),
+              onChanged: (s) {
+                _teamDebounce?.cancel();
+                _teamDebounce = Timer(const Duration(milliseconds: 350), () {
+                  if (mounted) setState(() => _teamSearch = s.trim());
+                });
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
       ),
       identity: (p) => '${p['id']}',
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       emptyTitle: 'Set up your delivery team',
       emptyMessage:
           'Create real delivery employee accounts and assign their work.',
       emptyAction: 'Create employee',
       onEmptyAction: () => _editPerson(),
-      itemBuilder: (_, p, _) {
-        return Card(
-          child: Column(
-            children: [
-              ListTile(
-                onTap: () => _editPerson(p),
-                leading: CircleAvatar(
-                  backgroundColor: const Color(0xFFE4F0E7),
-                  child: Text('${p['name']}'.substring(0, 1).toUpperCase()),
+      itemBuilder: (_, p, _) => OpsPanel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: opsGlassMint,
+                  child: Text(
+                    opsInitial('${p['name'] ?? ''}'),
+                    style: const TextStyle(
+                      color: opsForestGreen,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ),
-                title: Text(
-                  '${p['name']}',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${p['name'] ?? ''}',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${p['employee_code'] ?? 'Complete onboarding'}',
+                        style: const TextStyle(fontSize: 11, color: opsMuted),
+                      ),
+                    ],
+                  ),
                 ),
-                subtitle: Text(
-                  '${p['employee_code'] ?? 'Complete onboarding'} | ${p['phone']}\n${p['active_orders']} orders | ${money(amount(p['cash_to_handover']))} cash due',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                Flexible(
+                  child: AdminStatusBadge(
+                    p['is_active'] != true
+                        ? 'Inactive'
+                        : p['ready_for_deliveries'] != true
+                        ? 'Onboarding'
+                        : '${p['status']}',
+                  ),
                 ),
-                isThreeLine: true,
-                trailing: StatusChip(
-                  p['is_active'] == true
-                      ? p['ready_for_deliveries'] == true
-                            ? '${p['status']}'
-                            : 'Onboarding'
-                      : 'Inactive',
-                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '${p['phone'] ?? ''}',
+              style: const TextStyle(fontSize: 12, color: opsMuted),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: opsBaseCream,
+                borderRadius: BorderRadius.circular(12),
               ),
-              Wrap(
-                spacing: 4,
+              child: Row(
                 children: [
-                  TextButton(
-                    onPressed: () => _editPerson(p),
-                    child: const Text(
-                      'View Profile',
-                      style: TextStyle(fontSize: 11),
+                  Expanded(
+                    child: Text(
+                      '${p['active_orders'] ?? 0} active orders',
+                      style: const TextStyle(fontSize: 12),
                     ),
                   ),
-                  TextButton(
-                    onPressed: p['ready_for_deliveries'] == true
-                        ? () => _showOrders('Unassigned', employee: p)
-                        : null,
-                    child: const Text(
-                      'Assign Order',
-                      style: TextStyle(fontSize: 11),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: amount(p['cash_to_handover']) > 0
-                        ? () => _receiveCash(p)
-                        : null,
-                    child: const Text(
-                      'Receive Cash',
-                      style: TextStyle(fontSize: 11),
+                  Flexible(
+                    child: Text(
+                      '${money(amount(p['cash_to_handover']))} cash held',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: opsForestGreen,
+                      ),
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
-        );
-      },
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 4,
+              children: [
+                TextButton.icon(
+                  onPressed: () => _editPerson(p),
+                  icon: const Icon(Icons.person_outline, size: 16),
+                  label: const Text('Profile', style: TextStyle(fontSize: 11)),
+                ),
+                TextButton.icon(
+                  onPressed: p['ready_for_deliveries'] == true
+                      ? () => _showOrders('Unassigned', employee: p)
+                      : null,
+                  icon: const Icon(Icons.route, size: 16),
+                  label: const Text('Assign', style: TextStyle(fontSize: 11)),
+                ),
+                TextButton.icon(
+                  onPressed: amount(p['cash_to_handover']) > 0
+                      ? () => _receiveCash(p)
+                      : null,
+                  icon: const Icon(Icons.payments_outlined, size: 16),
+                  label: const Text(
+                    'Receive cash',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1479,8 +1713,10 @@ class _AdminSignInState extends ConsumerState<AdminSignInScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    backgroundColor: opsBaseCream,
     appBar: AppBar(
       leading: BackButton(
+        color: opsInk,
         onPressed: () {
           if (context.canPop()) {
             context.pop();
@@ -1490,98 +1726,208 @@ class _AdminSignInState extends ConsumerState<AdminSignInScreen> {
         },
       ),
     ),
-    body: Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(28),
-          child: Form(
-            key: _form,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: storeGreen,
-                    borderRadius: BorderRadius.circular(22),
+    body: AdminCanvas(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: Container(
+              padding: const EdgeInsets.all(26),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.92),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: Colors.white, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF087532).withOpacity(0.06),
+                    blurRadius: 20,
+                    offset: const Offset(0, 6),
                   ),
-                  child: const Icon(
-                    Icons.storefront,
-                    color: Colors.white,
-                    size: 36,
-                  ),
-                ),
-                const SizedBox(height: 28),
-                const Text(
-                  'Welcome back.',
-                  style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Sign in to your Agaram store workspace.',
-                  style: TextStyle(color: Colors.black54, fontSize: 16),
-                ),
-                const SizedBox(height: 32),
-                TextFormField(
-                  controller: _email,
-                  enabled: !_busy,
-                  keyboardType: TextInputType.emailAddress,
-                  autofillHints: const [AutofillHints.username],
-                  decoration: const InputDecoration(
-                    labelText: 'Admin email',
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
-                  validator: (s) => (s?.trim().isEmpty ?? true)
-                      ? 'Enter your admin email'
-                      : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _password,
-                  enabled: !_busy,
-                  obscureText: _hidden,
-                  autofillHints: const [AutofillHints.password],
-                  onFieldSubmitted: (_) => _login(),
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      onPressed: () => setState(() => _hidden = !_hidden),
-                      icon: Icon(
-                        _hidden
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
+                ],
+              ),
+              child: Form(
+                key: _form,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 64,
+                        height: 64,
+                        decoration: const BoxDecoration(
+                          color: opsGlassMint,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.storefront_rounded,
+                            color: opsGreen,
+                            size: 32,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                  validator: (s) =>
-                      (s?.isEmpty ?? true) ? 'Enter your password' : null,
-                ),
-                const SizedBox(height: 20),
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 20),
-                    child: Text(
-                      _error!,
+                    const SizedBox(height: 18),
+                    const Center(
+                      child: Text(
+                        'AGARAM',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: opsForestGreen,
+                          letterSpacing: 2.2,
+                        ),
+                      ),
+                    ),
+                    const Center(
+                      child: Text(
+                        'STORE OPERATIONS',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          color: opsGreen,
+                          letterSpacing: 2.8,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: Image.asset(
+                        'assets/images/storefront-harvest.png',
+                        height: 110,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        excludeFromSemantics: true,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Admin Sign In',
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: opsInk,
                       ),
                     ),
-                  ),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _busy ? null : _login,
-                    child: Text(_busy ? 'Signing in...' : 'Sign in'),
-                  ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Sign in to manage inventory, orders, and store staff.',
+                      style: TextStyle(
+                        color: opsMuted,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 26),
+                    TextFormField(
+                      controller: _email,
+                      enabled: !_busy,
+                      keyboardType: TextInputType.emailAddress,
+                      autofillHints: const [AutofillHints.username],
+                      decoration: InputDecoration(
+                        labelText: 'Admin email',
+                        prefixIcon: const Icon(
+                          Icons.person_outline_rounded,
+                          color: opsGreen,
+                        ),
+                        fillColor: opsBaseCream.withOpacity(0.6),
+                      ),
+                      validator: (s) => (s?.trim().isEmpty ?? true)
+                          ? 'Enter your admin email'
+                          : null,
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: _password,
+                      enabled: !_busy,
+                      obscureText: _hidden,
+                      autofillHints: const [AutofillHints.password],
+                      onFieldSubmitted: (_) => _login(),
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        prefixIcon: const Icon(
+                          Icons.lock_outline_rounded,
+                          color: opsGreen,
+                        ),
+                        fillColor: opsBaseCream.withOpacity(0.6),
+                        suffixIcon: IconButton(
+                          onPressed: () => setState(() => _hidden = !_hidden),
+                          icon: Icon(
+                            _hidden
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                            color: opsMuted,
+                          ),
+                        ),
+                      ),
+                      validator: (s) =>
+                          (s?.isEmpty ?? true) ? 'Enter your password' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    if (_error != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: opsRedBg,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.error_outline_rounded,
+                              color: opsRed,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _error!,
+                                style: const TextStyle(
+                                  color: opsRed,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: FilledButton(
+                        onPressed: _busy ? null : _login,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: opsGreen,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                        ),
+                        child: Text(
+                          _busy ? 'Signing in...' : 'Sign In to Workspace',
+                          style: const TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Center(
+                      child: Text(
+                        'Authorized store staff only.',
+                        style: TextStyle(color: opsMuted, fontSize: 11.5),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 24),
-                const Text(
-                  'For authorised store staff. Customers can browse and shop without an admin account.',
-                  style: TextStyle(color: Colors.black54, height: 1.5),
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -1809,183 +2155,242 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
       data: operationsTheme(),
       child: Scaffold(
         appBar: AppBar(
-          title: Text(widget.product == null ? 'Add product' : 'Edit product'),
+          title: Text(
+            widget.product == null ? 'Add new product' : 'Edit product',
+          ),
         ),
-        body: Form(
-          key: _form,
-          child: ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              InkWell(
-                onTap: _photo,
-                borderRadius: BorderRadius.circular(20),
-                child: Card(
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    children: [
-                      if (_imageUrl.isNotEmpty)
-                        ProductPhoto(_imageUrl, height: 210)
-                      else
-                        const SizedBox(
-                          height: 150,
-                          child: Center(
-                            child: Icon(
-                              Icons.add_photo_alternate_outlined,
-                              size: 48,
-                              color: storeGreen,
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: FilledButton.icon(
+              onPressed: _busy || _uploading || _namePending ? null : _save,
+              icon: const Icon(Icons.check_rounded, size: 19),
+              label: Text(
+                _busy
+                    ? 'Saving product…'
+                    : widget.product == null
+                    ? (_published
+                          ? 'Save & publish product'
+                          : 'Save hidden product')
+                    : 'Save changes',
+              ),
+            ),
+          ),
+        ),
+        body: AdminCanvas(
+          child: Form(
+            key: _form,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              children: [
+                OpsPanel(
+                  padding: EdgeInsets.zero,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: _busy || _uploading ? null : _photo,
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 110,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              color: opsMint,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: opsBorder),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: _imageUrl.isNotEmpty
+                                ? ProductPhoto(
+                                    _imageUrl,
+                                    height: 120,
+                                    fit: BoxFit.contain,
+                                  )
+                                : const Icon(
+                                    Icons.add_a_photo_outlined,
+                                    size: 30,
+                                    color: opsForestGreen,
+                                  ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _imageUrl.isEmpty
+                                      ? 'Product photo'
+                                      : 'Change photo',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                const Text(
+                                  '1000 × 1000 recommended\nJPG, PNG or WebP · Max 8 MB',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: opsMuted,
+                                    height: 1.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                if (_uploading)
+                                  const LinearProgressIndicator()
+                                else
+                                  const AdminStatusBadge(
+                                    'Single photo · optional',
+                                  ),
+                              ],
                             ),
                           ),
-                        ),
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text(
-                          _uploading
-                              ? 'Uploading photo...'
-                              : _imageId.isEmpty
-                              ? 'Add product photo (optional)'
-                              : 'Change product photo',
-                          style: const TextStyle(
-                            color: storeGreen,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                OpsPanel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const OpsHeading('Basic information'),
+                      _field(_tamil, 'Tamil product name', required: true),
+                      _field(_name, 'English / Tanglish reference (optional)'),
+                      if (_suggestingName)
+                        const LinearProgressIndicator(minHeight: 2),
+                      Text(
+                        _nameHint,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          height: 1.5,
+                          color: opsMuted,
                         ),
                       ),
-                      if (_uploading) const LinearProgressIndicator(),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: _busy || _uploading || _suggestingName
+                              ? null
+                              : () => _suggestTamilName(replace: true),
+                          icon: const Icon(Icons.auto_awesome, size: 16),
+                          label: const Text('Suggest Tamil'),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'Square photo · 1000 × 1000 recommended · JPG, PNG or WebP · Max 8 MB',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.black54,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 22),
-              const Text(
-                'Product details',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: storeInk,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Tamil name is shown first. Enter the actual price, selling unit and stock.',
-                style: TextStyle(color: Colors.black54, height: 1.5),
-              ),
-              const SizedBox(height: 20),
-              _field(_tamil, 'Tamil product name', required: true),
-              _field(_name, 'English / Tanglish reference (optional)'),
-              if (_suggestingName) const LinearProgressIndicator(minHeight: 2),
-              Row(
-                children: [
-                  const Icon(Icons.translate, size: 18, color: storeGreen),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _nameHint,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        height: 1.5,
-                        color: Colors.black54,
+                const SizedBox(height: 12),
+                OpsPanel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const OpsHeading('Catalogue'),
+                      _field(_category, 'Category', required: true),
+                      _field(
+                        _unit,
+                        'Selling unit (1 kg, 500 g, 1 pack)',
+                        required: true,
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: _busy || _uploading || _suggestingName
-                      ? null
-                      : () => _suggestTamilName(replace: true),
-                  icon: const Icon(Icons.auto_awesome, size: 16),
-                  label: const Text('Suggest Tamil'),
                 ),
-              ),
-              _field(_brand, 'Brand (optional)'),
-              _field(_category, 'Category', required: true),
-              _field(
-                _unit,
-                'Selling unit (e.g. 1 kg, 500 g, 1 pack)',
-                required: true,
-              ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: _field(
-                      _price,
-                      'Price (INR)',
-                      numeric: true,
-                      validator: (s) {
-                        final v = double.tryParse(s ?? '');
-                        return v == null || v <= 0 || v > 99999999
-                            ? 'Enter a valid price'
-                            : null;
-                      },
-                    ),
+                const SizedBox(height: 12),
+                OpsPanel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const OpsHeading('Pricing & inventory'),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _field(
+                              _price,
+                              'Price (INR)',
+                              numeric: true,
+                              validator: (s) {
+                                final v = double.tryParse(s ?? '');
+                                return v == null || v <= 0 || v > 99999999
+                                    ? 'Enter a valid price'
+                                    : null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: _field(
+                              _stock,
+                              'Stock (units)',
+                              numeric: true,
+                              validator: (s) {
+                                final v = double.tryParse(s ?? '');
+                                return v == null ||
+                                        !v.isFinite ||
+                                        v < 0 ||
+                                        v > 99999999 ||
+                                        !RegExp(r'^\d+(\.\d{1,2})?$')
+                                            .hasMatch(s?.trim() ?? '')
+                                    ? 'Enter a stock quantity with up to 2 decimals'
+                                    : null;
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: _field(
-                      _stock,
-                      'Stock (units)',
-                      numeric: true,
-                      validator: (s) {
-                        final v = double.tryParse(s ?? '');
-                        return v == null ||
-                                !v.isFinite ||
-                                v < 0 ||
-                                v > 99999999 ||
-                                !RegExp(r'^\d+(\.\d{1,2})?$')
-                                    .hasMatch(s?.trim() ?? '')
-                            ? 'Enter a stock quantity with up to 2 decimals'
-                            : null;
-                      },
-                    ),
+                ),
+                const SizedBox(height: 12),
+                OpsPanel(
+                  child: ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    maintainState: true,
+                    title: const Text('More details'),
+                    subtitle: const Text('Optional brand, SKU and description'),
+                    children: [
+                      const SizedBox(height: 12),
+                      _field(_brand, 'Brand (optional)'),
+                      _field(_sku, 'SKU (optional)'),
+                      _field(_description, 'Product description', lines: 3),
+                    ],
                   ),
-                ],
-              ),
-              _field(_sku, 'SKU (optional)'),
-              _field(_description, 'Product description', lines: 4),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Available for purchase'),
-                subtitle: const Text(
-                  'Stock is checked automatically at checkout.',
                 ),
-                value: _available,
-                onChanged: _busy ? null : (v) => setState(() => _available = v),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _published,
-                title: const Text('Publish in customer store'),
-                subtitle: const Text(
-                  'Hidden products stay in your inventory and existing order history.',
+                const SizedBox(height: 12),
+                OpsPanel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const OpsHeading('Availability'),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Available for purchase'),
+                        subtitle: const Text('Stock is checked at checkout.'),
+                        value: _available,
+                        onChanged: _busy
+                            ? null
+                            : (v) => setState(() => _available = v),
+                      ),
+                      const Divider(height: 12),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Publish in customer store'),
+                        subtitle: const Text(
+                          'Hidden products stay in inventory and order history.',
+                        ),
+                        value: _published,
+                        onChanged: _busy
+                            ? null
+                            : (v) => setState(() => _published = v),
+                      ),
+                    ],
+                  ),
                 ),
-                onChanged: _busy ? null : (v) => setState(() => _published = v),
-              ),
-              const SizedBox(height: 22),
-              FilledButton(
-                onPressed: _busy || _uploading || _namePending ? null : _save,
-                child: Text(
-                  _busy
-                      ? 'Saving product...'
-                      : widget.product == null
-                      ? (_published ? 'Publish product' : 'Save hidden product')
-                      : 'Save changes',
-                ),
-              ),
-              const SizedBox(height: 30),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -2182,114 +2587,195 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
         title: Text('Order ${_order.shortId}'),
         actions: [
           IconButton(
+            tooltip: 'Refresh order',
             onPressed: _busy ? null : _reloadOrder,
             icon: const Icon(Icons.refresh),
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          if (_refreshError != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                _refreshError!,
-                style: const TextStyle(color: Colors.red),
+      bottomNavigationBar:
+          !_order.canFulfill || !['New', 'Preparing'].contains(_order.status)
+          ? null
+          : SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: FilledButton.icon(
+                  onPressed: _busy ? null : _advance,
+                  icon: Icon(
+                    _order.status == 'New'
+                        ? Icons.shopping_bag_outlined
+                        : Icons.inventory_2_outlined,
+                    size: 18,
+                  ),
+                  label: Text(
+                    _busy
+                        ? 'Updating?'
+                        : _order.status == 'New'
+                        ? 'Accept & start preparing'
+                        : 'Items checked ? mark packed',
+                  ),
+                ),
               ),
             ),
-          Card(
-            color: storeGreen,
-            child: Padding(
-              padding: const EdgeInsets.all(20),
+      body: AdminCanvas(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
+            if (_refreshError != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  _refreshError!,
+                  style: const TextStyle(color: opsRed),
+                ),
+              ),
+            OpsPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SelectableText(
+                          _order.id,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(child: AdminStatusBadge(_order.status)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    opsTime(_order.data['created_at']),
+                    style: const TextStyle(fontSize: 11, color: opsMuted),
+                  ),
+                  const Divider(height: 24),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Order total',
+                          style: TextStyle(color: opsMuted),
+                        ),
+                      ),
+                      Text(
+                        money(_order.total),
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  AdminStatusBadge(
+                    _order.paymentStatus == 'cod'
+                        ? 'Cash due at delivery'
+                        : _order.paymentStatus == 'collected'
+                        ? 'Cash collected'
+                        : _order.paymentStatus,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            OpsPanel(
+              color: opsMint,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     'NEXT ACTION',
                     style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 11,
-                      letterSpacing: 1.5,
+                      fontSize: 10,
+                      letterSpacing: 1.2,
+                      color: opsForestGreen,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     _order.nextAction,
                     style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          SelectableText(
-            _order.id,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              StatusChip(_order.status),
-              if (_order.status != 'Cancelled')
-                StatusChip(_order.paymentStatus),
-            ],
-          ),
-          const SizedBox(height: 22),
-          CodPaymentCard(order: _order),
-          const SizedBox(height: 16),
-          OrderJourney(order: _order),
-          if (_order.status == 'Cancelled')
-            Card(
-              color: const Color(0xFFFFF0E2),
-              child: ListTile(
-                leading: const Icon(Icons.cancel_outlined),
-                title: const Text('Cancelled · no cash due'),
-                subtitle: Text(
-                  '${_order.data['cancellation_reason']}\nReserved stock has been released.',
-                ),
-              ),
-            ),
-          if ([
-            'Out for Delivery',
-            'Delivery Attempted',
-            'Delivered',
-          ].contains(_order.status))
-            DeliveryTrackingCard(orderId: _order.id, admin: true),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(18),
+            const SizedBox(height: 12),
+            OpsPanel(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const OpsHeading('Order journey'),
+                  OrderJourney(order: _order),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            OpsPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const OpsHeading('Cash on delivery'),
                   Text(
-                    '${_order.data['customer_name']}',
+                    _order.status == 'Cancelled'
+                        ? 'Cancelled · no cash due'
+                        : _order.paymentStatus == 'collected'
+                        ? (_order.data['cash_handover'] != null ||
+                                  _order.data['cash_received_directly'] == true
+                              ? 'Cash received by store'
+                              : 'Cash with delivery employee · handover pending')
+                        : _order.paymentStatus == 'cod'
+                        ? '${money(_order.total)} to collect from customer'
+                        : 'Payment status: ${_order.paymentStatus}',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  if (_order.status == 'Cancelled')
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        '${_order.data['cancellation_reason'] ?? ''}\nReserved stock has been released.',
+                        style: const TextStyle(color: opsMuted, fontSize: 12),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            OpsPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const OpsHeading('Customer & address'),
+                  Text(
+                    '${_order.data['customer_name'] ?? ''}',
                     style: const TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 6),
                   SelectableText(
-                    '${_order.data['customer_phone']}\n${_order.data['delivery_address']}',
-                    style: const TextStyle(height: 1.6),
+                    '${_order.data['customer_phone'] ?? ''}\n${_order.data['delivery_address'] ?? ''}',
+                    style: const TextStyle(fontSize: 13, height: 1.6),
                   ),
                   Wrap(
-                    spacing: 12,
+                    spacing: 8,
                     children: [
                       TextButton.icon(
                         onPressed: () => openDeliveryLink(
                           context,
                           directionsForOrder(_order),
                         ),
-                        icon: const Icon(Icons.directions_outlined),
+                        icon: const Icon(Icons.directions_outlined, size: 17),
                         label: const Text('Google Maps'),
                       ),
                       TextButton.icon(
@@ -2300,7 +2786,7 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
                             path: '${_order.data['customer_phone']}',
                           ),
                         ),
-                        icon: const Icon(Icons.call_outlined),
+                        icon: const Icon(Icons.call_outlined, size: 17),
                         label: const Text('Call customer'),
                       ),
                     ],
@@ -2309,212 +2795,288 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
                       .isNotEmpty)
                     Text(
                       'Instructions: ${_order.data['delivery_instructions']}',
+                      style: const TextStyle(fontSize: 12, color: opsMuted),
                     ),
                 ],
               ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          for (final i in _order.items)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(productLabel(i)),
-              subtitle: Text('${i['unit']} \u00d7 ${i['quantity']}'),
-              trailing: Text(money(amount(i['total_price']))),
-            ),
-          const Divider(),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Order total'),
-            trailing: Text(
-              money(_order.total),
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-            ),
-          ),
-          if (_order.canFulfill) ...[
-            const SizedBox(height: 22),
-            const Text(
-              'Assign delivery employee',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 14),
-            OutlinedButton.icon(
-              onPressed: _busy || _order.status == 'Out for Delivery'
-                  ? null
-                  : () async {
-                      final employee =
-                          await Navigator.push<Map<String, dynamic>>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const EmployeePickerScreen(),
-                            ),
-                          );
-                      if (employee != null && mounted) {
-                        setState(() {
-                          _person = employee['id'];
-                          _personName = employee['name'];
-                        });
-                        await _update();
-                      }
-                    },
-              icon: const Icon(Icons.person_search_outlined),
-              label: Text(
-                _personName.isEmpty
-                    ? 'Choose employee & save assignment'
-                    : '$_personName · change assignment',
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'Choose a verified employee. Their assigned order appears automatically in the employee app. They collect the items after packing.',
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.5,
-                  color: Colors.black54,
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _minutes,
-              enabled: !_busy,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Estimated arrival in minutes (optional)',
-                helperText: '30 means about 30 minutes from saving. The customer sees the estimated arrival time in Track my order.',
-                helperMaxLines: 3,
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _note,
-              enabled: !_busy,
-              maxLength: 255,
-              decoration: const InputDecoration(
-                labelText: 'Message to customer (optional)',
-                helperText: 'A delivery update shown on the customer’s order, such as a delay or arrival note.',
-                helperMaxLines: 3,
-              ),
-            ),
-            const SizedBox(height: 14),
-            OutlinedButton(
-              onPressed: _busy ? null : () => _update(),
-              child: const Text('Save arrival time & customer message'),
             ),
             const SizedBox(height: 12),
-            if (['New', 'Preparing'].contains(_order.status))
-              FilledButton(
-                onPressed: _busy ? null : _advance,
-                child: Text(
-                  _busy
-                      ? 'Updating...'
-                      : _order.nextStatus == 'Delivered' &&
-                            _order.paymentStatus == 'cod'
-                      ? 'Confirm cash & complete delivery'
-                      : _order.status == 'Delivery Attempted'
-                      ? 'Retry delivery'
-                      : _order.status == 'New'
-                      ? 'Accept order & start preparation'
-                      : 'Items checked · mark packed',
-                ),
-              ),
-            if ([
-              'Packed',
-              'Out for Delivery',
-              'Delivery Attempted',
-            ].contains(_order.status)) ...[
-              const SizedBox(height: 12),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.delivery_dining, color: storeGreen),
-                  title: Text(
-                    _personName.isEmpty
-                        ? 'Choose an employee to continue'
-                        : _personName,
-                  ),
-                  subtitle: Text(
-                    _order.status == 'Packed'
-                        ? 'Employee picks up from their app. Customer can find their delivery code in Track my order.'
-                        : 'Employee handles navigation, cash collection and customer code verification.',
-                  ),
-                ),
-              ),
-              ExpansionTile(
-                title: const Text('Admin delivery assistance'),
-                subtitle: const Text('Use only when helping an employee'),
+            OpsPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: Text(
-                      'An assigned, verified employee is still required. Completion requires the customer’s delivery code and exact cash amount.',
+                  OpsHeading('Items (${_order.items.length})'),
+                  for (final i in _order.items)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 46,
+                            child: ProductPhoto(
+                              '${i['image_url'] ?? ''}',
+                              height: 46,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  productLabel(i),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                Text(
+                                  '${i['unit']} × ${i['quantity']}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: opsMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            money(amount(i['total_price'])),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  FilledButton(
-                    onPressed: _busy || _person == null ? null : _advance,
-                    child: Text(
-                      _order.status == 'Out for Delivery'
-                          ? 'Verify customer code & cash'
-                          : 'Confirm employee pickup & dispatch',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
                 ],
               ),
-            ],
-            if (_order.status == 'Out for Delivery') ...[
+            ),
+            if (_order.canFulfill) ...[
               const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: _busy ? null : _recordAttempt,
-                icon: const Icon(Icons.report_outlined),
-                label: const Text('Delivery could not be completed'),
+              OpsPanel(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const OpsHeading('Delivery assignment'),
+                    Row(
+                      children: [
+                        const AdminIcon(Icons.delivery_dining),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _personName.isEmpty
+                                ? 'No employee assigned'
+                                : _personName,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _busy || _order.status == 'Out for Delivery'
+                            ? null
+                            : () async {
+                                final employee = await showAdminEmployeePicker(
+                                  context,
+                                );
+                                if (employee != null && mounted) {
+                                  setState(() {
+                                    _person = employee['id'];
+                                    _personName = employee['name'];
+                                  });
+                                  await _update();
+                                }
+                              },
+                        icon: const Icon(
+                          Icons.person_search_outlined,
+                          size: 18,
+                        ),
+                        label: Text(
+                          _personName.isEmpty
+                              ? 'Choose verified employee'
+                              : 'Change assignment',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Employee picks up the packed order from their app and completes delivery with the customer code and exact cash.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: opsMuted,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(height: 12),
+              OpsPanel(
+                child: ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  maintainState: true,
+                  title: const Text('Arrival & customer update'),
+                  subtitle: const Text(
+                    'Set an estimate or send a delivery update',
+                  ),
+                  children: [
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _minutes,
+                      enabled: !_busy,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Estimated arrival · minutes (optional)',
+                        helperText: '30 means about 30 minutes from saving. Customer sees this estimate in Track my order.',
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: _note,
+                      enabled: !_busy,
+                      maxLength: 255,
+                      decoration: const InputDecoration(
+                        labelText: 'Message to customer (optional)',
+                        helperText: 'A delivery update visible to the customer, such as a delay or arrival note.',
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: _busy ? null : () => _update(),
+                        child: const Text('Save estimate & message'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if ([
+                'Packed',
+                'Out for Delivery',
+                'Delivery Attempted',
+              ].contains(_order.status)) ...[
+                const SizedBox(height: 12),
+                OpsPanel(
+                  child: ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    title: const Text('Admin delivery assistance'),
+                    subtitle: const Text('Use when helping an employee'),
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: Text(
+                          'An assigned, verified employee is required. Completion needs the customer delivery code and exact cash amount.',
+                          style: TextStyle(fontSize: 12, color: opsMuted),
+                        ),
+                      ),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: _busy || _person == null ? null : _advance,
+                          child: Text(
+                            _order.status == 'Out for Delivery'
+                                ? 'Verify code & cash'
+                                : 'Confirm pickup & dispatch',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (_order.status == 'Out for Delivery') ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _recordAttempt,
+                  icon: const Icon(Icons.report_outlined),
+                  label: const Text('Delivery could not be completed'),
+                ),
+              ],
+              if ([
+                    'New',
+                    'Preparing',
+                    'Packed',
+                    'Delivery Attempted',
+                  ].contains(_order.status) &&
+                  _order.paymentStatus == 'cod') ...[
+                const SizedBox(height: 12),
+                OpsPanel(
+                  color: opsRedBg,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Cancellation',
+                        style: TextStyle(
+                          color: opsRed,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _busy ? null : _cancelOrder,
+                        style: TextButton.styleFrom(foregroundColor: opsRed),
+                        icon: const Icon(Icons.cancel_outlined),
+                        label: const Text('Cancel order & restore stock'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
             if ([
-                  'New',
-                  'Preparing',
-                  'Packed',
-                  'Delivery Attempted',
-                ].contains(_order.status) &&
-                _order.paymentStatus == 'cod') ...[
+              'Out for Delivery',
+              'Delivery Attempted',
+              'Delivered',
+            ].contains(_order.status)) ...[
               const SizedBox(height: 12),
-              TextButton.icon(
-                onPressed: _busy ? null : _cancelOrder,
-                icon: const Icon(Icons.cancel_outlined),
-                label: const Text('Cancel order & restore stock'),
-              ),
+              DeliveryTrackingCard(orderId: _order.id, admin: true),
             ],
+            if (_order.paymentStatus == 'pending')
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  'Previous incomplete online checkout. It can be cancelled; new orders use cash on delivery.',
+                ),
+              ),
+            if (_order.paymentStatus == 'review')
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  'Previous online payment needs manual store review. Check original payment records before fulfillment.',
+                ),
+              ),
+            const SizedBox(height: 16),
+            OpsPanel(
+              child: ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: const Text('Audit timeline'),
+                children: [
+                  for (final event in _order.events)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const AdminIcon(
+                        Icons.check_circle_outline,
+                        size: 30,
+                      ),
+                      title: Text('${event['status']}'),
+                      subtitle: Text('${event['note'] ?? ''}'),
+                      trailing: Text(
+                        opsTime(event['created_at']),
+                        style: const TextStyle(fontSize: 9, color: opsMuted),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ],
-          if (_order.paymentStatus == 'pending')
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Text(
-                'This is a previous incomplete online checkout. It can be cancelled; new orders use cash on delivery.',
-              ),
-            ),
-          if (_order.paymentStatus == 'review')
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Text(
-                'A previous online payment needs manual store review. Check the original payment records before fulfillment.',
-              ),
-            ),
-          const SizedBox(height: 24),
-          const Text(
-            'Activity',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-          ),
-          for (final event in _order.events)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(
-                Icons.check_circle_outline,
-                color: storeGreen,
-              ),
-              title: Text('${event['status']}'),
-              subtitle: Text('${event['note']}'),
-            ),
-        ],
+        ),
       ),
     ),
   );

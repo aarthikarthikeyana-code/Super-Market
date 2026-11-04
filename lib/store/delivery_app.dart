@@ -649,67 +649,95 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
                 ),
                 DeliveryTrackingCard(orderId: _order.id, employee: true),
               ],
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${_order.data['customer_name']}',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
+              // Modern Zomato / Rapido Style Action Hub
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFDDE8E1)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE9F8EF),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.person_pin_circle_rounded, color: Color(0xFF16A05D), size: 24),
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      SelectableText(
-                        '${_order.data['customer_phone']}\n${_order.data['delivery_address']}',
-                        style: const TextStyle(height: 1.7),
-                      ),
-                      if ('${_order.data['delivery_instructions'] ?? ''}'
-                          .isNotEmpty)
-                        Text(
-                          'Instructions: ${_order.data['delivery_instructions']}',
-                          style: const TextStyle(height: 1.5),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${_order.data['customer_name']}',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF15211A),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${_order.data['customer_phone']}',
+                                style: const TextStyle(fontSize: 13, color: Color(0xFF69756F), fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
                         ),
-                      TextButton.icon(
+                        IconButton.filled(
+                          style: IconButton.styleFrom(backgroundColor: const Color(0xFF16A05D)),
+                          icon: const Icon(Icons.call_rounded, color: Colors.white, size: 20),
+                          onPressed: () => openDeliveryLink(
+                            context,
+                            Uri(scheme: 'tel', path: '${_order.data['customer_phone']}'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 24),
+                    Text(
+                      '${_order.data['delivery_address']}',
+                      style: const TextStyle(height: 1.5, fontSize: 13.5, color: Color(0xFF15211A)),
+                    ),
+                    const SizedBox(height: 14),
+                    // Zomato/Rapido Google Maps Turn-by-Turn Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1976D2),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        icon: const Icon(Icons.directions_bike_rounded, size: 22),
+                        label: const Text(
+                          'Turn-by-Turn GPS Navigation',
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                        ),
                         onPressed: () => openDeliveryLink(
                           context,
                           directionsForOrder(_order),
                         ),
-                        icon: const Icon(Icons.navigation_outlined),
-                        label: const Text('Navigate with Google Maps'),
                       ),
-                      TextButton.icon(
-                        onPressed: () => openDeliveryLink(
-                          context,
-                          Uri(
-                            scheme: 'tel',
-                            path: '${_order.data['customer_phone']}',
-                          ),
-                        ),
-                        icon: const Icon(Icons.call_outlined),
-                        label: const Text('Call customer'),
-                      ),
-                      TextButton.icon(
-                        onPressed: () async {
-                          await Clipboard.setData(
-                            ClipboardData(
-                              text: '${_order.data['delivery_address']}',
-                            ),
-                          );
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Address copied')),
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.copy, size: 17),
-                        label: const Text('Copy address'),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 16),

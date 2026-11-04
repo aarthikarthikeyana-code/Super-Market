@@ -34,6 +34,43 @@ def lookup_pincode(pincode):
         raise ServiceUnavailable('PIN lookup is temporarily unavailable. Enter your city/town and state manually.') from None
 
 
+def reverse_geocode(latitude, longitude):
+    import json
+    from urllib.request import Request, urlopen
+    from django.core.cache import cache
+    key = f'reverse-geo-v1:{latitude:.4f}:{longitude:.4f}'
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    try:
+        url = f'https://nominatim.openstreetmap.org/reverse?lat={latitude}&lon={longitude}&format=json&addressdetails=1'
+        req = Request(url, headers={'User-Agent': 'AgaramSupermarketApp/1.0 (agaram.supermarket@gmail.com)', 'Accept': 'application/json'})
+        with urlopen(req, timeout=6) as resp:
+            data = json.loads(resp.read(1024 * 1024))
+        addr = data.get('address', {})
+        line1_parts = [addr.get(k) for k in ['house_number', 'building', 'amenity', 'road'] if addr.get(k)]
+        line2_parts = [addr.get(k) for k in ['neighbourhood', 'suburb', 'residential', 'commercial'] if addr.get(k)]
+        city = addr.get('city') or addr.get('town') or addr.get('village') or addr.get('county') or ''
+        state = addr.get('state') or ''
+        pincode = addr.get('postcode') or ''
+        landmark = addr.get('landmark') or addr.get('amenity') or ''
+        result = {
+            'line1': ', '.join(line1_parts) if line1_parts else data.get('name', ''),
+            'line2': ', '.join(line2_parts) if line2_parts else '',
+            'city': city,
+            'state': state,
+            'pincode': pincode,
+            'landmark': landmark,
+            'display_name': data.get('display_name', '')
+        }
+        cache.set(key, result, 86400)
+        return result
+    except Exception as e:
+        logger.warning('Reverse geocoding failed: %s', e)
+        return {'line1': '', 'line2': '', 'city': '', 'state': '', 'pincode': '', 'landmark': '', 'display_name': ''}
+
+
+
 def upload_image(file):
     import cloudinary
     import cloudinary.uploader
