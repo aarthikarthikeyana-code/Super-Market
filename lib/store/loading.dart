@@ -138,7 +138,7 @@ class _AppSkeletonState extends State<AppSkeleton>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _box(width: 50, height: 16),
+                    Flexible(child: _box(width: 50, height: 16)),
                     _box(width: 32, height: 32, radius: 16),
                   ],
                 ),

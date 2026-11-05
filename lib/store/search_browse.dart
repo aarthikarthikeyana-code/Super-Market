@@ -872,7 +872,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: constraints.maxWidth > 700 ? 4 : 2,
-                  mainAxisExtent: 278,
+                  mainAxisExtent: groceryProductCardExtent(
+                    context,
+                    (constraints.maxWidth -
+                            32 -
+                            (constraints.maxWidth > 700 ? 3 : 1) * 12) /
+                        (constraints.maxWidth > 700 ? 4 : 2),
+                  ),
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                 ),
@@ -957,7 +963,9 @@ mixin CatalogActions<T extends ConsumerStatefulWidget> on ConsumerState<T> {
               ProductPhoto(product.imageUrl, height: 210, fit: BoxFit.contain),
               const SizedBox(height: 16),
               Text(
-                product.name,
+                product.tamilName.trim().isNotEmpty
+                    ? product.tamilName.trim()
+                    : product.name,
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
@@ -965,7 +973,7 @@ mixin CatalogActions<T extends ConsumerStatefulWidget> on ConsumerState<T> {
               ),
               if (product.brand.isNotEmpty) Text(product.brand),
               Text(
-                '${money(product.price)} · ${product.unit}',
+                '${money(product.price)} · ${groceryUnitLabel(product.unit)}',
                 style: const TextStyle(fontSize: 18, color: storeForestGreen),
               ),
               const SizedBox(height: 12),
@@ -985,7 +993,7 @@ mixin CatalogActions<T extends ConsumerStatefulWidget> on ConsumerState<T> {
   }
 }
 
-// Existing green/cream two-panel browse, populated entirely by catalog facets.
+// The home page and browse rail share the same eleven illustrated departments.
 class BrowseGroceriesScreen extends ConsumerStatefulWidget {
   const BrowseGroceriesScreen({super.key});
   @override
@@ -994,21 +1002,10 @@ class BrowseGroceriesScreen extends ConsumerStatefulWidget {
 
 class _BrowseGroceriesState extends ConsumerState<BrowseGroceriesScreen>
     with CatalogActions<BrowseGroceriesScreen> {
-  String? _selectedCategory;
-  void _open({String? category, String? brand, String? collection}) =>
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => SearchScreen(
-            initialCategory: category,
-            initialBrand: brand,
-            initialCollection: collection,
-          ),
-        ),
-      );
+  Map<String, String>? _selectedDepartment;
+
   void _refresh() {
     ref.read(storeApiProvider).clearPublicCache();
-    ref.invalidate(catalogBrowseProvider);
     ref.read(storeApiProvider).feedChanges.value++;
   }
 
@@ -1018,6 +1015,8 @@ class _BrowseGroceriesState extends ConsumerState<BrowseGroceriesScreen>
     appBar: AppBar(
       title: const Text(
         'Browse Groceries',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: storeForestGreen,
           fontWeight: FontWeight.w900,
@@ -1040,224 +1039,161 @@ class _BrowseGroceriesState extends ConsumerState<BrowseGroceriesScreen>
         ),
       ],
     ),
-    body: DataView(
-      value: ref.watch(catalogBrowseProvider),
-      onRetry: _refresh,
-      builder: (data) {
-        final categories = catalogEntries(data, 'categories');
-        final brands = catalogEntries(data, 'brands');
-        final collections = catalogEntries(data, 'collections');
-        if (categories.isEmpty) {
-          return EmptyPanel(
-            icon: Icons.shopping_basket_outlined,
-            title: 'Groceries are on their way',
-            message: 'Published groceries will appear here when the store adds them.',
-            action: 'Refresh',
-            onAction: _refresh,
-          );
-        }
-        return Column(
+    body: LayoutBuilder(
+      builder: (context, constraints) {
+        final railWidth = (constraints.maxWidth * .25).clamp(80.0, 120.0);
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (collections.isNotEmpty)
-              Container(
+            SizedBox(
+              width: railWidth,
+              child: Material(
                 color: Colors.white,
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                child: SizedBox(
-                  height: 40,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: collections.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (_, i) => ActionChip(
-                      avatar: const Icon(
-                        Icons.shopping_bag_outlined,
-                        size: 17,
-                        color: storeForestGreen,
+                child: Column(
+                  children: [
+                    _railEntry(null),
+                    const Divider(height: 1, color: storeBorder),
+                    Expanded(
+                      child: ListView.builder(
+                        key: const ValueKey('browse-rail-list'),
+                        padding: const EdgeInsets.only(bottom: 12),
+                        itemCount: homeGroceryCategories.length,
+                        itemBuilder: (_, index) =>
+                            _railEntry(homeGroceryCategories[index]),
                       ),
-                      backgroundColor: storeMint,
-                      label: Text('${collections[i]['label']}'),
-                      onPressed: () => _open(collection: collections[i]['key']),
                     ),
-                  ),
+                  ],
                 ),
               ),
-            Expanded(
-              child: Row(
-                children: [
-                  Container(
-                    width: MediaQuery.sizeOf(context).width < 350 ? 88 : 104,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      border: Border(right: BorderSide(color: storeBorder)),
-                    ),
-                    child: ListView(
-                      children: [
-                        _rail('All groceries', null),
-                        for (final category in categories)
-                          _rail('${category['name']}', '${category['name']}'),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: _selectedCategory == null
-                        ? ListView(
-                            padding: const EdgeInsets.all(12),
-                            children: [
-                              const Text(
-                                'Shop by category',
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w800,
-                                  color: storeInk,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              _facetGrid(categories, false),
-                              if (brands.isNotEmpty) ...[
-                                const SizedBox(height: 20),
-                                const Text(
-                                  'Shop by brand',
-                                  style: TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                _facetGrid(brands, true),
-                              ],
-                            ],
-                          )
-                        : _categoryProducts(),
-                  ),
-                ],
-              ),
             ),
+            const VerticalDivider(width: 1, thickness: 1, color: storeBorder),
+            Expanded(child: _products()),
           ],
         );
       },
     ),
   );
 
-  Widget _rail(String label, String? category) => InkWell(
-    onTap: () => setState(() => _selectedCategory = category),
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 16),
-      decoration: BoxDecoration(
-        color: _selectedCategory == category ? storeMint : Colors.white,
-        border: Border(
-          left: BorderSide(
-            width: 4,
-            color: _selectedCategory == category
-                ? storeForestGreen
-                : Colors.transparent,
+  Widget _railEntry(Map<String, String>? category) {
+    final selected = category?['query'] == _selectedDepartment?['query'];
+    final title = category == null ? 'All Groceries' : category['tamil']!;
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: selected ? storeMint : Colors.white,
+        child: InkWell(
+          key: ValueKey(
+            category == null
+                ? 'browse-all'
+                : 'browse-category-${category['query']}',
           ),
-        ),
-      ),
-      child: Column(
-        children: [
-          const Icon(
-            Icons.shopping_basket_outlined,
-            color: storeForestGreen,
-            size: 22,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
-    ),
-  );
-
-  Widget _facetGrid(List<Map<String, dynamic>> entries, bool brand) =>
-      LayoutBuilder(
-        builder: (context, constraints) => GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: entries.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: constraints.maxWidth < 180 ? 1 : 2,
-            mainAxisExtent:
-                160 + 44 * (MediaQuery.textScalerOf(context).scale(1) - 1),
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 10,
-          ),
-          itemBuilder: (_, i) {
-            final entry = entries[i];
-            return Material(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () => _open(
-                  category: brand ? null : entry['name'],
-                  brand: brand ? entry['name'] : null,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: '${entry['image_url'] ?? ''}'.isEmpty
-                            ? const Icon(
-                                Icons.shopping_basket_outlined,
-                                size: 36,
-                                color: storeForestGreen,
-                              )
-                            : ProductPhoto(
-                                '${entry['image_url']}',
-                                height: 84,
-                                fit: BoxFit.contain,
-                              ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '${entry['name']}',
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      Text(
-                        '${entry['count']} products',
-                        style: const TextStyle(fontSize: 10, color: storeGrey),
-                      ),
-                    ],
-                  ),
+          onTap: () => setState(() => _selectedDepartment = category),
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border(
+                left: BorderSide(
+                  width: 3,
+                  color: selected ? storeForestGreen : Colors.transparent,
                 ),
               ),
-            );
-          },
-        ),
-      );
-
-  Widget _categoryProducts() {
-    final api = ref.watch(storeApiProvider);
-    final cart = ref.watch(storeCartProvider);
-    final saved = ref.watch(wishlistIdsProvider).asData?.value ?? <String>[];
-    return PagedFeed<StoreProduct>(
-      queryKey: ('browseCategory', _selectedCategory),
-      changes: api.feedChanges,
-      beforeRefresh: api.clearPublicCache,
-      load: (cursor) =>
-          api.productPage(cursor: cursor, category: _selectedCategory!),
-      identity: (p) => p.id,
-      header: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Text(
-          _selectedCategory!,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 13),
+            child: Column(
+              children: [
+                if (category == null)
+                  const Icon(
+                    Icons.grid_view_rounded,
+                    color: storeForestGreen,
+                    size: 24,
+                  )
+                else
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(11),
+                    child: SizedBox(
+                      width: 54,
+                      height: 54,
+                      child: Image.asset(
+                        category['asset']!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const Icon(
+                          Icons.shopping_basket_outlined,
+                          color: storeForestGreen,
+                        ),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 7),
+                Text(
+                  title,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: category == null ? null : 'NotoSansTamil',
+                    fontSize: category == null ? 10.5 : 11.5,
+                    height: 1.45,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                    color: selected ? storeForestGreen : storeInk,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
-      padding: const EdgeInsets.all(10),
-      itemBuilder: (_, product, _) => SizedBox(
-        height: 290,
-        child: ProductCard(
+    );
+  }
+
+  Widget _products() => LayoutBuilder(
+    builder: (context, constraints) {
+      final api = ref.watch(storeApiProvider);
+      final metadata =
+          ref.watch(catalogBrowseProvider).asData?.value ?? <String, dynamic>{};
+      final category = _selectedDepartment == null
+          ? 'All'
+          : groceryCategoryQuery(
+              _selectedDepartment!,
+              catalogEntries(metadata, 'categories'),
+            );
+      final cart = ref.watch(storeCartProvider);
+      final saved = ref.watch(wishlistIdsProvider).asData?.value ?? <String>[];
+      final cardWidth = (constraints.maxWidth - 16 - 8) / 2;
+      return PagedFeed<StoreProduct>(
+        key: const ValueKey('browse-product-grid'),
+        queryKey: ('browseDepartment', category),
+        changes: api.feedChanges,
+        beforeRefresh: api.clearPublicCache,
+        load: (cursor) => api.productPage(cursor: cursor, category: category),
+        identity: (p) => p.id,
+        header: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 15, 8, 12),
+          child: Text(
+            _selectedDepartment == null
+                ? 'All Groceries'
+                : _selectedDepartment!['tamil']!,
+            style: TextStyle(
+              fontFamily: _selectedDepartment == null ? null : 'NotoSansTamil',
+              fontSize: 16,
+              height: 1.45,
+              fontWeight: FontWeight.w800,
+              color: storeForestGreen,
+            ),
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(8, 0, 8, 20),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisExtent: groceryProductCardExtent(
+            context,
+            cardWidth,
+            compact: true,
+          ),
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 12,
+        ),
+        itemBuilder: (_, product, _) => PremiumProductCard(
+          compact: true,
           product: product,
           cartQuantity: cart
               .where((l) => l.product.id == product.id)
@@ -1270,11 +1206,11 @@ class _BrowseGroceriesState extends ConsumerState<BrowseGroceriesScreen>
               ref.read(storeCartProvider.notifier).change(product.id, -1),
           onToggleWishlist: () => _toggleProduct(product),
         ),
-      ),
-      emptyTitle: 'No groceries available',
-      emptyMessage: 'Refresh or choose another category.',
-    );
-  }
+        emptyTitle: 'No groceries available',
+        emptyMessage: 'Refresh the catalog or select All Groceries.',
+      );
+    },
+  );
 }
 
 class ProductFilterSheet extends ConsumerStatefulWidget {

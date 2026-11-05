@@ -299,3 +299,6 @@ remains under admin assistance with the existing verification requirements.
 Three additional temporary widget checks cover filtering, selection mode,
 required-field validation, full-width headers and 320/360/412-pixel layouts with
 normal and larger text. Private-data previews use explicit empty states only.
+
+
+Home, the Categories selector and Browse Groceries share `homeGroceryCategories`: the same eleven existing Tamil department names and illustrated category assets. Browse starts with All Groceries, then these eleven departments; it does not use individual product thumbnails in the rail. Category labels resolve against actual admin category names, with English/Tamil aliases, before requesting real backend products. Unconfigured/empty categories remain empty. The right side keeps two compact product cards per row with a shorter title area and slightly reduced height. Product images still come from admin uploads, and display units use English kg/g without changing stored quantities. This frontend correction requires no backend migration.

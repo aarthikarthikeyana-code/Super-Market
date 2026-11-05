@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'state.dart';
@@ -48,8 +47,12 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
     _signedIn =
         widget.initialEmployeeCode == null && _api.deliveryToken != null;
     _api.staffChanges.addListener(_staffChanged);
+    if (_signedIn) ref.read(deliveryTrackerProvider).syncActiveTrips();
     _poll = Timer.periodic(const Duration(seconds: 15), (_) {
-      if (_signedIn) refreshDelivery(ref);
+      if (_signedIn) {
+        refreshDelivery(ref);
+        ref.read(deliveryTrackerProvider).syncActiveTrips();
+      }
     });
   }
 
@@ -84,6 +87,7 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
       await ref.read(deliverySummaryProvider.future);
       if (!mounted) return;
       setState(() => _signedIn = true);
+      ref.read(deliveryTrackerProvider).syncActiveTrips();
     } catch (e) {
       if (mounted) {
         setState(() => _error = e.toString());
@@ -302,19 +306,19 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
                 listenable: ref.watch(deliveryTrackerProvider),
                 builder: (context, _) {
                   final tracker = ref.read(deliveryTrackerProvider);
-                  if (tracker.orders.isEmpty) return const SizedBox.shrink();
+                  if (tracker.orders.isEmpty && tracker.error == null) {
+                    return const SizedBox.shrink();
+                  }
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.my_location, color: storeGreen),
                     title: Text(
-                      'Sharing ${tracker.orders.length} active trips',
+                      tracker.orders.isEmpty
+                          ? 'Live tracking needs attention'
+                          : 'Sharing ${tracker.orders.length} active trips',
                     ),
                     subtitle: Text(
                       tracker.error ?? 'Keep location enabled. Sharing stops when each delivery closes.',
-                    ),
-                    trailing: TextButton(
-                      onPressed: tracker.stop,
-                      child: const Text('Stop'),
                     ),
                   );
                 },
@@ -518,7 +522,7 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
         builder: (ctx) => AlertDialog(
           title: const Text('Start this delivery?'),
           content: const Text(
-            'Check every packed item and confirm pickup. You can share this trip’s device location with the store and customer. Location permission will be requested; the customer’s code appears when delivery starts.',
+            'Check every packed item and confirm pickup. Live location is shared with the store and this customer only while this delivery is active. Enable location permission to start.',
           ),
           actions: [
             TextButton(
@@ -533,6 +537,13 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
         ),
       );
       if (pickup != true) return;
+      if (!mounted) return;
+      try {
+        await ref.read(deliveryTrackerProvider).ensureLocationPermission();
+      } catch (e) {
+        if (mounted) showStoreError(context, e);
+        return;
+      }
     }
     if (extra == null || !mounted) return;
     setState(() => _busy = true);
@@ -625,24 +636,20 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
                         subtitle: Text(
                           tracker.error ?? 'Share only during an active delivery. Android uses a visible trip notification. iOS/web need the app open.',
                         ),
-                        trailing: IconButton(
-                          icon: Icon(
-                            active
-                                ? Icons.stop_circle_outlined
-                                : Icons.play_circle_outline,
-                          ),
-                          onPressed: () async {
-                            if (active) {
-                              tracker.finish(_order.id);
-                              return;
-                            }
-                            try {
-                              await tracker.start(_order);
-                            } catch (e) {
-                              if (context.mounted) showStoreError(context, e);
-                            }
-                          },
-                        ),
+                        trailing: active
+                            ? null
+                            : IconButton(
+                                icon: Icon(Icons.play_circle_outline),
+                                onPressed: () async {
+                                  try {
+                                    await tracker.start(_order);
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      showStoreError(context, e);
+                                    }
+                                  }
+                                },
+                              ),
                       ),
                     );
                   },
@@ -676,7 +683,11 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
                             color: Color(0xFFE9F8EF),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.person_pin_circle_rounded, color: Color(0xFF16A05D), size: 24),
+                          child: const Icon(
+                            Icons.person_pin_circle_rounded,
+                            color: Color(0xFF16A05D),
+                            size: 24,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -694,17 +705,30 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
                               const SizedBox(height: 2),
                               Text(
                                 '${_order.data['customer_phone']}',
-                                style: const TextStyle(fontSize: 13, color: Color(0xFF69756F), fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF69756F),
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ],
                           ),
                         ),
                         IconButton.filled(
-                          style: IconButton.styleFrom(backgroundColor: const Color(0xFF16A05D)),
-                          icon: const Icon(Icons.call_rounded, color: Colors.white, size: 20),
+                          style: IconButton.styleFrom(
+                            backgroundColor: const Color(0xFF16A05D),
+                          ),
+                          icon: const Icon(
+                            Icons.call_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                           onPressed: () => openDeliveryLink(
                             context,
-                            Uri(scheme: 'tel', path: '${_order.data['customer_phone']}'),
+                            Uri(
+                              scheme: 'tel',
+                              path: '${_order.data['customer_phone']}',
+                            ),
                           ),
                         ),
                       ],
@@ -712,7 +736,11 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
                     const Divider(height: 24),
                     Text(
                       '${_order.data['delivery_address']}',
-                      style: const TextStyle(height: 1.5, fontSize: 13.5, color: Color(0xFF15211A)),
+                      style: const TextStyle(
+                        height: 1.5,
+                        fontSize: 13.5,
+                        color: Color(0xFF15211A),
+                      ),
                     ),
                     const SizedBox(height: 14),
                     // Zomato/Rapido Google Maps Turn-by-Turn Button
@@ -724,12 +752,20 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
                           backgroundColor: const Color(0xFF1976D2),
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
-                        icon: const Icon(Icons.directions_bike_rounded, size: 22),
+                        icon: const Icon(
+                          Icons.directions_bike_rounded,
+                          size: 22,
+                        ),
                         label: const Text(
                           'Turn-by-Turn GPS Navigation',
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                          ),
                         ),
                         onPressed: () => openDeliveryLink(
                           context,

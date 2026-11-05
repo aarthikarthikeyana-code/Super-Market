@@ -111,6 +111,7 @@ class StoreApi {
       }
     }
     final uri = Uri.parse(path);
+    final locationUpdate = method == 'POST' && uri.path.endsWith('/tracking/');
     final cacheable =
         method == 'GET' &&
         !admin &&
@@ -146,8 +147,9 @@ class StoreApi {
           json: jsonEncode(response.data),
         );
       }
-      if (method != 'GET') clearPublicCache();
+      if (method != 'GET' && !locationUpdate) clearPublicCache();
       if (method != 'GET' &&
+          !locationUpdate &&
           !path.contains('login') &&
           !path.contains('logout') &&
           !path.contains('session')) {
@@ -642,6 +644,25 @@ class StoreApi {
       admin: true,
     ).timeout(const Duration(seconds: 12));
     return data['matched'] == true ? data['tamil_name'] as String : null;
+  }
+
+  Future<List<String>> productCategories() async {
+    final data = await request(
+      'GET',
+      '/admin/product-categories/',
+      admin: true,
+    );
+    return List<String>.from(data['categories']);
+  }
+
+  Future<String> createProductCategory(String name) async {
+    final data = await request(
+      'POST',
+      '/admin/product-categories/',
+      admin: true,
+      data: {'name': name},
+    );
+    return data['name'] as String;
   }
 
   Future<void> deleteProduct(String id) async {

@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError
 from .commerce import cash_total, is_grocery_category
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from rest_framework import serializers
 from .models import Product, ProductImage, DeliveryPersonnel, EmployeeCodeSequence, Order, OrderItem, OrderEvent, CustomerProfile, CashHandover, NewItemRequest
 
@@ -28,27 +28,79 @@ def next_employee_code():
 
 
 class ProductSerializer(serializers.ModelSerializer):
+    base_price = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01'), required=False)
+    offer_percent = serializers.DecimalField(max_digits=5, decimal_places=2, min_value=Decimal('0'), max_value=Decimal('99.99'), required=False)
+    mrp = serializers.SerializerMethodField()
     tamil_name = serializers.CharField(required=True, allow_blank=False, max_length=120)
     english_name = serializers.CharField(required=False, allow_blank=True, default='', max_length=120)
-    category = serializers.CharField(max_length=60, default='Groceries')
+    category = serializers.CharField(max_length=60, required=True)
+    unit = serializers.RegexField(r'^\d+(?:\.\d{1,2})? (?:kg|g)$', max_length=40, required=True)
     image_url = serializers.SerializerMethodField()
     image = serializers.PrimaryKeyRelatedField(queryset=ProductImage.objects.all(), required=False, allow_null=True)
-    price = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01'))
+    price = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01'), required=False)
     stock_kg = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0'))
 
     def get_image_url(self, product):
         return product.image.secure_url if product.image_id else ''
 
+    def get_mrp(self, product):
+        return str(product.base_price or product.price)
+
+    def validate(self, attrs):
+        if not self.instance or any(k in attrs for k in ['tamil_name', 'image', 'is_active']):
+            image = attrs.get('image', self.instance.image if self.instance else None)
+            if not image:
+                raise serializers.ValidationError({'image': 'Upload a product photo before saving.'})
+        if 'tamil_name' in attrs and (not any('\u0b80' <= c <= '\u0bff' for c in attrs['tamil_name']) or any(c.isascii() and c.isalpha() for c in attrs['tamil_name'])):
+            raise serializers.ValidationError({'tamil_name': 'Please enter or convert the product name to Tamil.'})
+        if not self.instance or any(k in attrs for k in ['price', 'base_price', 'offer_percent']):
+            # Legacy clients send price as the actual selling price; new clients send base_price.
+            if 'price' in attrs and 'base_price' not in attrs:
+                base, offer = attrs['price'], Decimal('0')
+            else:
+                base = attrs.get('base_price', (self.instance.base_price or self.instance.price) if self.instance else None)
+                offer = attrs.get('offer_percent', self.instance.offer_percent if self.instance else Decimal('0'))
+            if base is None:
+                raise serializers.ValidationError({'base_price': 'Enter a price.'})
+            price = (base * (Decimal('100') - offer) / Decimal('100')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            if price < Decimal('0.01'):
+                raise serializers.ValidationError({'offer_percent': 'The selling price must be at least 0.01.'})
+            attrs.update(base_price=base, offer_percent=offer, price=price)
+        return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        from .models import ProductCodeSequence
+        ProductCodeSequence.objects.get_or_create(pk=1)
+        sequence = ProductCodeSequence.objects.select_for_update().get(pk=1)
+        while True:
+            sequence.last_number += 1
+            code = f'agmp{sequence.last_number:04d}'
+            if not Product.objects.filter(sku=code).exists():
+                break
+        sequence.save(update_fields=['last_number'])
+        validated_data['sku'] = code
+        return super().create(validated_data)
+
     def validate_category(self, category):
         if not is_grocery_category(category):
             raise serializers.ValidationError('This store sells groceries only; fresh fruit and vegetable categories are not supported.')
-        return category
+        from .models import ProductCategory
+        selected = ProductCategory.objects.filter(name__iexact=category).first()
+        if not selected:
+            raise serializers.ValidationError('Select a category from the list or create a new category first.')
+        return selected.name
+
+    def validate_unit(self, unit):
+        if Decimal(unit.split()[0]) <= 0:
+            raise serializers.ValidationError('Selling quantity must be positive.')
+        return unit
 
     class Meta:
         model = Product
-        fields = ['id', 'english_name', 'tamil_name', 'brand', 'category', 'sku', 'price', 'unit',
+        fields = ['id', 'english_name', 'tamil_name', 'brand', 'category', 'sku', 'price', 'base_price', 'offer_percent', 'mrp', 'unit',
                   'stock_kg', 'is_in_stock', 'description', 'image', 'image_url', 'is_active', 'updated_at']
-        read_only_fields = ['id', 'updated_at']
+        read_only_fields = ['id', 'updated_at', 'sku']
 
     def validate_image(self, image):
         if image is None:

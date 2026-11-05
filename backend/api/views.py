@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.hashers import check_password, make_password
 from django.db import transaction
-from django.db.models import Q, Sum, Count, OuterRef, Subquery, Value, IntegerField
+from django.db.models import Q, Sum, Count, OuterRef, Subquery, Value, IntegerField, F
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -227,6 +227,7 @@ def browse_catalog(request):
     for key, label, queryset in [
         ('best_sellers', 'Best Sellers', ranked_products(products).filter(units_sold__gt=0)),
         ('most_bought', 'Most Bought', ranked_products(products, 'purchase_count').filter(purchase_count__gt=0)),
+        ('offers', 'Store Offers', products.filter(offer_percent__gt=0, base_price__gt=F('price'))),
         ('under_100', 'Under ₹100', products.filter(price__lt=100)),
     ]:
         count = queryset.count()
@@ -234,7 +235,7 @@ def browse_catalog(request):
             photo = queryset.filter(image__isnull=False).order_by('pk').values_list('image__secure_url', flat=True).first()
             collections.append({'key': key, 'label': label, 'count': count, 'image_url': photo or ''})
     return Response({'categories': product_facets(products, 'category'), 'brands': product_facets(products, 'brand'),
-        'collections': collections, 'capabilities': {'deals': False, 'new_arrivals': False, 'value_packs': False},
+        'collections': collections, 'capabilities': {'deals': products.filter(offer_percent__gt=0, base_price__gt=F('price')).exists(), 'new_arrivals': False, 'value_packs': False},
         'total_products': products.count()})
 
 
@@ -252,7 +253,13 @@ def get_products(request):
     for field in ['category', 'brand']:
         value = request.query_params.get(field, '').strip()
         if value and value != 'All':
-            products = products.filter(**{field + '__iexact': value})
+            if field == 'category' and value in commerce.GROCERY_GROUPS:
+                condition = Q(category__iexact=value)
+                for alias in commerce.GROCERY_GROUPS[value]:
+                    condition |= Q(category__iexact=alias)
+                products = products.filter(condition)
+            else:
+                products = products.filter(**{field + '__iexact': value})
     prices = {}
     for field, lookup in [('min_price', 'gte'), ('max_price', 'lte')]:
         if field in request.query_params:
@@ -287,6 +294,9 @@ def get_products(request):
     elif collection == 'under_100':
         products = products.filter(price__lt=100)
         cursor_order = ('price', 'pk')
+    elif collection == 'offers':
+        products = products.filter(offer_percent__gt=0, base_price__gt=F('price'))
+        cursor_order = ('-offer_percent', 'pk')
     elif collection:
         raise ValidationError({'collection': 'This collection is not supported by the current catalog.'})
     else:
@@ -404,8 +414,66 @@ def suggest_tamil_product_name(request):
         quantity = ' ' + pack[1] + ' ' + units[unit]
         normalized = normalized[:pack.start()].strip()
     translated = GROCERY_TAMIL_NAMES.get(normalized)
+    if not translated:
+        translated = re.sub(r'[A-Za-z]+', lambda match: tamil_phonetic_word(match.group()), normalized)
     return Response({'tamil_name': translated + quantity if translated else '',
                      'matched': bool(translated), 'requires_review': True})
+
+
+def tamil_phonetic_word(word):
+    """Offline phonetic input, with the existing grocery vocabulary preferred.
+
+    Ambiguous Tanglish spellings remain editable by the administrator.
+    """
+    word = word.lower()
+    if word in GROCERY_TAMIL_NAMES:
+        return GROCERY_TAMIL_NAMES[word]
+    vowels = {'a': ('அ', ''), 'aa': ('ஆ', 'ா'), 'i': ('இ', 'ி'),
+              'ii': ('ஈ', 'ீ'), 'ee': ('ஈ', 'ீ'), 'u': ('உ', 'ு'),
+              'uu': ('ஊ', 'ூ'), 'oo': ('ஊ', 'ூ'), 'e': ('எ', 'ெ'),
+              'ea': ('ஏ', 'ே'), 'ae': ('ஏ', 'ே'), 'ai': ('ஐ', 'ை'),
+              'o': ('ஒ', 'ொ'), 'oa': ('ஓ', 'ோ'), 'au': ('ஔ', 'ௌ')}
+    consonants = {'zh': 'ழ', 'ng': 'ங', 'nj': 'ஞ', 'ny': 'ஞ', 'th': 'த',
+                  'dh': 'த', 'ch': 'ச', 'sh': 'ஷ', 'k': 'க', 'g': 'க',
+                  'c': 'ச', 's': 'ச', 'j': 'ஜ', 't': 'ட', 'd': 'ட',
+                  'n': 'ன', 'p': 'ப', 'b': 'ப', 'm': 'ம', 'y': 'ய',
+                  'r': 'ர', 'l': 'ல', 'v': 'வ', 'w': 'வ', 'h': 'ஹ', 'f': 'ஃப'}
+    output, index = '', 0
+    while index < len(word):
+        consonant = next((key for key in sorted(consonants, key=len, reverse=True) if word.startswith(key, index)), None)
+        if consonant:
+            letter = consonants[consonant]
+            if consonant == 'n' and index == 0:
+                letter = 'ந'
+            index += len(consonant)
+            vowel = next((key for key in sorted(vowels, key=len, reverse=True) if word.startswith(key, index)), None)
+            output += letter + (vowels[vowel][1] if vowel else '்')
+            index += len(vowel) if vowel else 0
+        else:
+            vowel = next((key for key in sorted(vowels, key=len, reverse=True) if word.startswith(key, index)), None)
+            output += vowels[vowel][0] if vowel else word[index]
+            index += len(vowel) if vowel else 1
+    return output
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAdminUser])
+def admin_product_categories(request):
+    from .models import ProductCategory
+    if request.method == 'POST':
+        name = str(request.data.get('name', '')).strip()
+        if not name or len(name) > 60 or not commerce.is_grocery_category(name):
+            raise ValidationError({'name': 'Enter a grocery category, up to 60 characters.'})
+        with transaction.atomic():
+            # Lock the singleton to serialize case-insensitive category creation.
+            from .models import ProductCodeSequence
+            ProductCodeSequence.objects.get_or_create(pk=1)
+            ProductCodeSequence.objects.select_for_update().get(pk=1)
+            category = ProductCategory.objects.filter(name__iexact=name).first()
+            if category is None:
+                category = ProductCategory.objects.create(name=name)
+        return Response({'name': category.name}, status=201)
+    return Response({'categories': list(ProductCategory.objects.exclude(name__iregex=commerce.PRODUCE_CATEGORY_PATTERN).values_list('name', flat=True))})
 
 
 @api_view(['GET', 'POST'])
@@ -753,6 +821,8 @@ def own_orders(user):
 @permission_classes([IsDeliveryEmployee])
 def employee_orders(request):
     orders = own_orders(request.user)
+    if request.query_params.get('status'):
+        orders = orders.filter(status=request.query_params['status'])
     if request.query_params.get('scope') == 'active':
         orders = orders.exclude(status__in=['Delivered', 'Cancelled'])
     elif request.query_params.get('scope') == 'completed':

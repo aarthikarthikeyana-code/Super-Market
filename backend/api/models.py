@@ -10,12 +10,27 @@ class ProductImage(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class ProductCategory(models.Model):
+    name = models.CharField(max_length=60, unique=True)
+    position = models.PositiveIntegerField(default=100)
+
+    class Meta:
+        ordering = ['position', 'id']
+
+
+class ProductCodeSequence(models.Model):
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1)
+    last_number = models.PositiveIntegerField(default=0)
+
+
 class Product(models.Model):
     id = models.CharField(max_length=64, primary_key=True)
     tamil_name = models.CharField(max_length=120)
     english_name = models.CharField(max_length=120, blank=True)
     category = models.CharField(max_length=60, default='Vegetables')
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    base_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    offer_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     unit = models.CharField(max_length=40, default='Kg')
     stock_kg = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
     is_in_stock = models.BooleanField(default=True)

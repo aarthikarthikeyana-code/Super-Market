@@ -12,6 +12,20 @@ from . import delivery
 
 
 # Store policy excludes fresh produce, while allowing dried fruit, juices and oils.
+GROCERY_GROUPS = {
+    'Rice & Grains': ['Rice', 'Grains', 'அரிசி', 'தானியங்கள்', 'அரிசி & தானியங்கள்'],
+    'Cooking Oil & Ghee': ['Cooking Oil', 'Cooking Oils', 'Ghee', 'Oil & Ghee', 'எண்ணெய்', 'நெய்', 'எண்ணெய் & நெய்'],
+    'Dals & Pulses': ['Dals', 'Pulses', 'Dal & Pulses', 'பருப்பு', 'பருப்புகள்', 'பருப்பு வகைகள்'],
+    'Atta & Flours': ['Atta', 'Flours', 'மாவு', 'மாவு வகைகள்'],
+    'Biscuits & Cookies': ['Biscuits', 'Cookies', 'Snacks & Biscuits', 'பிஸ்கட்', 'பிஸ்கட் & குக்கீஸ்'],
+    'Snacks': ['Noodles', 'ஸ்நாக்ஸ்'],
+    'Chocolates': ['Chocolate', 'சாக்லேட்', 'சாக்லேட்ஸ்'],
+    'Spices & Masalas': ['Spices', 'Masalas', 'Masalas & Spices', 'மசாலா', 'மசாலா பொருட்கள்'],
+    'Tea & Coffee': ['Tea', 'Coffee', 'Beverages', 'தேநீர்', 'காபி', 'தேநீர் & காபி'],
+    'Sugar & Salt': ['Sugar', 'Salt', 'சர்க்கரை', 'உப்பு', 'சர்க்கரை & உப்பு'],
+    'Dairy Products': ['Dairy', 'Dairy & Chilled', 'பால்', 'பால் பொருட்கள்'],
+}
+
 PRODUCE_CATEGORY_PATTERN = r'^\s*(?:(?:fresh\s+)?(?:fruits?|vegetables?)(?:\s*(?:&|and|/|-)\s*(?:fruits?|vegetables?))?|fresh\s+produce|produce|காய்கறிகள்|காய்கறி|பழங்கள்|பழம்)\s*$'
 
 

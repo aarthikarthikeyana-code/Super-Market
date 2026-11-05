@@ -76,10 +76,12 @@ def record_location(order_id, user, data):
     if (order.status != 'Out for Delivery' or not person or person.user_id != user.pk
             or not person.ready_for_deliveries):
         raise ValidationError({'detail': 'Location can only be shared for your active, assigned delivery.'})
+    if order.dispatched_at and data['captured_at'] < order.dispatched_at:
+        raise ValidationError({'captured_at': 'Send a GPS fix captured after this delivery started.'})
     last = order.locations.order_by('-captured_at', '-pk').first()
     if last and data['captured_at'] <= last.captured_at:
         return
-    if last and (data['captured_at'] - last.captured_at).total_seconds() < 15:
+    if last and (data['captured_at'] - last.captured_at).total_seconds() < 5:
         return
     DeliveryLocation.objects.create(order=order, employee=person, **data)
     # Bound per-order storage while retaining the original pickup fix.
@@ -90,12 +92,12 @@ def record_location(order_id, user, data):
 
 
 def tracking_payload(order, *, customer=False):
+    if order.status != 'Out for Delivery':
+        return {'points': [], 'active': False, 'stale': True}
     points = order.locations.filter(employee_id=order.assigned_to_id)
     # Hide an old trip after reassignment or a delivery retry.
     if order.dispatched_at:
         points = points.filter(captured_at__gte=order.dispatched_at)
-    if customer and order.status != 'Out for Delivery':
-        return {'points': [], 'active': False, 'stale': True}
     first = points.order_by('captured_at', 'pk').first()
     recent = list(points.order_by('-captured_at', '-pk')[:299])
     recent.reverse()
@@ -104,6 +106,6 @@ def tracking_payload(order, *, customer=False):
     last = recent[-1] if recent else None
     return {'active': order.status == 'Out for Delivery',
             'destination': {key: order.address_details[key] for key in ['latitude', 'longitude'] if key in order.address_details},
-            'stale': not last or (timezone.now() - last.captured_at).total_seconds() > 90,
+            'stale': not last or (timezone.now() - last.captured_at).total_seconds() > 30,
             'points': [{'latitude': str(p.latitude), 'longitude': str(p.longitude),
                         'accuracy': p.accuracy, 'captured_at': p.captured_at} for p in recent]}

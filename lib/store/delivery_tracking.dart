@@ -65,15 +65,14 @@ class DeliveryTracker extends ChangeNotifier {
     if (api.deliveryToken == null) stop();
   }
 
-  Future<void> start(StoreOrder order) async {
-    if (order.status != 'Out for Delivery') return;
+  Future<void> ensureLocationPermission({bool request = true}) async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       throw StoreException(
         'Turn on device location to share your delivery trip.',
       );
     }
     var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
+    if (permission == LocationPermission.denied && request) {
       permission = await Geolocator.requestPermission();
     }
     if (permission == LocationPermission.denied ||
@@ -82,7 +81,58 @@ class DeliveryTracker extends ChangeNotifier {
         'Location permission is needed for trip sharing. Enable it in app settings, then tap Share trip location.',
       );
     }
-    if (_disposed || api.deliveryToken == null) return;
+  }
+
+  bool _syncing = false;
+  Future<void> syncActiveTrips() async {
+    if (_disposed || _syncing || api.deliveryToken == null) return;
+    _syncing = true;
+    final token = api.deliveryToken;
+    final trackedAtStart = orders.toSet();
+    try {
+      final active = <StoreOrder>[];
+      String? cursor;
+      final seen = <String>{};
+      do {
+        final page = await api.orderPage(
+          employee: true,
+          status: 'Out for Delivery',
+          cursor: cursor,
+        );
+        if (_disposed || api.deliveryToken != token) return;
+        active.addAll(
+          page.items.where((order) => order.status == 'Out for Delivery'),
+        );
+        cursor = page.nextCursor;
+      } while (cursor != null && seen.add(cursor));
+      final ids = active.map((order) => order.id).toSet();
+      for (final id in trackedAtStart) {
+        if (!ids.contains(id)) finish(id);
+      }
+      for (final order in active) {
+        if (!orders.contains(order.id)) {
+          await start(order, requestPermission: false);
+        }
+      }
+      if (active.isEmpty && error != null) {
+        error = null;
+        _notify();
+      }
+    } catch (_) {
+      if (!_disposed && api.deliveryToken == token) {
+        error = 'Live tracking needs location permission and a connection. Open your active delivery to retry.';
+        _notify();
+      }
+    } finally {
+      _syncing = false;
+    }
+  }
+
+  Future<void> start(StoreOrder order, {bool requestPermission = true}) async {
+    if (order.status != 'Out for Delivery' || orders.contains(order.id)) return;
+    final token = api.deliveryToken;
+    await ensureLocationPermission(request: requestPermission);
+    if (_disposed || token == null || api.deliveryToken != token) return;
     orders.add(order.id);
     error = null;
     if (_stream == null) {
@@ -90,17 +140,17 @@ class DeliveryTracker extends ChangeNotifier {
           !kIsWeb && defaultTargetPlatform == TargetPlatform.android
           ? AndroidSettings(
               accuracy: LocationAccuracy.high,
-              distanceFilter: 15,
-              intervalDuration: const Duration(seconds: 20),
+              distanceFilter: 5,
+              intervalDuration: const Duration(seconds: 5),
               foregroundNotificationConfig: const ForegroundNotificationConfig(
                 notificationTitle: 'Agaram delivery in progress',
-                notificationText: 'Sharing location for your active deliveries. Stop sharing from the delivery app.',
+                notificationText: 'Sharing location for active deliveries. Stops when each delivery closes.',
                 enableWakeLock: true,
               ),
             )
           : const LocationSettings(
               accuracy: LocationAccuracy.high,
-              distanceFilter: 15,
+              distanceFilter: 5,
             );
       _stream = Geolocator.getPositionStream(locationSettings: settings).listen(
         (position) {
@@ -114,7 +164,7 @@ class DeliveryTracker extends ChangeNotifier {
         },
       );
       _heartbeat = Timer.periodic(
-        const Duration(seconds: 20),
+        const Duration(seconds: 5),
         (_) => _sampleAndPublish(),
       );
     }
@@ -129,7 +179,7 @@ class DeliveryTracker extends ChangeNotifier {
     _sampling = true;
     try {
       if (_position == null ||
-          DateTime.now().difference(_position!.timestamp).inSeconds > 25) {
+          DateTime.now().difference(_position!.timestamp).inSeconds > 10) {
         final fresh = await Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.high,
@@ -165,7 +215,7 @@ class DeliveryTracker extends ChangeNotifier {
       return;
     }
     if (lastSent != null &&
-        DateTime.now().difference(lastSent!).inSeconds < 18) {
+        DateTime.now().difference(lastSent!).inSeconds < 5) {
       return;
     }
     _sending = true;
@@ -238,6 +288,21 @@ class DeliveryTracker extends ChangeNotifier {
   }
 }
 
+LatLng? _trackingCoordinate(dynamic value) {
+  if (value is! Map) return null;
+  final latitude = double.tryParse('${value['latitude']}');
+  final longitude = double.tryParse('${value['longitude']}');
+  if (latitude == null ||
+      longitude == null ||
+      !latitude.isFinite ||
+      !longitude.isFinite ||
+      latitude.abs() > 90 ||
+      longitude.abs() > 180) {
+    return null;
+  }
+  return LatLng(latitude, longitude);
+}
+
 class DeliveryTrackingCard extends ConsumerStatefulWidget {
   final String orderId;
   final bool admin, employee;
@@ -261,7 +326,7 @@ class _DeliveryTrackingCardState extends ConsumerState<DeliveryTrackingCard> {
   void initState() {
     super.initState();
     _load();
-    _timer = Timer.periodic(const Duration(seconds: 20), (_) => _load());
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _load());
   }
 
   @override
@@ -296,27 +361,25 @@ class _DeliveryTrackingCardState extends ConsumerState<DeliveryTrackingCard> {
 
   @override
   Widget build(BuildContext context) {
-    final points = List<Map<String, dynamic>>.from(_data?['points'] ?? []);
+    final rawPoints = _data?['points'];
+    final points = [
+      if (rawPoints is List)
+        for (final point in rawPoints)
+          if (_trackingCoordinate(point) != null) point as Map,
+    ];
     final locations = points
-        .map(
-          (p) => LatLng(
-            double.parse('${p['latitude']}'),
-            double.parse('${p['longitude']}'),
-          ),
-        )
+        .map((point) => _trackingCoordinate(point)!)
         .toList();
     final stale = _data?['stale'] != false || _error != null;
-    final destination = _data?['destination'] as Map?;
-    final latitude = double.tryParse('${destination?['latitude']}'),
-        longitude = double.tryParse('${destination?['longitude']}');
-    final home =
-        latitude != null &&
-            longitude != null &&
-            latitude.abs() <= 90 &&
-            longitude.abs() <= 180
-        ? LatLng(latitude, longitude)
-        : null;
-    final validLocations = locations.where((p) => p.latitude != 0 && p.longitude != 0).toList(); final mapPoints = <LatLng>[...validLocations, if (home != null) home];
+    final home = _trackingCoordinate(_data?['destination']);
+    final mapPoints = <LatLng>[...locations, ?home];
+    final canFitBounds =
+        mapPoints.length >= 2 &&
+        mapPoints.any(
+          (point) =>
+              point.latitude != mapPoints.first.latitude ||
+              point.longitude != mapPoints.first.longitude,
+        );
     final last = points.isEmpty ? null : points.last;
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -352,10 +415,10 @@ class _DeliveryTrackingCardState extends ConsumerState<DeliveryTrackingCard> {
                 ),
                 options: MapOptions(
                   initialCenter: locations.isNotEmpty ? locations.last : home!,
-                  initialZoom: 14,
-                  initialCameraFit: (mapPoints.whereType<LatLng>().length > 1)
+                  initialZoom: 15,
+                  initialCameraFit: canFitBounds
                       ? CameraFit.bounds(
-                          bounds: LatLngBounds.fromPoints(mapPoints.whereType<LatLng>().toList()),
+                          bounds: LatLngBounds.fromPoints(mapPoints),
                           padding: const EdgeInsets.all(35),
                           maxZoom: 16,
                         )
@@ -370,15 +433,16 @@ class _DeliveryTrackingCardState extends ConsumerState<DeliveryTrackingCard> {
                     ),
                     userAgentPackageName: 'com.agaram.supermarket',
                   ),
-                  PolylineLayer(
-                    polylines: [
-                      Polyline(
-                        points: locations,
-                        strokeWidth: 4,
-                        color: storeGreen,
-                      ),
-                    ],
-                  ),
+                  if (locations.length >= 2)
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: locations,
+                          strokeWidth: 4,
+                          color: storeGreen,
+                        ),
+                      ],
+                    ),
                   MarkerLayer(
                     markers: [
                       if (locations.isNotEmpty)

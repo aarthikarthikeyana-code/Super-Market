@@ -3,8 +3,8 @@ import 'dart:math';
 double amount(dynamic value) => double.tryParse('$value') ?? 0;
 String money(num value) => '₹${value.toStringAsFixed(2)}';
 String productLabel(Map<String, dynamic> data) {
-  final english = '${data['english_name'] ?? ''}'.trim();
-  return english.isNotEmpty ? english : '${data['tamil_name'] ?? ''}'.trim();
+  final tamil = '${data['tamil_name'] ?? ''}'.trim();
+  return tamil.isNotEmpty ? tamil : '${data['english_name'] ?? ''}'.trim();
 }
 
 String newUuid() {
@@ -28,6 +28,7 @@ class StoreProduct {
       imageId,
       sku;
   final double price, stock;
+  final double offerPercent;
   final bool inStock;
   final bool published;
   final double? rawMrp;
@@ -47,10 +48,11 @@ class StoreProduct {
     this.inStock = true,
     this.published = true,
     this.rawMrp,
+    this.offerPercent = 0,
   }) : englishName = name;
-  String get name => englishName.trim().isNotEmpty ? englishName : tamilName;
+  String get name => tamilName.trim().isNotEmpty ? tamilName : englishName;
   double get mrp {
-    if (rawMrp != null && rawMrp! > price) return rawMrp!;
+    if (rawMrp != null && rawMrp!.isFinite && rawMrp! > price) return rawMrp!;
     return price;
   }
 
@@ -72,6 +74,7 @@ class StoreProduct {
     stock: amount(j['stock_kg']),
     inStock: j['is_in_stock'] == true,
     rawMrp: j['mrp'] != null ? amount(j['mrp']) : null,
+    offerPercent: amount(j['offer_percent']),
   );
   bool get available => published && inStock && stock >= 1;
   Map<String, dynamic> toJson() => {
@@ -90,6 +93,7 @@ class StoreProduct {
     'stock_kg': stock,
     'is_in_stock': inStock,
     if (rawMrp != null) 'mrp': rawMrp,
+    'offer_percent': offerPercent,
   };
 }
 
