@@ -13,6 +13,7 @@ class PagedFeed<T> extends StatefulWidget {
   final String Function(T item) identity;
   final Widget Function(BuildContext, T, int) itemBuilder;
   final Widget? header, endContent;
+  final Widget? emptyContent;
   final SliverGridDelegate? gridDelegate;
   final Listenable? changes;
   final VoidCallback? beforeRefresh;
@@ -29,6 +30,7 @@ class PagedFeed<T> extends StatefulWidget {
     required this.itemBuilder,
     this.header,
     this.endContent,
+    this.emptyContent,
     this.gridDelegate,
     this.changes,
     this.beforeRefresh,
@@ -228,13 +230,15 @@ class _PagedFeedState<T> extends State<PagedFeed<T>> {
         else if (_items.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
-            child: EmptyPanel(
-              icon: Icons.inventory_2_outlined,
-              title: widget.emptyTitle,
-              message: widget.emptyMessage,
-              action: widget.emptyAction,
-              onAction: widget.onEmptyAction,
-            ),
+            child:
+                widget.emptyContent ??
+                EmptyPanel(
+                  icon: Icons.inventory_2_outlined,
+                  title: widget.emptyTitle,
+                  message: widget.emptyMessage,
+                  action: widget.emptyAction,
+                  onAction: widget.onEmptyAction,
+                ),
           )
         else
           SliverPadding(
@@ -277,19 +281,19 @@ class _PagedFeedState<T> extends State<PagedFeed<T>> {
             ),
           ),
         if (_items.isNotEmpty && !_busy && !_more && _error == null)
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.all(20),
-              child: Center(
-                child: Text(
-                  'You’re all caught up',
-                  style: TextStyle(color: Colors.black54, fontSize: 12),
+          SliverToBoxAdapter(
+            child:
+                widget.endContent ??
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Center(
+                    child: Text(
+                      'You’re all caught up',
+                      style: TextStyle(color: Colors.black54, fontSize: 12),
+                    ),
+                  ),
                 ),
-              ),
-            ),
           ),
-        if (!_more && widget.endContent != null && _items.isNotEmpty)
-          SliverToBoxAdapter(child: widget.endContent),
       ],
     ),
   );

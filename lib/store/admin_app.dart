@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -51,7 +50,6 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     _api = api;
     _signedIn = api.adminToken != null;
     api.staffChanges.addListener(_staffChanged);
-    if (_signedIn) _checkAndSeedCatalog();
     _poll = Timer.periodic(const Duration(seconds: 20), (_) {
       if (_signedIn) {
         ref.read(storeApiProvider).feedChanges.value++;
@@ -79,7 +77,6 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   void _staffChanged() {
     if (mounted) {
       setState(() => _signedIn = _api.adminToken != null);
-      if (_signedIn) _checkAndSeedCatalog();
     }
   }
 
@@ -99,7 +96,6 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   void _loginSuccess() {
     refreshCommerce(ref);
     setState(() => _signedIn = true);
-    _checkAndSeedCatalog();
   }
 
   @override
@@ -770,66 +766,6 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     if (mounted && result == true) refreshCommerce(ref);
   }
 
-  bool _seedingChecked = false;
-
-  void _checkAndSeedCatalog() {
-    if (_seedingChecked || !_signedIn) return;
-    _seedingChecked = true;
-    _seedCatalogInBackground();
-  }
-
-  Future<void> _seedCatalogInBackground() async {
-    try {
-      final api = ref.read(storeApiProvider);
-      if (api.adminToken == null) return;
-      final existing = await api.products();
-      final existingNames = existing
-          .map((p) => p.tamilName.trim().toLowerCase())
-          .toSet();
-
-      bool addedAny = false;
-      for (final item in kCuratedFortyGroceryProducts) {
-        final name = (item['tamil_name'] as String).trim().toLowerCase();
-        if (existingNames.contains(name)) continue;
-
-        String? imageId;
-        try {
-          final dio = api.dio;
-          final res = await dio.get<List<int>>(
-            item['image_url'] as String,
-            options: Options(responseType: ResponseType.bytes),
-          );
-          if (res.data != null && res.data!.isNotEmpty) {
-            final uploadRes = await api.upload(res.data!, '${item['sku']}.jpg');
-            imageId = uploadRes['id'] as String?;
-          }
-        } catch (_) {}
-
-        await api.saveProduct({
-          'english_name': item['english_name'],
-          'tamil_name': item['tamil_name'],
-          'brand': item['brand'],
-          'category': item['category'],
-          'price': item['price'],
-          'stock_kg': item['stock_kg'],
-          'unit': item['unit'],
-          'description': item['description'],
-          'sku': item['sku'],
-          'image': ?imageId,
-          'is_in_stock': true,
-          'is_active': true,
-        });
-        existingNames.add(name);
-        addedAny = true;
-      }
-      if (addedAny && mounted) {
-        refreshCommerce(ref);
-      }
-    } catch (_) {
-      // Background seeder is silent and resilient
-    }
-  }
-
   Widget _products() {
     final api = ref.watch(storeApiProvider);
     return PagedFeed<StoreProduct>(
@@ -981,8 +917,13 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                           ),
                         ),
                         showCheckmark: false,
-                        onSelected: (_) =>
-                            setState(() => _productFilter = filter.$2),
+                        onSelected: (_) => setState(() {
+                          _productFilter = filter.$2;
+                          if (filter.$2 == 'all') {
+                            _productCategory = null;
+                            _productBrand = null;
+                          }
+                        }),
                       ),
                     ),
                 ],
@@ -1003,12 +944,18 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                     children: [
                       const Icon(Icons.category_rounded, size: 16, color: Color(0xFF0F7645)),
                       const SizedBox(width: 8),
-                      Text(
-                        'Category: ',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F7645),
+                      Flexible(
+                        child: Text(
+                          _productCategory != null
+                              ? 'Category: $_productCategory'
+                              : 'Brand: $_productBrand',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F7645),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -2079,7 +2026,34 @@ class ProductEditorScreen extends ConsumerStatefulWidget {
 }
 
 class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
+  static const _standardCategories = {
+    'Rice',
+    'Grains',
+    'Atta',
+    'Flours',
+    'Dals',
+    'Pulses',
+    'Cooking Oil',
+    'Ghee',
+    'Sugar',
+    'Salt',
+    'Spices',
+    'Masalas',
+    'Tea',
+    'Coffee',
+    'Biscuits',
+    'Cookies',
+    'Snacks',
+    'Noodles',
+    'Dairy Products',
+    'Chocolates',
+  };
   final _form = GlobalKey<FormState>();
+  final _scroll = ScrollController();
+  final _categoryAnchorKey = GlobalKey();
+  final _photoAnchorKey = GlobalKey();
+  final Map<TextEditingController, GlobalKey<FormFieldState<String>>>
+  _fieldKeys = {};
   late final TextEditingController _name,
       _tamil,
       _brand,
@@ -2098,9 +2072,10 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
   bool _busy = false, _uploading = false, _available = true, _published = true;
   Timer? _nameDebounce;
   int _nameGeneration = 0;
+    bool _tamilManuallyEdited = false;
   bool _suggestingName = false, _applyingName = false;
   String _nameHint =
-      'Type Tanglish (arisi) or Tamil. Converted names stay editable.';
+      'Enter the English name to suggest Tamil. You can edit the Tamil name below.';
   bool get _namePending =>
       _suggestingName || (_nameDebounce?.isActive ?? false);
   @override
@@ -2127,7 +2102,8 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
     _imageUrl = p?.imageUrl ?? '';
     _available = p?.inStock ?? true;
     _published = p?.published ?? true;
-    _tamil.addListener(_queueTamilName);
+    _name.addListener(_queueTamilName);
+    _tamil.addListener(_markTamilNameEdited);
     _price.addListener(_priceChanged);
     _offer.addListener(_priceChanged);
     _unit.addListener(_priceChanged);
@@ -2136,6 +2112,49 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
 
   void _priceChanged() {
     if (mounted) setState(() {});
+  }
+
+  GlobalKey<FormFieldState<String>> _fieldKey(
+    TextEditingController controller,
+  ) => _fieldKeys.putIfAbsent(
+    controller,
+    () => GlobalKey<FormFieldState<String>>(),
+  );
+
+  void _scrollToContext(BuildContext? target) {
+    if (target == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !target.mounted) return;
+      Scrollable.ensureVisible(
+        target,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOutCubic,
+        alignment: 0.16,
+      );
+    });
+  }
+
+  void _scrollToFirstInvalidField() {
+    final targets = <BuildContext?>[
+      if (_fieldKey(_tamil).currentState?.hasError == true)
+        _fieldKey(_tamil).currentContext,
+      if (!_categories.contains(_category.text))
+        _categoryAnchorKey.currentContext,
+      if (_fieldKey(_unit).currentState?.hasError == true)
+        _fieldKey(_unit).currentContext,
+      if (_fieldKey(_price).currentState?.hasError == true)
+        _fieldKey(_price).currentContext,
+      if (_fieldKey(_stock).currentState?.hasError == true)
+        _fieldKey(_stock).currentContext,
+      if (_fieldKey(_offer).currentState?.hasError == true)
+        _fieldKey(_offer).currentContext,
+    ];
+    for (final target in targets) {
+      if (target != null) {
+        _scrollToContext(target);
+        return;
+      }
+    }
   }
 
   Future<void> _loadCategories() async {
@@ -2147,7 +2166,9 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
       final categories = await ref.read(storeApiProvider).productCategories();
       if (!mounted) return;
       setState(() {
-        _categories = [...categories];
+        _categories = categories
+            .where(_standardCategories.contains)
+            .toList();
         if (_category.text.isNotEmpty &&
             !_categories.contains(_category.text)) {
           _categories.add(_category.text);
@@ -2240,29 +2261,39 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
     _nameGeneration++;
     _nameDebounce?.cancel();
     setState(() => _suggestingName = false);
-    if (RegExp(r'[A-Za-z]').hasMatch(_tamil.text)) {
-      _nameDebounce = Timer(
-        const Duration(milliseconds: 800),
-        _suggestTamilName,
-      );
+    if (_tamilManuallyEdited || !RegExp(r'[A-Za-z]').hasMatch(_name.text)) {
+      return;
     }
+    _nameDebounce = Timer(
+      const Duration(milliseconds: 800),
+      _suggestTamilName,
+    );
   }
 
-  Future<void> _suggestTamilName() async {
+  void _markTamilNameEdited() {
+    if (_applyingName) return;
+    _tamilManuallyEdited = true;
+    _nameGeneration++;
     _nameDebounce?.cancel();
-    final input = _tamil.text.trim();
+  }
+
+  Future<void> _suggestTamilName({bool force = false}) async {
+    _nameDebounce?.cancel();
+    final input = _name.text.trim();
     if (!RegExp(r'[A-Za-z]').hasMatch(input)) return;
+    if (force) _tamilManuallyEdited = false;
+    if (_tamilManuallyEdited) return;
     final generation = ++_nameGeneration;
     setState(() => _suggestingName = true);
     try {
       final tamil = await ref.read(storeApiProvider).suggestTamilName(input);
       if (!mounted ||
           generation != _nameGeneration ||
-          input != _tamil.text.trim()) {
+          input != _name.text.trim() ||
+          _tamilManuallyEdited) {
         return;
       }
       if (tamil != null && tamil.isNotEmpty) {
-        _name.text = input;
         _applyingName = true;
         _tamil.value = TextEditingValue(
           text: tamil,
@@ -2270,13 +2301,13 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
         );
         _applyingName = false;
         setState(
-          () => _nameHint = 'Tamil name converted. Please review the spelling.',
+          () => _nameHint = 'Tamil name suggested. Review or edit it before saving.',
         );
       }
     } catch (_) {
       if (mounted && generation == _nameGeneration) {
         setState(
-          () => _nameHint = 'Conversion unavailable. Enter Tamil directly or tap Convert Tamil to retry.',
+          () => _nameHint = 'Suggestion unavailable. Enter Tamil directly or tap Suggest Tamil to retry.',
         );
       }
     } finally {
@@ -2303,6 +2334,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
     ]) {
       c.dispose();
     }
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -2334,16 +2366,16 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
   }
 
   Future<void> _save() async {
-    if (_busy ||
-        _uploading ||
-        _namePending ||
-        !_form.currentState!.validate()) {
+    if (_busy || _uploading || _namePending) return;
+    if (!_form.currentState!.validate()) {
+      _scrollToFirstInvalidField();
       return;
     }
     if (_imageId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Upload a product photo before saving.')),
       );
+      _scrollToContext(_photoAnchorKey.currentContext);
       return;
     }
     setState(() => _busy = true);
@@ -2404,9 +2436,11 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
           child: Form(
             key: _form,
             child: ListView(
+              controller: _scroll,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               children: [
                 OpsPanel(
+                  key: _photoAnchorKey,
                   padding: EdgeInsets.zero,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(20),
@@ -2480,15 +2514,17 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const OpsHeading('Basic information'),
+                      _field(_name, 'Product name (English, optional)'),
                       _field(
                         _tamil,
-                        'Product name (Tanglish to Tamil)',
+                        'Product name (Tamil)',
+                        required: true,
                         validator: (value) {
                           final text = value?.trim() ?? '';
                           return text.isEmpty ||
                                   !RegExp(r'[஀-௿]').hasMatch(text) ||
                                   RegExp(r'[A-Za-z]').hasMatch(text)
-                              ? 'Enter a Tamil product name or wait for conversion'
+                              ? 'Enter or review the Tamil product name'
                               : null;
                         },
                       ),
@@ -2507,9 +2543,9 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                         child: TextButton.icon(
                           onPressed: _busy || _uploading || _suggestingName
                               ? null
-                              : _suggestTamilName,
+                              : () => _suggestTamilName(force: true),
                           icon: const Icon(Icons.auto_awesome, size: 16),
-                          label: const Text('Convert Tamil'),
+                            label: const Text('Suggest Tamil'),
                         ),
                       ),
                     ],
@@ -2525,7 +2561,9 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                            child: DropdownButtonFormField<String>(
+                            child: KeyedSubtree(
+                              key: _categoryAnchorKey,
+                              child: DropdownButtonFormField<String>(
                               key: ValueKey((
                                 'product-category',
                                 _category.text,
@@ -2535,16 +2573,31 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                                   ? _category.text
                                   : null,
                               isExpanded: true,
+                              itemHeight: 52,
+                              menuMaxHeight: 360,
+                              borderRadius: BorderRadius.circular(16),
+                              elevation: 10,
+                              dropdownColor: Colors.white,
+                              style: const TextStyle(
+                                color: opsInk,
+                                fontSize: 14,
+                              ),
+                              icon: const Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                color: opsForestGreen,
+                              ),
                               decoration: const InputDecoration(
-                                labelText: 'Category',
+                                labelText: 'Category *',
                               ),
                               items: _categories
                                   .map(
-                                    (name) => DropdownMenuItem(
+                                    (name) => DropdownMenuItem<String>(
                                       value: name,
                                       child: Text(
                                         name,
+                                        maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(color: opsInk),
                                       ),
                                     ),
                                   )
@@ -2556,6 +2609,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                                     ),
                               validator: (value) =>
                                   value == null ? 'Select a category' : null,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -2590,6 +2644,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                       _field(
                         _unit,
                         'Selling quantity ($_unitKind)',
+                        required: true,
                         numeric: true,
                         validator: (value) {
                           final quantity = double.tryParse(value ?? '');
@@ -2623,6 +2678,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                             child: _field(
                               _price,
                               'Price (INR)',
+                              required: true,
                               numeric: true,
                               validator: (s) {
                                 final v = double.tryParse(s ?? '');
@@ -2642,6 +2698,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                             child: _field(
                               _stock,
                               'Stock (units)',
+                              required: true,
                               numeric: true,
                               validator: (s) {
                                 final v = double.tryParse(s ?? '');
@@ -2778,14 +2835,16 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
     child: TextFormField(
-      key: ValueKey(label),
+      key: _fieldKey(controller),
       controller: controller,
       enabled: !_busy && !_uploading,
       maxLines: lines,
       keyboardType: numeric
           ? const TextInputType.numberWithOptions(decimal: true)
           : null,
-      decoration: InputDecoration(labelText: label),
+      decoration: InputDecoration(
+        labelText: required ? '$label *' : label,
+      ),
       validator:
           validator ??
           (s) => required && (s?.trim().isEmpty ?? true)

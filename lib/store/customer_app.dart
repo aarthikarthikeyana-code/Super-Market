@@ -15,6 +15,7 @@ import 'paged_feed.dart';
 import 'loading.dart';
 import 'delivery_tracking.dart';
 import 'order_invoice.dart';
+import 'customer_orders.dart';
 
 class StorefrontScreen extends ConsumerStatefulWidget {
   const StorefrontScreen({super.key});
@@ -626,39 +627,15 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
   );
 
   Widget _signedInOrdersList() {
-    final api = ref.watch(storeApiProvider);
     final phone = ref.watch(customerAccountProvider).asData?.value?['phone'];
 
-    return PagedFeed<StoreOrder>(
-      queryKey: ('customer_orders_tab', phone),
-      changes: api.feedChanges,
-      load: (cursor) => api.orderPage(cursor: cursor),
-      identity: (o) => o.id,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      header: const Padding(
-        padding: EdgeInsets.fromLTRB(4, 4, 4, 14),
-        child: Text(
-          'Your Orders',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w900,
-            color: storeInk,
-          ),
-        ),
-      ),
-      emptyTitle: 'No orders placed yet',
-      emptyMessage:
-          'Add everyday pantry staples to your cart and place an order.',
-      itemBuilder: (_, order, _) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: OrderCard(
-          order: order,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => OrderTrackingScreen(orderId: order.id),
-            ),
-          ),
+    return CustomerOrdersList(
+      key: ValueKey(('customer-orders', phone)),
+      accountKey: phone,
+      onOpen: (order) => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OrderTrackingScreen(orderId: order.id),
         ),
       ),
     );

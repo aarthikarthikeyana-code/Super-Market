@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -28,6 +29,7 @@ class EmployeeEditorScreen extends ConsumerStatefulWidget {
 class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
   final _form = GlobalKey<FormState>();
   final Map<String, TextEditingController> _fields = {};
+  final Map<String, GlobalKey<FormFieldState<String>>> _fieldKeys = {};
   Map<String, dynamic>? _person;
   bool _busy = false, _active = true, _consent = false, _verified = false;
   String _vehicle = 'bicycle', _idType = '', _kind = 'identity';
@@ -56,7 +58,12 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
     _person = widget.person;
     if (_person?['ready_for_deliveries'] == true) _setupStep = 2;
     for (final key in _keys) {
-      _fields[key] = TextEditingController(text: '${_person?[key] ?? ''}');
+      var value = '${_person?[key] ?? ''}';
+      if (key == 'phone' || key == 'emergency_contact_phone') {
+        value = _mobileDigits(value);
+      }
+      _fields[key] = TextEditingController(text: value);
+      _fieldKeys[key] = GlobalKey<FormFieldState<String>>();
     }
     _fields['joining_date']!.text =
         _person?['joining_date'] ??
@@ -77,8 +84,40 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
     super.dispose();
   }
 
+  String _mobileDigits(String value) {
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    return digits.length == 12 && digits.startsWith('91')
+        ? digits.substring(2)
+        : digits;
+  }
+
+  void _scrollToFirstInvalidField() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (final key in _keys) {
+        final fieldKey = _fieldKeys[key]!;
+        final target = fieldKey.currentContext;
+        if (fieldKey.currentState?.hasError == true &&
+            target != null &&
+            target.mounted) {
+          Scrollable.ensureVisible(
+            target,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeInOutCubic,
+            alignment: 0.18,
+          );
+          return;
+        }
+      }
+    });
+  }
+
   Future<void> _save() async {
-    if (_busy || !_form.currentState!.validate()) return;
+    if (_busy) return;
+    if (!_form.currentState!.validate()) {
+      _scrollToFirstInvalidField();
+      return;
+    }
     setState(() => _busy = true);
     try {
       final data = <String, dynamic>{
@@ -273,11 +312,18 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 14),
     child: TextFormField(
+      key: _fieldKeys[key],
       controller: _fields[key],
       enabled: !_busy,
       obscureText: secret,
       maxLines: lines,
-      maxLength: length,
+      maxLength: phone ? 10 : length,
+      inputFormatters: phone
+          ? [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ]
+          : null,
       keyboardType: phone
           ? TextInputType.phone
           : key == 'pincode'
@@ -285,7 +331,7 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
           : key == 'email'
           ? TextInputType.emailAddress
           : TextInputType.text,
-      decoration: InputDecoration(labelText: label),
+      decoration: InputDecoration(labelText: required ? '$label *' : label),
       validator: (value) {
         final v = value?.trim() ?? '';
         if (required && v.isEmpty) return 'Enter $label';
@@ -296,9 +342,8 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
         }
         if (phone &&
             v.isNotEmpty &&
-            !RegExp(r'^(\+91)?[6-9][0-9]{9}$')
-                .hasMatch(v.replaceAll(RegExp(r'[\s()-]'), ''))) {
-          return 'Enter a valid Indian mobile number';
+            !RegExp(r'^[6-9][0-9]{9}$').hasMatch(v)) {
+          return 'Enter a valid 10-digit Indian mobile number';
         }
         if (key == 'pincode' && !RegExp(r'^[1-9][0-9]{5}$').hasMatch(v)) {
           return 'Enter a 6-digit pincode';
@@ -315,11 +360,12 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
   Widget _date(String key, String label, {bool required = false}) => Padding(
     padding: const EdgeInsets.only(bottom: 14),
     child: TextFormField(
+      key: _fieldKeys[key],
       controller: _fields[key],
       enabled: !_busy,
       readOnly: true,
       decoration: InputDecoration(
-        labelText: label,
+        labelText: required ? '$label *' : label,
         suffixIcon: const Icon(Icons.calendar_month_outlined),
       ),
       validator: (v) =>
@@ -449,7 +495,12 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
               if (_setupStep == 0) ...[
                 _heading('1. Employee contact & login'),
                 _field('name', 'Full name', required: true, length: 100),
-                _field('phone', 'Mobile number', required: true, phone: true),
+                _field(
+                  'phone',
+                  'Mobile number (10 digits)',
+                  required: true,
+                  phone: true,
+                ),
                 _field('email', 'Email (optional)'),
                 _field(
                   'password',
@@ -488,7 +539,7 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
                 ),
                 _field(
                   'emergency_contact_phone',
-                  'Emergency contact mobile',
+                  'Emergency contact mobile (10 digits)',
                   required: true,
                   phone: true,
                 ),
@@ -497,6 +548,16 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
                 DropdownButtonFormField<String>(
                   initialValue: _vehicle,
                   isExpanded: true,
+                  itemHeight: 52,
+                  menuMaxHeight: 320,
+                  borderRadius: BorderRadius.circular(16),
+                  elevation: 8,
+                  dropdownColor: Colors.white,
+                  style: const TextStyle(color: opsInk, fontSize: 14),
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: opsForestGreen,
+                  ),
                   decoration: const InputDecoration(labelText: 'Delivery mode'),
                   items: [
                     for (final entry in {
@@ -508,7 +569,11 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
                     }.entries)
                       DropdownMenuItem(
                         value: entry.key,
-                        child: Text(entry.value),
+                        child: Text(
+                          entry.value,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                   ],
                   onChanged: _busy
@@ -567,6 +632,16 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
                 DropdownButtonFormField<String>(
                   initialValue: _idType,
                   isExpanded: true,
+                  itemHeight: 52,
+                  menuMaxHeight: 320,
+                  borderRadius: BorderRadius.circular(16),
+                  elevation: 8,
+                  dropdownColor: Colors.white,
+                  style: const TextStyle(color: opsInk, fontSize: 14),
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: opsForestGreen,
+                  ),
                   decoration: const InputDecoration(labelText: 'ID proof type'),
                   items: [
                     for (final entry in {
@@ -579,7 +654,11 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
                     }.entries)
                       DropdownMenuItem(
                         value: entry.key,
-                        child: Text(entry.value),
+                        child: Text(
+                          entry.value,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                   ],
                   onChanged: _busy ? null : (v) => setState(() => _idType = v!),
@@ -661,12 +740,26 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
                   DropdownButtonFormField<String>(
                     initialValue: _kind,
                     isExpanded: true,
+                    itemHeight: 52,
+                    menuMaxHeight: 360,
+                    borderRadius: BorderRadius.circular(16),
+                    elevation: 8,
+                    dropdownColor: Colors.white,
+                    style: const TextStyle(color: opsInk, fontSize: 14),
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: opsForestGreen,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Document type',
+                    ),
                     items: [
                       for (final entry in employeeDocuments.entries)
                         DropdownMenuItem(
                           value: entry.key,
                           child: Text(
                             entry.value,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -744,6 +837,8 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
                                 if (_form.currentState!.validate()) {
                                   setState(() => _setupStep++);
                                   _scroll.jumpTo(0);
+                                } else {
+                                  _scrollToFirstInvalidField();
                                 }
                               },
                         child: Text(

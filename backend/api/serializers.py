@@ -117,7 +117,7 @@ class PublicDeliveryPersonnelSerializer(serializers.ModelSerializer):
 
 
 class DeliveryPersonnelSerializer(serializers.ModelSerializer):
-    phone = serializers.RegexField(r'^\+?[0-9]{10,15}$', max_length=16)
+    phone = serializers.RegexField(r'^[6-9][0-9]{9}$', max_length=10)
     active_orders = serializers.SerializerMethodField()
 
     class Meta:
@@ -306,6 +306,9 @@ class EmployeeSerializer(serializers.ModelSerializer):
         return password
 
     def validate_phone(self, phone):
+        import re
+        if not re.fullmatch(r'[6-9][0-9]{9}', phone):
+            raise ValidationError('Enter a valid 10-digit Indian mobile number.')
         phone = normalize_customer_phone(phone)
         others = DeliveryPersonnel.objects.filter(phone__in=[phone, phone[3:]])
         if self.instance:
@@ -315,6 +318,9 @@ class EmployeeSerializer(serializers.ModelSerializer):
         return phone
 
     def validate_emergency_contact_phone(self, value):
+        import re
+        if not re.fullmatch(r'[6-9][0-9]{9}', value):
+            raise ValidationError('Enter a valid 10-digit Indian mobile number.')
         return normalize_customer_phone(value)
 
     def validate(self, attrs):

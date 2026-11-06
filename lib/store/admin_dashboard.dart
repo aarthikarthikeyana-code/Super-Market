@@ -179,6 +179,9 @@ class OperationsDashboard extends ConsumerWidget {
     onRetry: () => ref.invalidate(adminDashboardProvider),
     builder: (data) {
       final today = Map<String, dynamic>.from(data['today'] ?? {});
+      final adminProfile = Map<String, dynamic>.from(
+        data['admin_profile'] ?? {},
+      );
       final alerts = List<Map<String, dynamic>>.from(data['alerts'] ?? []);
       final snapshot = ref.watch(adminDashboardProvider);
       return RefreshIndicator(
@@ -201,6 +204,7 @@ class OperationsDashboard extends ConsumerWidget {
                           : hour < 17
                           ? 'Good afternoon'
                           : 'Good evening';
+                        final adminName = '${adminProfile['name'] ?? ''}'.trim();
                       return Row(
                         children: [
                           Expanded(
@@ -209,13 +213,18 @@ class OperationsDashboard extends ConsumerWidget {
                               children: [
                                 Row(
                                   children: [
-                                    Text(
-                                      '$greeting, Admin',
-                                      style: const TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w900,
-                                        color: storeInk,
-                                        letterSpacing: -0.4,
+                                    Flexible(
+                                      child: Text(
+                                        '$greeting${adminName.isEmpty ? '' : ', $adminName'}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        softWrap: false,
+                                        style: const TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w900,
+                                          color: storeInk,
+                                          letterSpacing: -0.4,
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 6),
@@ -231,12 +240,17 @@ class OperationsDashboard extends ConsumerWidget {
                                       color: opsForestGreen,
                                     ),
                                     const SizedBox(width: 5),
-                                    Text(
-                                      'Agaram Operations · ${opsDate(today['date'])}',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: opsMuted,
+                                    Expanded(
+                                      child: Text(
+                                        'Agaram Operations · ${opsDate(today['date'])}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        softWrap: false,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: opsMuted,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -816,7 +830,12 @@ class DeliveryPreviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final person = order.data['assigned_to_details'] as Map?;
     final name = '${person?['name'] ?? ''}';
-    final date = DateTime.tryParse('${order.data['delivered_at'] ?? order.data['updated_at'] ?? order.data['created_at']}');
+    final date = DateTime.tryParse('${order.data['delivered_at'] ?? ''}');
+    final estimate = DateTime.tryParse(
+      '${order.data['estimated_delivery_at'] ?? ''}',
+    );
+    final address = '${order.data['delivery_address'] ?? ''}'.trim();
+    final deliveryNote = '${order.data['delivery_note'] ?? ''}'.trim();
     final isDelivered = order.status == 'Delivered';
 
     return Container(
@@ -867,8 +886,12 @@ class DeliveryPreviewCard extends StatelessWidget {
                   isDelivered
                       ? (date != null
                           ? 'Delivered on ${date.day}/${date.month}/${date.year} • ${TimeOfDay.fromDateTime(date).format(context)}'
-                          : 'Delivered successfully')
-                      : 'Expected by Today, ${order.data['delivery_slot'] ?? 'Express delivery'}',
+                      : 'Delivery time not recorded')
+                    : estimate != null
+                    ? 'Estimated ${estimate.day}/${estimate.month} • ${TimeOfDay.fromDateTime(estimate).format(context)}'
+                    : 'Arrival estimate not recorded',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w500,
@@ -907,7 +930,7 @@ class DeliveryPreviewCard extends StatelessWidget {
                     const SizedBox(height: 14),
                   ],
 
-                  // Delivery Rider Card with Scooter & Arriving Soon Pill
+                  // Delivery employee and recorded delivery details.
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
@@ -943,51 +966,44 @@ class DeliveryPreviewCard extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    name.isNotEmpty ? name : 'Agaram Express Partner',
+                                    name.isNotEmpty
+                                        ? name
+                                        : 'Delivery employee not recorded',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w800,
                                       color: Color(0xFF0F172A),
                                     ),
                                   ),
-                                  Text(
-                                    '${order.data['delivery_address'] ?? 'Customer address'}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Color(0xFF64748B),
+                                  if (address.isNotEmpty)
+                                    Text(
+                                      address,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF64748B),
+                                      ),
                                     ),
-                                  ),
                                 ],
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFFD1FAE5)),
+                        if (deliveryNote.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            deliveryNote,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF475569),
+                            ),
                           ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.eco_rounded, size: 14, color: Color(0xFF16A05D)),
-                              SizedBox(width: 5),
-                              Text(
-                                'Your order is on the way! Arriving soon...',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF15803D),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        ],
                       ],
                     ),
                   ),

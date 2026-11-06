@@ -883,37 +883,38 @@ class AdminOrderCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header: #ID · Date/Time · Status Pill · Chevron
+                // Keep the ID and status together; put the timestamp below.
                 Row(
                   children: [
-                    Text(
-                      '#${order.shortId}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 14,
-                        color: Color(0xFF0F172A),
+                    Expanded(
+                      child: Text(
+                        '#${order.shortId}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                          color: Color(0xFF0F172A),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    if (date != null)
-                      Text(
-                        '${date.day}/${date.month}/${date.year} • ${TimeOfDay.fromDateTime(date).format(context)}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    const Spacer(),
                     AdminStatusBadge(order.status),
-                    const SizedBox(width: 4),
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      size: 18,
-                      color: Color(0xFF94A3B8),
-                    ),
                   ],
                 ),
+                if (date != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    '${date.day}/${date.month}/${date.year} • ${TimeOfDay.fromDateTime(date).format(context)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
 
                 // Body: Product Thumbnails + Customer Name + Items list
@@ -1005,88 +1006,106 @@ class AdminOrderCard extends StatelessWidget {
                 ),
                 const Divider(height: 22, color: Color(0xFFF1F5F9)),
 
-                // Footer: Price bold + Cash status + CTA Button
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                // Keep the action inside the card width on compact screens.
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Column(
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          money(order.total),
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF0F172A),
-                            letterSpacing: -0.4,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                money(order.total),
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0F172A),
+                                  letterSpacing: -0.4,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                order.status == 'New'
+                                    ? 'Next: accept & prepare the items'
+                                    : order.status == 'Preparing'
+                                    ? 'Next: check and pack items'
+                                    : order.status == 'Packed'
+                                    ? 'Next: assign delivery employee'
+                                    : order.nextAction,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF64748B),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          order.status == 'New'
-                              ? 'Next: accept & prepare the items'
-                              : order.status == 'Preparing'
-                              ? 'Next: check and pack items'
-                              : order.status == 'Packed'
-                              ? 'Next: assign delivery employee'
-                              : order.nextAction,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF64748B),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          cash,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF059669),
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        if (actionLabel != null)
-                          FilledButton.icon(
-                            onPressed: onAction,
-                            icon: Icon(
-                              actionLabel!.contains('Prepare') ||
-                                      actionLabel!.contains('Start')
-                                  ? Icons.inventory_2_outlined
-                                  : actionLabel!.contains('Pack')
-                                  ? Icons.task_alt_rounded
-                                  : actionLabel!.contains('Assign')
-                                  ? Icons.two_wheeler_rounded
-                                  : Icons.arrow_forward_rounded,
-                              size: 15,
-                            ),
-                            label: Text(
-                              actionLabel!,
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 5),
+                            child: Text(
+                              cash,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.end,
                               style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: const Color(0xFF16A05D),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 8,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF059669),
                               ),
                             ),
                           ),
+                        ),
                       ],
                     ),
+                    if (actionLabel != null) ...[
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: FilledButton.icon(
+                          onPressed: onAction,
+                          icon: Icon(
+                            actionLabel!.contains('Prepare') ||
+                                    actionLabel!.contains('Start')
+                                ? Icons.inventory_2_outlined
+                                : actionLabel!.contains('Pack')
+                                ? Icons.task_alt_rounded
+                                : actionLabel!.contains('Assign')
+                                ? Icons.two_wheeler_rounded
+                                : Icons.arrow_forward_rounded,
+                            size: 15,
+                          ),
+                          label: Text(
+                            actionLabel!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF16A05D),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],
@@ -1398,8 +1417,12 @@ class AdminDeliveryStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final riderName = order.data['employee_name'] ?? order.data['assigned_employee_name'] ?? 'Agaram Delivery Partner';
-    final riderPhone = order.data['employee_phone'] ?? '';
+    final employee = order.data['assigned_to_details'] as Map?;
+    final riderName = '${employee?['name'] ?? ''}'.trim();
+    final riderPhone = '${employee?['phone'] ?? ''}'.trim();
+    final estimate = DateTime.tryParse(
+      '${order.data['estimated_delivery_at'] ?? ''}',
+    );
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -1494,9 +1517,9 @@ class AdminDeliveryStatusCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 14),
-                const Text(
-                  'Your order is on the way!',
-                  style: TextStyle(
+                Text(
+                  order.status,
+                  style: const TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w900,
                     color: Color(0xFF0F172A),
@@ -1504,9 +1527,11 @@ class AdminDeliveryStatusCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                const Text(
-                  'Arriving soon to customer address with fresh groceries.',
-                  style: TextStyle(
+                Text(
+                  estimate == null
+                      ? 'Arrival estimate not recorded'
+                      : 'Estimated ${estimate.day}/${estimate.month} • ${TimeOfDay.fromDateTime(estimate).format(context)}',
+                  style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                     color: Color(0xFF475569),
@@ -1533,7 +1558,9 @@ class AdminDeliveryStatusCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              riderName,
+                              riderName.isNotEmpty
+                                  ? riderName
+                                  : 'Delivery employee not recorded',
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w800,
@@ -1543,7 +1570,9 @@ class AdminDeliveryStatusCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
-                              riderPhone.isNotEmpty ? riderPhone : 'Assigned Rider',
+                              riderPhone.isNotEmpty
+                                  ? riderPhone
+                                  : 'Phone not recorded',
                               style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                             ),
                           ],
@@ -1752,19 +1781,17 @@ class AnimatedCountingCurrency extends StatelessWidget {
     if (value == null) {
       return Text('—', style: style);
     }
-    final target = (value is num)
-        ? value.toDouble()
-        : (double.tryParse('') ?? 0.0);
+    final target = value is num ? value.toDouble() : double.tryParse('$value');
+    if (target == null || !target.isFinite) {
+      return Text('—', style: style);
+    }
 
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0.0, end: target),
       duration: const Duration(milliseconds: 1200),
       curve: Curves.easeOutCubic,
       builder: (context, current, _) {
-        return Text(
-          '₹',
-          style: style,
-        );
+        return Text(money(current), style: style);
       },
     );
   }

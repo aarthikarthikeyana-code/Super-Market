@@ -263,20 +263,9 @@ class ProductDetailScreen extends StatefulWidget {
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
-  int _quantity = 1;
-  String _selectedSize = '1 kg';
-  bool _isFavorite = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedSize = widget.product.unit.isNotEmpty ? widget.product.unit : '1 kg';
-  }
-
   @override
   Widget build(BuildContext context) {
     final p = widget.product;
-    final originalPrice = p.price * 1.25;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
@@ -373,36 +362,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ),
                         const SizedBox(height: 10),
 
-                        // Rating badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE8F7EE),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFC7EBD4)),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.star_rounded, size: 16, color: Color(0xFFEAB308)),
-                              SizedBox(width: 4),
-                              Text(
-                                '4.7 (12.4k+ reviews)',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF15803D),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
                         // Price Row
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 10,
+                          runSpacing: 8,
                           children: [
                             Text(
                               money(p.price),
@@ -410,134 +374,39 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 fontSize: 28,
                                 fontWeight: FontWeight.w900,
                                 color: Color(0xFF0F172A),
-                                letterSpacing: -0.5,
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            Text(
-                              money(originalPrice),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Color(0xFF94A3B8),
-                                decoration: TextDecoration.lineThrough,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE8F7EE),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text(
-                                '20% OFF',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF16A05D),
+                            if (p.mrp > p.price)
+                              Text(
+                                money(p.mrp),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Color(0xFF94A3B8),
+                                  decoration: TextDecoration.lineThrough,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            ),
+                            if (p.discountPercent > 0)
+                              Text(
+                                '${p.discountPercent}% off',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF15803D),
+                                ),
+                              ),
                           ],
                         ),
-                        const SizedBox(height: 20),
-
-                        // Size Selector
-                        const Text(
-                          'Select Size',
-                          style: TextStyle(
+                        const SizedBox(height: 12),
+                        Text(
+                          'Selling unit: ${p.unit}',
+                          style: const TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0F172A),
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF334155),
                           ),
                         ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            for (final size in ['1 kg', '5 kg', '10 kg']) ...[
-                              InkWell(
-                                onTap: () => setState(() => _selectedSize = size),
-                                borderRadius: BorderRadius.circular(16),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                                  margin: const EdgeInsets.only(right: 12),
-                                  decoration: BoxDecoration(
-                                    color: _selectedSize == size
-                                        ? const Color(0xFF0F5132)
-                                        : Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: _selectedSize == size
-                                          ? const Color(0xFF0F5132)
-                                          : const Color(0xFFE2E8F0),
-                                      width: 1.2,
-                                    ),
-                                    boxShadow: _selectedSize == size
-                                        ? [
-                                            BoxShadow(
-                                              color: const Color(0xFF0F5132).withOpacity(0.25),
-                                              blurRadius: 8,
-                                              offset: const Offset(0, 3),
-                                            ),
-                                          ]
-                                        : null,
-                                  ),
-                                  child: Text(
-                                    size,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                      color: _selectedSize == size
-                                          ? Colors.white
-                                          : const Color(0xFF334155),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 22),
-
-                        // 4 Feature Badges matching Screen 3
-                        Row(
-                          children: [
-                            for (final feature in [
-                              ('100% Pure', Icons.eco_outlined, const Color(0xFF16A05D)),
-                              ('Hygienic', Icons.verified_user_outlined, const Color(0xFF0284C7)),
-                              ('Trusted Brand', Icons.verified_outlined, const Color(0xFF7C3AED)),
-                              ('Fast Delivery', Icons.bolt_outlined, const Color(0xFFEA580C)),
-                            ])
-                              Expanded(
-                                child: Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF8FAFC),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      Icon(feature.$2, size: 20, color: feature.$3),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        feature.$1,
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(
-                                          fontSize: 9.5,
-                                          fontWeight: FontWeight.w700,
-                                          color: Color(0xFF334155),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 22),
+                        const SizedBox(height: 18),
 
                         // Description
                         Row(
@@ -551,21 +420,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 color: Color(0xFF0F172A),
                               ),
                             ),
-                            Text(
-                              'More ∨',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF16A05D),
-                              ),
-                            ),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Text(
                           p.description.isNotEmpty
                               ? p.description
-                              : 'Premium quality grocery staples, finely selected and sourced for healthy, nutritious daily cooking in your kitchen.',
+                              : 'No product description recorded.',
                           style: const TextStyle(
                             fontSize: 13,
                             height: 1.5,
@@ -615,7 +476,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           ),
 
-          // 2. Top Floating Navigation (Back + Heart)
+          // 2. Top Floating Navigation
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -642,30 +503,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       child: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A), size: 20),
                     ),
                   ),
-                  InkWell(
-                    onTap: () => setState(() => _isFavorite = !_isFavorite),
-                    borderRadius: BorderRadius.circular(14),
-                    child: Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        _isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                        color: _isFavorite ? const Color(0xFFE11D48) : const Color(0xFF0F172A),
-                        size: 20,
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -689,39 +526,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                 ],
               ),
-              child: Row(
-                children: [
-                  // Stepper [- 1 +]
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          onPressed: _quantity > 1 ? () => setState(() => _quantity--) : null,
-                          icon: const Icon(Icons.remove, size: 16),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        Text(
-                          '$_quantity',
-                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-                        ),
-                        IconButton(
-                          onPressed: () => setState(() => _quantity++),
-                          icon: const Icon(Icons.add, size: 16),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-
-                  // Edit & Configure Button
-                  Expanded(
-                    child: FilledButton.icon(
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
                         widget.onEdit();
@@ -739,9 +546,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                    ),
                   ),
-                ],
               ),
             ),
           ),
