@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'models.dart';
-import 'widgets.dart';
 
 class OrderInvoiceScreen extends StatelessWidget {
   final StoreOrder order;

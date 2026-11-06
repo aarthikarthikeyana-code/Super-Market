@@ -244,72 +244,27 @@ class OperationsDashboard extends ConsumerWidget {
                               ],
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: snapshot.hasError
-                                  ? opsRedBg
-                                  : snapshot.isLoading
-                                  ? opsWarningBg
-                                  : opsMint,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: snapshot.hasError
-                                    ? opsRed.withOpacity(0.3)
-                                    : snapshot.isLoading
-                                    ? opsWarning.withOpacity(0.3)
-                                    : opsForestGreen.withOpacity(0.2),
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: snapshot.hasError
-                                        ? opsRed
-                                        : snapshot.isLoading
-                                        ? opsWarning
-                                        : opsGreen,
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: (snapshot.hasError
-                                                ? opsRed
-                                                : snapshot.isLoading
-                                                ? opsWarning
-                                                : opsGreen)
-                                            .withOpacity(0.5),
-                                        blurRadius: 6,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  snapshot.hasError
-                                      ? 'Sync Retry'
-                                      : snapshot.isLoading
-                                      ? 'Updating...'
-                                      : 'Live Store',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: snapshot.hasError
-                                        ? opsRed
-                                        : snapshot.isLoading
-                                        ? opsWarning
-                                        : opsForestGreen,
-                                  ),
-                                ),
-                              ],
-                            ),
+                          LivePulseBeacon(
+                            color: snapshot.hasError
+                                ? const Color(0xFFE11D48)
+                                : snapshot.isLoading
+                                ? const Color(0xFFD97706)
+                                : const Color(0xFF10B981),
+                            label: snapshot.hasError
+                                ? 'Sync Retry'
+                                : snapshot.isLoading
+                                ? 'Updating...'
+                                : 'Live Store',
+                            backgroundColor: snapshot.hasError
+                                ? const Color(0xFFFFE4E6)
+                                : snapshot.isLoading
+                                ? const Color(0xFFFEF3C7)
+                                : const Color(0xFFE8F7EE),
+                            borderColor: snapshot.hasError
+                                ? const Color(0xFFFECDD3)
+                                : snapshot.isLoading
+                                ? const Color(0xFFFDE68A)
+                                : const Color(0xFFC7EBD4),
                           ),
                         ],
                       );
@@ -317,259 +272,11 @@ class OperationsDashboard extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // 2. Executive Store Financial Command Hero Card
-                  Container(
-                    padding: const EdgeInsets.all(22),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFFFFFFFF),
-                          Color(0xFFF7FCF9),
-                          Color(0xFFEFF9F3),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: const Color(0xFFD1FAE5),
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF16A05D).withOpacity(0.08),
-                          blurRadius: 20,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE8F7EE),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: const Color(0xFFC7EBD4),
-                                  width: 1,
-                                ),
-                              ),
-                              child: const Row(
-                                children: [
-                                  Icon(
-                                    Icons.insights_rounded,
-                                    color: Color(0xFF16A05D),
-                                    size: 14,
-                                  ),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    'STORE FINANCIAL PULSE',
-                                    style: TextStyle(
-                                      color: Color(0xFF0F7645),
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.8,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            InkWell(
-                              onTap: onReports,
-                              borderRadius: BorderRadius.circular(14),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFEF3C7),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: const Color(0xFFFDE68A),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      'Reports',
-                                      style: TextStyle(
-                                        color: Color(0xFFB45309),
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                    SizedBox(width: 4),
-                                    Icon(
-                                      Icons.chevron_right_rounded,
-                                      color: Color(0xFFB45309),
-                                      size: 15,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Recorded Gross Revenue',
-                          style: TextStyle(
-                            color: Color(0xFF64748B),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          opsMoney(data['revenue']),
-                          style: const TextStyle(
-                            fontSize: 34,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF0F172A),
-                            letterSpacing: -0.6,
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        Row(
-                          children: [
-                            // Cash with Employees / Riders
-                            Expanded(
-                              child: InkWell(
-                                onTap: onCash,
-                                borderRadius: BorderRadius.circular(16),
-                                child: Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: const Color(0xFFFED7AA),
-                                      width: 1.2,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.02),
-                                        blurRadius: 6,
-                                      ),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.two_wheeler_rounded,
-                                            size: 15,
-                                            color: Color(0xFFEA580C),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          const Expanded(
-                                            child: Text(
-                                              'With Staff',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                color: Color(0xFF64748B),
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        opsMoney(data['cash_with_employees']),
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w900,
-                                          color: Color(0xFFC2410C),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            // Cash in Store / Safe
-                            Expanded(
-                              child: InkWell(
-                                onTap: onCash,
-                                borderRadius: BorderRadius.circular(16),
-                                child: Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: const Color(0xFFBAE6FD),
-                                      width: 1.2,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.02),
-                                        blurRadius: 6,
-                                      ),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.account_balance_wallet_rounded,
-                                            size: 15,
-                                            color: Color(0xFF0284C7),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          const Expanded(
-                                            child: Text(
-                                              'Store Safe',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                color: Color(0xFF64748B),
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        opsMoney(data['cash_with_store']),
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w900,
-                                          color: Color(0xFF0369A1),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                  // 2. Executive Store Financial Command Hero Card (Midnight Titanium & Shimmering Aurora)
+                  ExecutiveAuroraHeroCard(
+                    data: data,
+                    onReports: onReports,
+                    onCash: onCash,
                   ),
                   const SizedBox(height: 22),
 
@@ -804,7 +511,9 @@ class OperationsDashboard extends ConsumerWidget {
                           for (final cat in categories)
                             SizedBox(
                               width: itemWidth,
-                              child: Material(
+                              child: BouncingTap(
+                                onTap: () => onCategory?.call(cat.id),
+                                child: Material(
                                 color: Colors.white,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(18),
@@ -898,6 +607,7 @@ class OperationsDashboard extends ConsumerWidget {
                                     ),
                                   ),
                                 ),
+                              ),
                               ),
                             ),
                         ],

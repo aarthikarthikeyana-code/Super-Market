@@ -1,29 +1,31 @@
+import 'dart:math' as math;
+import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import 'models.dart';
 import 'widgets.dart';
 
-const opsBaseCream = Color(0xFFF7FAF8);
-const opsWarmWhite = Color(0xFFFFFDF9);
+const opsBaseCream = Color(0xFFF6FAF8);
+const opsWarmWhite = Color(0xFFFFFFFF);
 const opsMint = Color(0xFFE8F7EE);
 const opsGlassMint = Color(0xFFDDF2E5);
 const opsPaleSage = Color(0xFFDDF2E5);
-const opsGreen = Color(0xFF12A05B);
-const opsForestGreen = Color(0xFF087247);
-const opsDeepGreen = opsForestGreen;
-const opsBorder = Color(0xFFDEE8E2);
+const opsGreen = Color(0xFF10B981);
+const opsForestGreen = Color(0xFF047857);
+const opsDeepGreen = Color(0xFF064E3B);
+const opsBorder = Color(0xFFE2EBE5);
 const opsGlassBorder = Color(0xCCFFFFFF);
-const opsInk = Color(0xFF152019);
-const opsMuted = Color(0xFF68736D);
-const opsLightMuted = Color(0xFF94A49B);
-const opsWarning = Color(0xFF996014);
-const opsWarningBg = Color(0xFFFFF3DC);
-const opsRed = Color(0xFFC43B45);
-const opsRedBg = Color(0xFFFFEAEA);
+const opsInk = Color(0xFF0F172A);
+const opsMuted = Color(0xFF64748B);
+const opsLightMuted = Color(0xFF94A3B8);
+const opsWarning = Color(0xFFD97706);
+const opsWarningBg = Color(0xFFFEF3C7);
+const opsRed = Color(0xFFE11D48);
+const opsRedBg = Color(0xFFFFE4E6);
 const opsSuccess = opsGreen;
 const opsSuccessBg = opsMint;
-const opsInfo = Color(0xFF2869AB);
-const opsInfoBg = Color(0xFFEAF3FF);
+const opsInfo = Color(0xFF2563EB);
+const opsInfoBg = Color(0xFFEFF6FF);
 
 String opsMoney(dynamic value) => value == null ? '—' : money(amount(value));
 
@@ -214,30 +216,28 @@ class AdminCanvas extends StatelessWidget {
         child: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
               colors: [
-                Color(0xFFE9F8EF),
-                opsBaseCream,
-                opsWarmWhite,
-                Color(0xFFEFF8F3),
+                Color(0xFFF7FBF8),
+                Color(0xFFFAFCFA),
+                Color(0xFFF3F7F5),
               ],
-              stops: [0, .28, .75, 1],
             ),
           ),
         ),
       ),
       Positioned(
-        top: -60,
+        top: -80,
         left: -40,
         child: Container(
-          width: 320,
-          height: 320,
+          width: 360,
+          height: 360,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: RadialGradient(
               colors: [
-                const Color(0xFF10B981).withOpacity(0.18),
+                const Color(0xFF10B981).withOpacity(0.09),
                 const Color(0xFF10B981).withOpacity(0.0),
               ],
             ),
@@ -245,17 +245,17 @@ class AdminCanvas extends StatelessWidget {
         ),
       ),
       Positioned(
-        top: 280,
-        right: -50,
+        top: 240,
+        right: -60,
         child: Container(
-          width: 340,
-          height: 340,
+          width: 300,
+          height: 300,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: RadialGradient(
               colors: [
-                const Color(0xFFFBBF24).withOpacity(0.16),
-                const Color(0xFFFBBF24).withOpacity(0.0),
+                const Color(0xFF047857).withOpacity(0.04),
+                const Color(0xFF047857).withOpacity(0.0),
               ],
             ),
           ),
@@ -385,34 +385,34 @@ class AdminToolTile extends StatelessWidget {
     this.background = opsMint,
   });
   @override
-  Widget build(BuildContext context) => Material(
+  Widget build(BuildContext context) => BouncingTap(
+    onTap: onTap,
+    child: Material(
     color: Colors.white,
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(20),
-      side: const BorderSide(color: Color(0xFFE2EBE5), width: 1.2),
+      borderRadius: BorderRadius.circular(22),
+      side: const BorderSide(color: Color(0xFFF1F5F3), width: 1.0),
     ),
     elevation: 0,
     clipBehavior: Clip.antiAlias,
     child: InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(22),
       child: Container(
-        padding: const EdgeInsets.all(15),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white,
-              background.withOpacity(0.35),
-            ],
-          ),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF0F3B25).withOpacity(0.04),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
+              color: const Color(0xFF0F172A).withOpacity(0.04),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: const Color(0xFF0F172A).withOpacity(0.02),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -422,22 +422,40 @@ class AdminToolTile extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
-                    color: background,
+                    gradient: LinearGradient(
+                      colors: [color, color.withOpacity(0.82)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: color.withOpacity(0.25), width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withOpacity(0.24),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: Icon(icon, color: color, size: 22),
+                  alignment: Alignment.center,
+                  child: Icon(icon, color: Colors.white, size: 21),
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.all(6),
+                  width: 28,
+                  height: 28,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.08),
+                    color: const Color(0xFFF8FAFC),
                     shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
-                  child: Icon(Icons.north_east_rounded, size: 14, color: color),
+                  child: const Icon(
+                    Icons.north_east_rounded,
+                    size: 13,
+                    color: Color(0xFF64748B),
+                  ),
                 ),
               ],
             ),
@@ -445,23 +463,32 @@ class AdminToolTile extends StatelessWidget {
             Text(
               label,
               style: const TextStyle(
-                fontSize: 14,
+                fontSize: 14.5,
                 fontWeight: FontWeight.w800,
-                color: opsInk,
+                color: Color(0xFF0F172A),
+                letterSpacing: -0.2,
               ),
             ),
             if (detail != null) ...[
               const SizedBox(height: 4),
               Text(
                 detail!,
-                style: const TextStyle(fontSize: 11.5, color: opsMuted, height: 1.3),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF64748B),
+                  height: 1.35,
+                ),
               ),
             ],
           ],
         ),
       ),
     ),
-  );
+  ),
+);
 }
 
 class AdminMetricCard extends StatelessWidget {
@@ -479,34 +506,34 @@ class AdminMetricCard extends StatelessWidget {
     this.onTap,
   });
   @override
-  Widget build(BuildContext context) => Material(
+  Widget build(BuildContext context) => BouncingTap(
+    onTap: onTap,
+    child: Material(
     color: Colors.white,
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(20),
-      side: BorderSide(color: color.withOpacity(0.20), width: 1.2),
+      borderRadius: BorderRadius.circular(22),
+      side: const BorderSide(color: Color(0xFFF1F5F3), width: 1.0),
     ),
     elevation: 0,
     clipBehavior: Clip.antiAlias,
     child: InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(22),
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white,
-              background.withOpacity(0.40),
-            ],
-          ),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.07),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
+              color: const Color(0xFF0F172A).withOpacity(0.04),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: const Color(0xFF0F172A).withOpacity(0.02),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -517,29 +544,38 @@ class AdminMetricCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
                     color: background,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: color.withOpacity(0.25), width: 1),
                   ),
+                  alignment: Alignment.center,
                   child: Icon(icon, size: 20, color: color),
                 ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 12,
-                  color: color.withOpacity(0.45),
+                Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 10,
+                    color: Color(0xFF94A3B8),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             Text(
               value,
-              style: TextStyle(
-                fontSize: 27,
+              style: const TextStyle(
+                fontSize: 26,
                 fontWeight: FontWeight.w900,
-                color: color,
-                letterSpacing: -0.5,
+                color: Color(0xFF0F172A),
+                letterSpacing: -0.6,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -550,7 +586,7 @@ class AdminMetricCard extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: opsInk,
+                color: Color(0xFF475569),
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -559,7 +595,8 @@ class AdminMetricCard extends StatelessWidget {
         ),
       ),
     ),
-  );
+  ),
+);
 }
 
 class AdminBottomNavigation extends StatelessWidget {
@@ -573,82 +610,90 @@ class AdminBottomNavigation extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SafeArea(
     top: false,
-    child: Container(
-      margin: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.96),
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: const Color(0xFFE2EBE5), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF087247).withOpacity(0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          for (final item in <(IconData, String)>[
-            (Icons.space_dashboard_outlined, 'Dashboard'),
-            (Icons.receipt_long_outlined, 'Orders'),
-            (Icons.inventory_2_outlined, 'Products'),
-            (Icons.route_outlined, 'Delivery'),
-            (Icons.grid_view_rounded, 'More'),
-          ].indexed)
-            Expanded(
-              child: Semantics(
-                selected: selected == item.$1,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(20),
-                  onTap: () => onSelected(item.$1),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: selected == item.$1
-                                ? const Color(0xFFD1FAE5)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Icon(
-                            item.$2.$1,
-                            size: 21,
-                            color: selected == item.$1
-                                ? const Color(0xFF047857)
-                                : const Color(0xFF64748B),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.94),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: Colors.white.withOpacity(0.85), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withOpacity(0.08),
+                  blurRadius: 28,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                for (final item in <(IconData, String)>[
+                  (Icons.space_dashboard_outlined, 'Dashboard'),
+                  (Icons.receipt_long_outlined, 'Orders'),
+                  (Icons.inventory_2_outlined, 'Products'),
+                  (Icons.route_outlined, 'Delivery'),
+                  (Icons.grid_view_rounded, 'More'),
+                ].indexed)
+                  Expanded(
+                    child: Semantics(
+                      selected: selected == item.$1,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () => onSelected(item.$1),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: selected == item.$1
+                                      ? const Color(0xFFE8F7EE)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Icon(
+                                  item.$2.$1,
+                                  size: 21,
+                                  color: selected == item.$1
+                                      ? const Color(0xFF047857)
+                                      : const Color(0xFF94A3B8),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                item.$2.$2,
+                                maxLines: 1,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: selected == item.$1
+                                      ? FontWeight.w900
+                                      : FontWeight.w600,
+                                  color: selected == item.$1
+                                      ? const Color(0xFF047857)
+                                      : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          item.$2.$2,
-                          maxLines: 1,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: selected == item.$1
-                                ? FontWeight.w900
-                                : FontWeight.w600,
-                            color: selected == item.$1
-                                ? const Color(0xFF047857)
-                                : const Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
+              ],
             ),
-        ],
+          ),
+        ),
       ),
     ),
   );
@@ -1526,3 +1571,615 @@ class AdminDeliveryStatusCard extends StatelessWidget {
   }
 }
 
+
+
+// ==========================================
+// INTERACTIVE ANIMATIONS & LUXURY THEME SUITE
+// ==========================================
+
+/// Tactile spring micro-interaction for cards and buttons.
+class BouncingTap extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final double scaleFactor;
+
+  const BouncingTap({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.scaleFactor = 0.96,
+  });
+
+  @override
+  State<BouncingTap> createState() => _BouncingTapState();
+}
+
+class _BouncingTapState extends State<BouncingTap> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      onPointerDown: (_) {
+        if (widget.onTap != null && mounted) {
+          setState(() => _pressed = true);
+        }
+      },
+      onPointerUp: (_) {
+        if (_pressed && mounted) {
+          setState(() => _pressed = false);
+        }
+      },
+      onPointerCancel: (_) {
+        if (_pressed && mounted) {
+          setState(() => _pressed = false);
+        }
+      },
+      child: AnimatedScale(
+        scale: _pressed ? widget.scaleFactor : 1.0,
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOutCubic,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+/// Real-time pulsing sonar radar ripple for status pills.
+class LivePulseBeacon extends StatefulWidget {
+  final Color color;
+  final String label;
+  final Color backgroundColor;
+  final Color borderColor;
+
+  const LivePulseBeacon({
+    super.key,
+    required this.color,
+    required this.label,
+    required this.backgroundColor,
+    required this.borderColor,
+  });
+
+  @override
+  State<LivePulseBeacon> createState() => _LivePulseBeaconState();
+}
+
+class _LivePulseBeaconState extends State<LivePulseBeacon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: widget.backgroundColor,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: widget.borderColor, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: widget.color.withOpacity(0.14),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) {
+              final progress = _controller.value;
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Sonar ripple outer ring
+                  Transform.scale(
+                    scale: 1.0 + (progress * 1.6),
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: widget.color.withOpacity((1.0 - progress) * 0.40),
+                      ),
+                    ),
+                  ),
+                  // Central luminous core
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: widget.color,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: widget.color.withOpacity(0.65),
+                          blurRadius: 6,
+                          spreadRadius: 1.2,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+          Text(
+            widget.label,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
+              color: widget.color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Smooth counting number ticker for revenue and balances.
+class AnimatedCountingCurrency extends StatelessWidget {
+  final dynamic value;
+  final TextStyle style;
+
+  const AnimatedCountingCurrency({
+    super.key,
+    required this.value,
+    required this.style,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (value == null) {
+      return Text('—', style: style);
+    }
+    final target = (value is num)
+        ? value.toDouble()
+        : (double.tryParse('') ?? 0.0);
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: target),
+      duration: const Duration(milliseconds: 1200),
+      curve: Curves.easeOutCubic,
+      builder: (context, current, _) {
+        return Text(
+          '₹',
+          style: style,
+        );
+      },
+    );
+  }
+}
+
+/// Executive Luxury Midnight Obsidian & Shimmering Aurora Command Hero Card.
+class ExecutiveAuroraHeroCard extends StatefulWidget {
+  final Map<String, dynamic> data;
+  final VoidCallback onReports;
+  final VoidCallback onCash;
+
+  const ExecutiveAuroraHeroCard({
+    super.key,
+    required this.data,
+    required this.onReports,
+    required this.onCash,
+  });
+
+  @override
+  State<ExecutiveAuroraHeroCard> createState() => _ExecutiveAuroraHeroCardState();
+}
+
+class _ExecutiveAuroraHeroCardState extends State<ExecutiveAuroraHeroCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 5500),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final progress = _controller.value;
+        final sweepOffset = -1.0 + (progress * 3.0);
+
+        return Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(26),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0F172A).withOpacity(0.32),
+                blurRadius: 28,
+                offset: const Offset(0, 12),
+              ),
+              BoxShadow(
+                color: const Color(0xFF0284C7).withOpacity(0.08 + (progress * 0.08)),
+                blurRadius: 36,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(26),
+            child: Stack(
+              children: [
+                // 1. Midnight Titanium Slate Base Gradient (No heavy green!)
+                Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF0F172A), // Midnight Slate
+                        Color(0xFF1E293B), // Titanium Navy
+                        Color(0xFF0F2038), // Deep Cosmic Sapphire
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(26),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.14),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: _buildCardContent(context),
+                ),
+
+                // 2. Animated Ambient Aurora Orb (Top-Left Cyan Glow)
+                Positioned(
+                  top: -50 + (math.sin(progress * math.pi) * 20),
+                  left: -40 + (math.cos(progress * math.pi) * 25),
+                  child: IgnorePointer(
+                    child: Container(
+                      width: 220,
+                      height: 220,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            const Color(0xFF0284C7).withOpacity(0.24),
+                            const Color(0xFF06B6D4).withOpacity(0.10),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // 3. Animated Ambient Aurora Orb (Bottom-Right Indigo/Violet Glow)
+                Positioned(
+                  bottom: -60 - (math.sin(progress * math.pi) * 18),
+                  right: -40 - (math.cos(progress * math.pi) * 20),
+                  child: IgnorePointer(
+                    child: Container(
+                      width: 240,
+                      height: 240,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            const Color(0xFF6366F1).withOpacity(0.22),
+                            const Color(0xFF8B5CF6).withOpacity(0.09),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // 4. Moving Liquid Shimmer Sheen Beam
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment(sweepOffset - 0.4, -1.0),
+                          end: Alignment(sweepOffset + 0.4, 1.0),
+                          colors: [
+                            Colors.white.withOpacity(0.0),
+                            Colors.white.withOpacity(0.05),
+                            Colors.white.withOpacity(0.0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCardContent(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Top Row: Glowing Pulse Pill + Luxury Reports Button
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.16),
+                  width: 1,
+                ),
+              ),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.auto_graph_rounded,
+                    color: Color(0xFF38BDF8),
+                    size: 14,
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    'STORE REVENUE PULSE',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            BouncingTap(
+              onTap: widget.onReports,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFFF59E0B).withOpacity(0.28),
+                      const Color(0xFFD97706).withOpacity(0.18),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: const Color(0xFFF59E0B).withOpacity(0.55),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFF59E0B).withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Reports',
+                      style: TextStyle(
+                        color: Color(0xFFFEF3C7),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(width: 4),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: Color(0xFFFEF3C7),
+                      size: 16,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+
+        // Middle: Recorded Gross Revenue
+        Row(
+          children: [
+            Container(
+              width: 6,
+              height: 6,
+              decoration: const BoxDecoration(
+                color: Color(0xFF38BDF8),
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Text(
+              'Recorded Gross Revenue',
+              style: TextStyle(
+                color: Color(0xFFCBD5E1),
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        AnimatedCountingCurrency(
+          value: widget.data['revenue'],
+          style: const TextStyle(
+            fontSize: 36,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+            letterSpacing: -0.6,
+            shadows: [
+              Shadow(
+                color: Color(0x66000000),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+
+        // Bottom Splits: With Staff & Store Safe
+        Row(
+          children: [
+            Expanded(
+              child: BouncingTap(
+                onTap: widget.onCash,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFFF59E0B).withOpacity(0.35),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF59E0B).withOpacity(0.25),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.two_wheeler_rounded,
+                              size: 13,
+                              color: Color(0xFFFDE68A),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Expanded(
+                            child: Text(
+                              'With Staff',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Color(0xFFE2E8F0),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      AnimatedCountingCurrency(
+                        value: widget.data['cash_with_employees'],
+                        style: const TextStyle(
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: BouncingTap(
+                onTap: widget.onCash,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFF38BDF8).withOpacity(0.35),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF38BDF8).withOpacity(0.25),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.account_balance_wallet_rounded,
+                              size: 13,
+                              color: Color(0xFFBAE6FD),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Expanded(
+                            child: Text(
+                              'Store Safe',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Color(0xFFE2E8F0),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      AnimatedCountingCurrency(
+                        value: widget.data['cash_with_store'],
+                        style: const TextStyle(
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}

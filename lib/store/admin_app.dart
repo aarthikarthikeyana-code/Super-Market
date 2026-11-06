@@ -172,14 +172,36 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'AGARAM',
-                  style: TextStyle(
-                    fontSize: 15,
-                    letterSpacing: 1,
-                    fontWeight: FontWeight.w800,
-                    color: opsForestGreen,
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'AGARAM',
+                      style: TextStyle(
+                        fontSize: 15,
+                        letterSpacing: 0.8,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F7EE),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'ADMIN',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F7645),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 Text(
                   const [
