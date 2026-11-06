@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -50,6 +51,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     _api = api;
     _signedIn = api.adminToken != null;
     api.staffChanges.addListener(_staffChanged);
+    if (_signedIn) _checkAndSeedCatalog();
     _poll = Timer.periodic(const Duration(seconds: 20), (_) {
       if (_signedIn) {
         ref.read(storeApiProvider).feedChanges.value++;
@@ -75,7 +77,10 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   }
 
   void _staffChanged() {
-    if (mounted) setState(() => _signedIn = _api.adminToken != null);
+    if (mounted) {
+      setState(() => _signedIn = _api.adminToken != null);
+      if (_signedIn) _checkAndSeedCatalog();
+    }
   }
 
   Future<void> _logout() async {
@@ -94,6 +99,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   void _loginSuccess() {
     refreshCommerce(ref);
     setState(() => _signedIn = true);
+    _checkAndSeedCatalog();
   }
 
   @override
@@ -263,6 +269,17 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       _tab = 2;
       _productFilter = filter;
       _productCategory = null;
+      _productBrand = null;
+      _productSearch = '';
+      _productSearchInput.clear();
+    });
+  }
+
+  void _showCategory(String category) {
+    setState(() {
+      _tab = 2;
+      _productFilter = 'all';
+      _productCategory = category;
       _productBrand = null;
       _productSearch = '';
       _productSearchInput.clear();
@@ -711,6 +728,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   Widget _overview() => OperationsDashboard(
     onOrders: _showOrders,
     onInventory: _showInventory,
+    onCategory: _showCategory,
     onAddProduct: () => _editProduct(),
     onCreateEmployee: () => _editPerson(),
     onTeam: () => setState(() => _tab = 5),
@@ -728,6 +746,66 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       MaterialPageRoute(builder: (_) => ProductEditorScreen(product: product)),
     );
     if (mounted && result == true) refreshCommerce(ref);
+  }
+
+  bool _seedingChecked = false;
+
+  void _checkAndSeedCatalog() {
+    if (_seedingChecked || !_signedIn) return;
+    _seedingChecked = true;
+    _seedCatalogInBackground();
+  }
+
+  Future<void> _seedCatalogInBackground() async {
+    try {
+      final api = ref.read(storeApiProvider);
+      if (api.adminToken == null) return;
+      final existing = await api.products();
+      final existingNames = existing
+          .map((p) => p.tamilName.trim().toLowerCase())
+          .toSet();
+
+      bool addedAny = false;
+      for (final item in kCuratedFortyGroceryProducts) {
+        final name = (item['tamil_name'] as String).trim().toLowerCase();
+        if (existingNames.contains(name)) continue;
+
+        String? imageId;
+        try {
+          final dio = api.dio;
+          final res = await dio.get<List<int>>(
+            item['image_url'] as String,
+            options: Options(responseType: ResponseType.bytes),
+          );
+          if (res.data != null && res.data!.isNotEmpty) {
+            final uploadRes = await api.upload(res.data!, '${item['sku']}.jpg');
+            imageId = uploadRes['id'] as String?;
+          }
+        } catch (_) {}
+
+        await api.saveProduct({
+          'english_name': item['english_name'],
+          'tamil_name': item['tamil_name'],
+          'brand': item['brand'],
+          'category': item['category'],
+          'price': item['price'],
+          'stock_kg': item['stock_kg'],
+          'unit': item['unit'],
+          'description': item['description'],
+          'sku': item['sku'],
+          'image': ?imageId,
+          'is_in_stock': true,
+          'is_active': true,
+        });
+        existingNames.add(name);
+        addedAny = true;
+      }
+      if (addedAny && mounted) {
+        refreshCommerce(ref);
+      }
+    } catch (_) {
+      // Background seeder is silent and resilient
+    }
   }
 
   Widget _products() {
@@ -889,12 +967,47 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
               ),
             ),
             if (_productCategory != null || _productBrand != null)
-              InputChip(
-                label: Text(_productCategory ?? _productBrand!),
-                onDeleted: () => setState(() {
-                  _productCategory = null;
-                  _productBrand = null;
-                }),
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F7EE),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFC7EBD4), width: 1.2),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.category_rounded, size: 16, color: Color(0xFF0F7645)),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Category: ',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F7645),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: () => setState(() {
+                          _productCategory = null;
+                          _productBrand = null;
+                        }),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF16A05D),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.close_rounded, size: 12, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             const SizedBox(height: 16),
           ],
@@ -2659,6 +2772,609 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
     ),
   );
 }
+
+const List<Map<String, dynamic>> kCuratedFortyGroceryProducts = [
+  {
+    'tamil_name': 'பாசுமதி அரிசி',
+    'english_name': 'Basmati Rice',
+    'category': 'Groceries',
+    'brand': 'SK',
+    'price': '120.00',
+    'stock_kg': '23.00',
+    'unit': '1 kg',
+    'description': 'Long-grain basmati rice for biryani, pulao and other fragrant rice dishes.',
+    'sku': '',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793685421/agaram/products/i47ksc7pgxtmnw5kwhwz.jpg',
+  },
+  {
+    'tamil_name': 'பொன்னி அரிசி',
+    'english_name': 'Ponni Boiled Rice',
+    'category': 'Groceries',
+    'brand': 'Agaram',
+    'price': '80.00',
+    'stock_kg': '12.00',
+    'unit': '1 kg',
+    'description': 'Ponni rice for everyday South Indian meals, steamed rice and variety rice dishes.',
+    'sku': '',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793685090/agaram/products/j420mhfbqksyory8lf0r.jpg',
+  },
+  {
+    'tamil_name': 'தூய பச்சரிசி',
+    'english_name': 'Pure Raw Rice',
+    'category': 'Groceries',
+    'brand': 'Agaram',
+    'price': '65.00',
+    'stock_kg': '60.00',
+    'unit': '1 kg',
+    'description': 'First-grade raw rice for sweet pongal, murukku batter, kozhukattai and temple prasadam.',
+    'sku': 'agmp0009',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793940679/agaram/products/t1nms0y2g4hxtpgwk6la.jpg',
+  },
+  {
+    'tamil_name': 'சீரக சம்பா பிரியாணி அரிசி',
+    'english_name': 'Seeraga Samba Biryani Rice',
+    'category': 'Groceries',
+    'brand': 'Agaram',
+    'price': '145.00',
+    'stock_kg': '40.00',
+    'unit': '1 kg',
+    'description': 'Traditional tiny grain scented Seeraga Samba rice for authentic Dindigul biryani.',
+    'sku': 'agmp0007',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793940680/agaram/products/vpg0yawnujgktsht1ji1.jpg',
+  },
+  {
+    'tamil_name': 'இட்லி அரிசி',
+    'english_name': 'Special Idli Rice',
+    'category': 'Groceries',
+    'brand': 'Agaram',
+    'price': '55.00',
+    'stock_kg': '80.00',
+    'unit': '1 kg',
+    'description': 'Short bold parboiled grain rice designed for extra-soft, spongy idlis and dosas.',
+    'sku': 'agmp0008',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793940683/agaram/products/k4hcqiuzbxjyr0dlpgs4.jpg',
+  },
+  {
+    'tamil_name': 'சூரியகாந்தி சமையல் எண்ணெய்',
+    'english_name': 'Fortune Sunlite Sunflower Oil',
+    'category': 'எண்ணெய் வகைகள்',
+    'brand': 'Fortune',
+    'price': '140.00',
+    'stock_kg': '45.00',
+    'unit': '1 L',
+    'description': 'Refined sunflower cooking oil enriched with vitamins A & D for healthy everyday cooking.',
+    'sku': 'OIL-SUN-1L',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793879484/agaram/products/m1qgktzdnrvpioy29je9.jpg',
+  },
+  {
+    'tamil_name': 'கோல்ட் வின்னர் கடலை எண்ணெய்',
+    'english_name': 'Gold Winner Groundnut Oil',
+    'category': 'எண்ணெய் வகைகள்',
+    'brand': 'Gold Winner',
+    'price': '195.00',
+    'stock_kg': '30.00',
+    'unit': '1 L',
+    'description': 'Filtered traditional groundnut peanut oil for crisp snacks, dosas and deep frying.',
+    'sku': 'OIL-GND-1L',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793879495/agaram/products/ke8gvsrcdi9aseifwyx3.jpg',
+  },
+  {
+    'tamil_name': 'இதயம் நல்லெண்ணெய்',
+    'english_name': 'Idhayam Gingelly Sesame Oil',
+    'category': 'எண்ணெய் வகைகள்',
+    'brand': 'Idhayam',
+    'price': '240.00',
+    'stock_kg': '45.00',
+    'unit': '1 kg',
+    'description': 'First-press sesame gingelly oil for traditional South Indian gravies, dosas and podis.',
+    'sku': 'agmp0034',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793940674/agaram/products/jzol5xtggts8yzywv6ao.jpg',
+  },
+  {
+    'tamil_name': 'நந்தினி சுத்தமான பசு நெய்',
+    'english_name': 'Nandini Pure Cow Ghee',
+    'category': 'எண்ணெய் வகைகள்',
+    'brand': 'Nandini',
+    'price': '285.00',
+    'stock_kg': '35.00',
+    'unit': '500 g',
+    'description': 'Golden granular aromatic pure cow ghee for sweets, pongal, dosas and daily meals.',
+    'sku': 'agmp0036',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793940677/agaram/products/akprjnznasskpkk9oxsl.jpg',
+  },
+  {
+    'tamil_name': 'விவிடி தூய தேங்காய் எண்ணெய்',
+    'english_name': 'VVD Pure Coconut Oil',
+    'category': 'எண்ணெய் வகைகள்',
+    'brand': 'VVD',
+    'price': '160.00',
+    'stock_kg': '30.00',
+    'unit': '500 g',
+    'description': '100% pure filtered coconut oil for Kerala & South Indian cooking, avial and baking.',
+    'sku': 'agmp0035',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793940685/agaram/products/tglgs2lyz4n5ve4crqgn.jpg',
+  },
+  {
+    'tamil_name': 'கருப்பு கொண்டைக்கடலை',
+    'english_name': 'Black Chickpeas Kala Chana',
+    'category': 'பருப்பு வகைகள்',
+    'brand': 'Tata Sampann',
+    'price': '85.00',
+    'stock_kg': '40.00',
+    'unit': '1 kg',
+    'description': 'Protein-dense brown unpolished kala chana for sundal, kadala curry and healthy sprouts.',
+    'sku': 'agmp0058',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793941669/agaram/products/grllrulo70mx8pwmddfa.png',
+  },
+  {
+    'tamil_name': 'கருப்பு உளுந்து',
+    'english_name': 'Black Urad Dal Whole',
+    'category': 'பருப்பு வகைகள்',
+    'brand': 'Tata Sampann',
+    'price': '68.00',
+    'stock_kg': '45.00',
+    'unit': '1 kg',
+    'description': 'Whole black gram with skin intact for traditional ulundhu kali, healthy porridge and dal makhani.',
+    'sku': 'agmp0061',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793941678/agaram/products/thju0jkfe1gbu3ojxd8q.png',
+  },
+  {
+    'tamil_name': 'கடலைப்பருப்பு',
+    'english_name': 'Chana Dal Premium',
+    'category': 'பருப்பு வகைகள்',
+    'brand': 'Agaram',
+    'price': '60.00',
+    'stock_kg': '30.00',
+    'unit': '2',
+    'description': 'Split Bengal gram for paruppu vadai, kootu, chutneys and tempering.',
+    'sku': '',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793796147/agaram/products/upm7lcfytez74ggo5vur.jpg',
+  },
+  {
+    'tamil_name': 'பச்சைப் பயறு',
+    'english_name': 'Green Gram',
+    'category': 'பருப்பு வகைகள்',
+    'brand': '',
+    'price': '75.00',
+    'stock_kg': '27.00',
+    'unit': '3',
+    'description': 'Whole mung beans for sundal, curries, pesarattu and sprouted preparations.',
+    'sku': '',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793796234/agaram/products/xhqidpj3u4ebrzhiqyfg.jpg',
+  },
+  {
+    'tamil_name': 'வெள்ளை கொண்டைக்கடலை',
+    'english_name': 'Kabuli White Chickpeas',
+    'category': 'பருப்பு வகைகள்',
+    'brand': 'Tata Sampann',
+    'price': '110.00',
+    'stock_kg': '35.00',
+    'unit': '1 kg',
+    'description': 'Plump tender white kabuli chickpeas for restaurant-style chana masala, sundal and salads.',
+    'sku': 'agmp0059',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793941671/agaram/products/prg2lqicgsuqu6wlwzop.jpg',
+  },
+  {
+    'tamil_name': 'பாசிப்பருப்பு',
+    'english_name': 'Moong Dal Yellow',
+    'category': 'பருப்பு வகைகள்',
+    'brand': 'Agaram',
+    'price': '80.00',
+    'stock_kg': '13.00',
+    'unit': '2',
+    'description': 'Yellow split mung beans for pongal, kootu, dal and payasam.',
+    'sku': '',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793796061/agaram/products/uxfd1jbpc3foput0thki.jpg',
+  },
+  {
+    'tamil_name': 'மசூர் பருப்பு',
+    'english_name': 'Red Masoor Dal Split',
+    'category': 'பருப்பு வகைகள்',
+    'brand': 'Tata Sampann',
+    'price': '72.00',
+    'stock_kg': '35.00',
+    'unit': '1 kg',
+    'description': 'Quick-cooking split red masoor lentils rich in protein and fiber for hearty sambar and soup.',
+    'sku': 'agmp0062',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793941680/agaram/products/ikutgrr6pvnlpvehtvii.png',
+  },
+  {
+    'tamil_name': 'துவரம்பருப்பு',
+    'english_name': 'Toor Dal Premium',
+    'category': 'பருப்பு வகைகள்',
+    'brand': 'Agaram',
+    'price': '200.00',
+    'stock_kg': '46.00',
+    'unit': '1',
+    'description': 'Split pigeon peas for preparing sambar, dal and traditional lentil dishes.',
+    'sku': '',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793703133/agaram/products/lttld3dljf0jz8ai8a3q.jpg',
+  },
+  {
+    'tamil_name': 'உளுத்தம் பருப்பு',
+    'english_name': 'Urad Dal Whole White',
+    'category': 'பருப்பு வகைகள்',
+    'brand': 'Agaram',
+    'price': '60.00',
+    'stock_kg': '44.00',
+    'unit': '1',
+    'description': 'Split, skinned black gram for idli and dosa batter, tempering and traditional recipes.',
+    'sku': '',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793703335/agaram/products/h1xy0wu5p4dqfjwkzfw4.jpg',
+  },
+  {
+    'tamil_name': '3 ரோஸஸ் தேயிலை',
+    'english_name': 'Brooke Bond 3 Roses Tea',
+    'category': 'பானங்கள்',
+    'brand': '3 Roses',
+    'price': '185.00',
+    'stock_kg': '40.00',
+    'unit': '250 g',
+    'description': 'Perfect blend of color and strength for an invigorating cup of South Indian milk tea.',
+    'sku': 'agmp0046',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793940673/agaram/products/lsovtlashgp6ebf5tljp.jpg',
+  },
+  {
+    'tamil_name': 'தாஜ் மஹால் தேயிலை',
+    'english_name': 'Brooke Bond Taj Mahal Tea',
+    'category': 'பானங்கள்',
+    'brand': 'Taj Mahal',
+    'price': '210.00',
+    'stock_kg': '40.00',
+    'unit': '250g',
+    'description': 'Exquisite tea crafted from fine tea leaves with golden liquor and invigorating aroma.',
+    'sku': 'BEV-TAJ-250G',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793879493/agaram/products/ff4gikymku0houuf3cnt.jpg',
+  },
+  {
+    'tamil_name': 'புரூ இன்ஸ்டண்ட் காபி தூள்',
+    'english_name': 'Bru Instant Coffee',
+    'category': 'பானங்கள்',
+    'brand': 'Bru',
+    'price': '190.00',
+    'stock_kg': '35.00',
+    'unit': '100g',
+    'description': 'Rich blend of fine robusta and arabica coffee beans with chicory for aromatic South Indian filter taste.',
+    'sku': 'BEV-BRU-100G',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793879491/agaram/products/iktnogkhc3pftdkbsdny.jpg',
+  },
+  {
+    'tamil_name': 'ரெட் லேபிள் தேயிலை',
+    'english_name': 'Red Label Natural Care Tea',
+    'category': 'பானங்கள்',
+    'brand': 'Red Label',
+    'price': '190.00',
+    'stock_kg': '35.00',
+    'unit': '250 g',
+    'description': 'Infused with ayurvedic herbs like tulsi, ginger and mulethi for natural immunity and health.',
+    'sku': 'agmp0047',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793940709/agaram/products/pmtb3w2hhtsnxecodpot.jpg',
+  },
+  {
+    'tamil_name': 'ஆச்சி மிளகுத் தூள்',
+    'english_name': 'Aachi Black Pepper Powder',
+    'category': 'மசாலா வகைகள்',
+    'brand': 'Aachi',
+    'price': '62.00',
+    'stock_kg': '40.00',
+    'unit': '50g',
+    'description': 'Finely ground Malabar black pepper powder delivering sharp pungency and warmth.',
+    'sku': 'SPICE-PEP-50G',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793879494/agaram/products/nfq401i5u12wpdqitr5f.jpg',
+  },
+  {
+    'tamil_name': 'ஆச்சி மல்லித் தூள்',
+    'english_name': 'Aachi Coriander Powder',
+    'category': 'மசாலா வகைகள்',
+    'brand': 'Aachi',
+    'price': '42.00',
+    'stock_kg': '40.00',
+    'unit': '200 g',
+    'description': 'Pure roasted coriander seeds dhaniya powder for rich curry aroma and thick gravy.',
+    'sku': 'agmp0037',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793940665/agaram/products/fyebwb233zhlcpc60lzg.jpg',
+  },
+  {
+    'tamil_name': 'ஆச்சி சீரகத் தூள்',
+    'english_name': 'Aachi Cumin Powder',
+    'category': 'மசாலா வகைகள்',
+    'brand': 'Aachi',
+    'price': '68.00',
+    'stock_kg': '45.00',
+    'unit': '100g',
+    'description': 'Fragrant pure ground jeera cumin powder, essential for rasam, curries and tadka.',
+    'sku': 'SPICE-JEE-100G',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793879497/agaram/products/dd8uigu5yxxfemo7skog.jpg',
+  },
+  {
+    'tamil_name': 'ஆச்சி கரம் மசாலா',
+    'english_name': 'Aachi Garam Masala',
+    'category': 'மசாலா வகைகள்',
+    'brand': 'Aachi',
+    'price': '45.00',
+    'stock_kg': '35.00',
+    'unit': '100 g',
+    'description': 'Special aromatic whole spice blend of cinnamon, cardamom and cloves for biryani and curries.',
+    'sku': 'agmp0038',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793940667/agaram/products/n68q14ndrovz7o8lrizk.jpg',
+  },
+  {
+    'tamil_name': 'மிளகாய்த் தூள்',
+    'english_name': 'Aachi Red Chilli Powder',
+    'category': 'மசாலா வகைகள்',
+    'brand': 'Aachi',
+    'price': '50.00',
+    'stock_kg': '29.00',
+    'unit': '1kg',
+    'description': 'Ground red chilli powder for adding heat and colour to curries, gravies and marinades.',
+    'sku': '',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793872493/agaram/products/if6em4lwi9iijhc7pafi.jpg',
+  },
+  {
+    'tamil_name': 'ஆச்சி சாம்பார் பொடி',
+    'english_name': 'Aachi Sambar Powder',
+    'category': 'மசாலா வகைகள்',
+    'brand': 'Aachi',
+    'price': '38.00',
+    'stock_kg': '50.00',
+    'unit': '100g',
+    'description': 'Authentic South Indian aromatic sambar masala blend crafted with premium roasted spices.',
+    'sku': 'SPICE-SAM-100G',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793879489/agaram/products/mv7pg7bht3zhnhf3bdod.jpg',
+  },
+  {
+    'tamil_name': 'மஞ்சள் தூள்',
+    'english_name': 'Aachi Turmeric Powder',
+    'category': 'மசாலா வகைகள்',
+    'brand': 'Aachi',
+    'price': '15.00',
+    'stock_kg': '49.00',
+    'unit': '500g',
+    'description': 'Ground turmeric for adding its characteristic golden colour and earthy flavour to everyday cooking.',
+    'sku': '',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793872855/agaram/products/qkvuixdgyleknsebnpep.jpg',
+  },
+  {
+    'tamil_name': 'சோம்பு',
+    'english_name': 'Fennel Seeds Perunjeeragam',
+    'category': 'மசாலா வகைகள்',
+    'brand': 'Tata Sampann',
+    'price': '45.00',
+    'stock_kg': '30.00',
+    'unit': '100 g',
+    'description': 'Sweet fragrant whole fennel seeds for biryani, non-veg curries and after-meal digestion.',
+    'sku': 'agmp0056',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793941663/agaram/products/xojee3kjtgszwgtsxekx.png',
+  },
+  {
+    'tamil_name': 'வெந்தயம்',
+    'english_name': 'Fenugreek Seeds Venthayam',
+    'category': 'மசாலா வகைகள்',
+    'brand': 'Tata Sampann',
+    'price': '32.00',
+    'stock_kg': '35.00',
+    'unit': '200 g',
+    'description': 'Golden aromatic fenugreek seeds for cooling vendhaya kali, kara kulambu and idli batter.',
+    'sku': 'agmp0055',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793941660/agaram/products/n1g0fgjaxkxwxopd5tnp.png',
+  },
+  {
+    'tamil_name': 'ஏலக்காய்',
+    'english_name': 'Green Cardamom Elakkai',
+    'category': 'மசாலா வகைகள்',
+    'brand': 'Tata Sampann',
+    'price': '135.00',
+    'stock_kg': '15.00',
+    'unit': '50 g',
+    'description': 'Fragrant green cardamom whole pods for royal South Indian payasam, kesari and chai.',
+    'sku': 'agmp0054',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793941656/agaram/products/yprbjmi3uyyaiyiduktq.png',
+  },
+  {
+    'tamil_name': 'எல்.ஜி பெருங்காயத் தூள்',
+    'english_name': 'LG Compounded Asafoetida',
+    'category': 'மசாலா வகைகள்',
+    'brand': 'LG',
+    'price': '55.00',
+    'stock_kg': '50.00',
+    'unit': '50 g',
+    'description': 'Aromatic hing powder for comforting digestion, sambar, rasam and tempering.',
+    'sku': 'agmp0039',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793940676/agaram/products/kdi7bmuipjlvuzggoblq.jpg',
+  },
+  {
+    'tamil_name': 'கடுகு',
+    'english_name': 'Mustard Seeds Kadugu',
+    'category': 'மசாலா வகைகள்',
+    'brand': 'Tata Sampann',
+    'price': '35.00',
+    'stock_kg': '40.00',
+    'unit': '200 g',
+    'description': 'Crisp pungent small black mustard seeds essential for South Indian tempering and pickles.',
+    'sku': 'agmp0051',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793941646/agaram/products/nw2cvkwgrp2vkdly6abo.png',
+  },
+  {
+    'tamil_name': 'கிராம்பு',
+    'english_name': 'Whole Cloves Krambu',
+    'category': 'மசாலா வகைகள்',
+    'brand': 'Tata Sampann',
+    'price': '95.00',
+    'stock_kg': '20.00',
+    'unit': '50 g',
+    'description': 'Premium aromatic whole cloves for fragrant biryani, kashayam, chai and spice tempering.',
+    'sku': 'agmp0053',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793941652/agaram/products/cir7jifsedxoofwhx0zk.png',
+  },
+  {
+    'tamil_name': 'சீரகம்',
+    'english_name': 'Whole Jeera Cumin Seeds',
+    'category': 'மசாலா வகைகள்',
+    'brand': 'Tata Sampann',
+    'price': '75.00',
+    'stock_kg': '35.00',
+    'unit': '200 g',
+    'description': 'Aromatic whole cumin seeds for tempering, jeera rice, rasam and digestive health.',
+    'sku': 'agmp0052',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793941649/agaram/products/vrd9vo2czcq5mc7up5nz.png',
+  },
+  {
+    'tamil_name': 'ஆச்சி குலாப் ஜாமூன் மிக்ஸ்',
+    'english_name': 'Aachi Gulab Jamun Ready Mix',
+    'category': 'மளிகைப் பொருட்கள்',
+    'brand': 'Aachi',
+    'price': '70.00',
+    'stock_kg': '35.00',
+    'unit': '200 g',
+    'description': 'Delicious instant sweet mix yielding 40 soft melt-in-mouth gulab jamuns.',
+    'sku': 'agmp0048',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793940708/agaram/products/t0dv92qqbdfenty0vuxy.jpg',
+  },
+  {
+    'tamil_name': 'தூய வெள்ளை சர்க்கரை',
+    'english_name': 'Pure Refined White Sugar',
+    'category': 'மளிகைப் பொருட்கள்',
+    'brand': 'Agaram',
+    'price': '48.00',
+    'stock_kg': '80.00',
+    'unit': '1 kg',
+    'description': 'Sparkling white sulphur-free refined sugar crystals for sweets, beverages and daily tea.',
+    'sku': 'SUG-WHT-1KG',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793879490/agaram/products/x9u4zmnalfjvz1ry8rat.jpg',
+  },
+  {
+    'tamil_name': 'வேர்க்கடலை / நிலக்கடலை',
+    'english_name': 'Raw Peanuts Groundnuts',
+    'category': 'மளிகைப் பொருட்கள்',
+    'brand': 'Tata Sampann',
+    'price': '95.00',
+    'stock_kg': '50.00',
+    'unit': '1 kg',
+    'description': 'Selected raw shelled whole pink groundnuts for roasting, peanut chutney, chikki and rice.',
+    'sku': 'agmp0060',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793941675/agaram/products/pqf5fvo9q14fapwc4vt4.png',
+  },
+  {
+    'tamil_name': 'டாடா உப்பு',
+    'english_name': 'Tata Salt Vacuum Evaporated Iodised',
+    'category': 'மளிகைப் பொருட்கள்',
+    'brand': 'Tata',
+    'price': '28.00',
+    'stock_kg': '60.00',
+    'unit': '1 kg',
+    'description': 'Desh ka Namak, vacuum evaporated iodised salt for purity and optimal iodine nutrition.',
+    'sku': 'SALT-TAT-1KG',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793879487/agaram/products/dbvnhdnh6trqzajofeeq.jpg',
+  },
+  {
+    'tamil_name': 'கெட்டி அவல்',
+    'english_name': 'Thick White Poha Aval',
+    'category': 'மளிகைப் பொருட்கள்',
+    'brand': 'Tata Sampann',
+    'price': '42.00',
+    'stock_kg': '45.00',
+    'unit': '500 g',
+    'description': 'Wholesome thick flattened rice flakes for quick breakfast upma, aval payasam and mixture.',
+    'sku': 'agmp0057',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793941666/agaram/products/pv3duau6avde6dtdbkrs.png',
+  },
+  {
+    'tamil_name': 'பஜ்ஜி போண்டா மாவு மிக்ஸ்',
+    'english_name': 'Aachi Bajji Bonda Flour Mix',
+    'category': 'மாவு வகைகள்',
+    'brand': 'Aachi',
+    'price': '45.00',
+    'stock_kg': '40.00',
+    'unit': '500 g',
+    'description': 'Authentic South Indian spiced ready mix for crispy golden onion pakoda, raw banana and potato bajjis.',
+    'sku': 'agmp0064',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793941685/agaram/products/c4yjyhoaewnycwmbmvos.png',
+  },
+  {
+    'tamil_name': 'அனில் வறுக்காத சேமியா',
+    'english_name': 'Anil Plain Vermicelli Semiya',
+    'category': 'மாவு வகைகள்',
+    'brand': 'Anil',
+    'price': '45.00',
+    'stock_kg': '55.00',
+    'unit': '500g',
+    'description': 'Non-sticky wheat vermicelli semiya for preparing traditional payasam, upma and kheer.',
+    'sku': 'FLOUR-SEM-500G',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793879496/agaram/products/gb26xnpl0otoroa0avxd.jpg',
+  },
+  {
+    'tamil_name': 'வறுத்த ரவை',
+    'english_name': 'Double Roasted Sooji Rava',
+    'category': 'மாவு வகைகள்',
+    'brand': 'Naga',
+    'price': '52.00',
+    'stock_kg': '40.00',
+    'unit': '500 g',
+    'description': 'Hygienically roasted durum wheat semolina for quick lump-free rava kesari and upma.',
+    'sku': 'agmp0028',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793940681/agaram/products/m5tzbue5ojnhzbpln3sb.jpg',
+  },
+  {
+    'tamil_name': 'இடியாப்ப அரிசி மாவு',
+    'english_name': 'Idiyappam Rice Flour',
+    'category': 'மாவு வகைகள்',
+    'brand': 'Anil',
+    'price': '48.00',
+    'stock_kg': '35.00',
+    'unit': '500 g',
+    'description': 'Steamed fine white rice flour for smooth string hoppers idiyappam and kozhukattai.',
+    'sku': 'agmp0029',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793940669/agaram/products/xhuevgxu6eczy0qyyvvo.jpg',
+  },
+  {
+    'tamil_name': 'மைதா மாவு',
+    'english_name': 'Naga Maida Flour',
+    'category': 'மாவு வகைகள்',
+    'brand': 'Naga',
+    'price': '46.00',
+    'stock_kg': '30.00',
+    'unit': '500 g',
+    'description': 'Premium high-stretch refined wheat flour for flaky layered Malabar parotta, samosas and sweets.',
+    'sku': 'agmp0065',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793941686/agaram/products/omssnnegttrsq9thb3ou.png',
+  },
+  {
+    'tamil_name': 'கடலை மாவு',
+    'english_name': 'Pure Besan Gram Flour',
+    'category': 'மாவு வகைகள்',
+    'brand': 'Agaram',
+    'price': '58.00',
+    'stock_kg': '40.00',
+    'unit': '500 g',
+    'description': 'Finely ground 100% Bengal gram flour for bajji, bonda, pakoda and festive sweets.',
+    'sku': 'agmp0030',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793940671/agaram/products/zldsdzphzfswf18c1n1y.jpg',
+  },
+  {
+    'tamil_name': 'கேழ்வரகு மாவு',
+    'english_name': 'Pure Ragi Flour',
+    'category': 'மாவு வகைகள்',
+    'brand': 'Tata Sampann',
+    'price': '55.00',
+    'stock_kg': '35.00',
+    'unit': '500 g',
+    'description': '100% whole grain finger millet ragi flour rich in calcium for soft ragi dosa, adai and puttu.',
+    'sku': 'agmp0063',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793941683/agaram/products/pcr1jkvgqtyplezdliks.png',
+  },
+  {
+    'tamil_name': 'கோதுமை மாவு',
+    'english_name': 'Whole wheat Atta',
+    'category': 'மாவு வகைகள்',
+    'brand': '',
+    'price': '100.00',
+    'stock_kg': '49.00',
+    'unit': '3',
+    'description': 'Whole wheat flour for preparing chapati, roti, paratha and other wheat-based dishes.',
+    'sku': '',
+    'image_url': 'https://res.cloudinary.com/kbs5o32p/image/upload/v1793796369/agaram/products/gratz210bp6th63esbow.jpg',
+  },
+];
 
 class AdminOrderScreen extends ConsumerStatefulWidget {
   final StoreOrder initialOrder;

@@ -121,12 +121,6 @@ class OpsEmpty extends StatelessWidget {
   );
 }
 
-String opsTime(dynamic value) {
-  final date = DateTime.tryParse('$value')?.toLocal();
-  if (date == null) return 'Time not recorded';
-  return '${date.day}/${date.month} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-}
-
 String opsDate(dynamic value) {
   final date = DateTime.tryParse('$value');
   if (date == null) return '';
@@ -152,6 +146,7 @@ String opsInitial(String name) =>
 
 class OperationsDashboard extends ConsumerWidget {
   final void Function(String) onOrders, onInventory;
+  final void Function(String category)? onCategory;
   final VoidCallback onAddProduct,
       onCreateEmployee,
       onTeam,
@@ -165,6 +160,7 @@ class OperationsDashboard extends ConsumerWidget {
     super.key,
     required this.onOrders,
     required this.onInventory,
+    this.onCategory,
     required this.onAddProduct,
     required this.onCreateEmployee,
     required this.onTeam,
@@ -196,56 +192,389 @@ class OperationsDashboard extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               sliver: SliverList.list(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Welcome back',
-                              style: TextStyle(
-                                fontSize: 23,
-                                fontWeight: FontWeight.w800,
+                  // 1. Dynamic Greeting & Live Store Pulse Header
+                  Builder(
+                    builder: (context) {
+                      final hour = DateTime.now().hour;
+                      final greeting = hour < 12
+                          ? 'Good morning'
+                          : hour < 17
+                          ? 'Good afternoon'
+                          : 'Good evening';
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      '$greeting, Admin',
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w900,
+                                        color: storeInk,
+                                        letterSpacing: -0.4,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    const Text('👋', style: TextStyle(fontSize: 20)),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.storefront_rounded,
+                                      size: 14,
+                                      color: opsForestGreen,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      'Agaram Operations · ${opsDate(today['date'])}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: opsMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: snapshot.hasError
+                                  ? opsRedBg
+                                  : snapshot.isLoading
+                                  ? opsWarningBg
+                                  : opsMint,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: snapshot.hasError
+                                    ? opsRed.withOpacity(0.3)
+                                    : snapshot.isLoading
+                                    ? opsWarning.withOpacity(0.3)
+                                    : opsForestGreen.withOpacity(0.2),
+                                width: 1,
                               ),
                             ),
-                            Text(
-                              'Store operations · ${opsDate(today['date'])}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: opsMuted,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: snapshot.hasError
+                                        ? opsRed
+                                        : snapshot.isLoading
+                                        ? opsWarning
+                                        : opsGreen,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: (snapshot.hasError
+                                                ? opsRed
+                                                : snapshot.isLoading
+                                                ? opsWarning
+                                                : opsGreen)
+                                            .withOpacity(0.5),
+                                        blurRadius: 6,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  snapshot.hasError
+                                      ? 'Sync Retry'
+                                      : snapshot.isLoading
+                                      ? 'Updating...'
+                                      : 'Live Store',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: snapshot.hasError
+                                        ? opsRed
+                                        : snapshot.isLoading
+                                        ? opsWarning
+                                        : opsForestGreen,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 2. Executive Store Financial Command Hero Card
+                  Container(
+                    padding: const EdgeInsets.all(22),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [
+                          Color(0xFFFFFFFF),
+                          Color(0xFFF7FCF9),
+                          Color(0xFFEFF9F3),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: const Color(0xFFD1FAE5),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF16A05D).withOpacity(0.08),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F7EE),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: const Color(0xFFC7EBD4),
+                                  width: 1,
+                                ),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(
+                                    Icons.insights_rounded,
+                                    color: Color(0xFF16A05D),
+                                    size: 14,
+                                  ),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'STORE FINANCIAL PULSE',
+                                    style: TextStyle(
+                                      color: Color(0xFF0F7645),
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            InkWell(
+                              onTap: onReports,
+                              borderRadius: BorderRadius.circular(14),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF3C7),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: const Color(0xFFFDE68A),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Reports',
+                                      style: TextStyle(
+                                        color: Color(0xFFB45309),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    SizedBox(width: 4),
+                                    Icon(
+                                      Icons.chevron_right_rounded,
+                                      color: Color(0xFFB45309),
+                                      size: 15,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      AdminStatusBadge(
-                        snapshot.hasError
-                            ? 'Refresh failed'
-                            : snapshot.isLoading
-                            ? 'Updating'
-                            : data['generated_at'] == null
-                            ? 'No data yet'
-                            : 'Live data',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: Image.asset(
-                        'assets/images/admin-dashboard-banner.png',
-                        width: double.infinity,
-                        height: 140,
-                        fit: BoxFit.contain,
-                        excludeFromSemantics: true,
-                        errorBuilder: (_, error, stackTrace) =>
-                            const SizedBox.shrink(),
-                      ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Recorded Gross Revenue',
+                          style: TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          opsMoney(data['revenue']),
+                          style: const TextStyle(
+                            fontSize: 34,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: -0.6,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            // Cash with Employees / Riders
+                            Expanded(
+                              child: InkWell(
+                                onTap: onCash,
+                                borderRadius: BorderRadius.circular(16),
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: const Color(0xFFFED7AA),
+                                      width: 1.2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.02),
+                                        blurRadius: 6,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.two_wheeler_rounded,
+                                            size: 15,
+                                            color: Color(0xFFEA580C),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          const Expanded(
+                                            child: Text(
+                                              'With Staff',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: Color(0xFF64748B),
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        opsMoney(data['cash_with_employees']),
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFFC2410C),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            // Cash in Store / Safe
+                            Expanded(
+                              child: InkWell(
+                                onTap: onCash,
+                                borderRadius: BorderRadius.circular(16),
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: const Color(0xFFBAE6FD),
+                                      width: 1.2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.02),
+                                        blurRadius: 6,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.account_balance_wallet_rounded,
+                                            size: 15,
+                                            color: Color(0xFF0284C7),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          const Expanded(
+                                            child: Text(
+                                              'Store Safe',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: Color(0xFF64748B),
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        opsMoney(data['cash_with_store']),
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFF0369A1),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
+                  const SizedBox(height: 22),
+
+                  // 3. Section: Live Orders Pipeline Radar (6 Stages)
+                  const OpsHeading('Live Orders Pipeline'),
                   LayoutBuilder(
                     builder: (_, c) {
                       final columns = c.maxWidth < 290
@@ -266,8 +595,8 @@ class OperationsDashboard extends ConsumerWidget {
                                   'new',
                                   'New',
                                   Icons.shopping_bag_outlined,
-                                  opsWarning,
-                                  opsWarningBg,
+                                  const Color(0xFFD97706),
+                                  const Color(0xFFFEF3C7),
                                 ),
                                 (
                                   'Preparing',
@@ -282,24 +611,24 @@ class OperationsDashboard extends ConsumerWidget {
                                   'packed',
                                   'Packed',
                                   Icons.inventory_2_outlined,
-                                  opsInfo,
-                                  opsInfoBg,
+                                  const Color(0xFF0284C7),
+                                  const Color(0xFFE0F2FE),
                                 ),
                                 (
                                   'Out for delivery',
                                   'out_for_delivery',
                                   'Out for Delivery',
                                   Icons.local_shipping_outlined,
-                                  opsInfo,
-                                  Color(0xFFE7F8F5),
+                                  const Color(0xFF7C3AED),
+                                  const Color(0xFFEDE9FE),
                                 ),
                                 (
                                   'Delivered today',
                                   'delivered',
                                   'Delivered',
                                   Icons.task_alt,
-                                  opsForestGreen,
-                                  opsGlassMint,
+                                  const Color(0xFF059669),
+                                  const Color(0xFFD1FAE5),
                                 ),
                                 (
                                   'Needs attention',
@@ -315,7 +644,7 @@ class OperationsDashboard extends ConsumerWidget {
                                   (c.maxWidth - (columns - 1) * 10) / columns,
                               child: AdminMetricCard(
                                 label: metric.$1,
-                                value: '${today[metric.$2] ?? '—'}',
+                                value: '${today[metric.$2] ?? '0'}',
                                 icon: metric.$4,
                                 color: metric.$5,
                                 background: metric.$6,
@@ -326,132 +655,48 @@ class OperationsDashboard extends ConsumerWidget {
                       );
                     },
                   ),
-                  const SizedBox(height: 16),
-                  OpsPanel(
-                    color: opsForestGreen,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                'Recorded sales',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: onReports,
-                              child: const Text(
-                                'Reports',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        Text(
-                          opsMoney(data['revenue']),
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'All time · paid and cash-collected orders',
-                          style: TextStyle(fontSize: 11, color: Colors.white70),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  OpsPanel(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _SmallMetric(
-                                'Cash with employees',
-                                opsMoney(data['cash_with_employees']),
-                                color: opsWarning,
-                                onTap: onCash,
-                              ),
-                              const SizedBox(height: 4),
-                              const Text(
-                                'Current outstanding',
-                                style: TextStyle(fontSize: 10, color: opsMuted),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _SmallMetric(
-                                'Cash received by store',
-                                opsMoney(data['cash_received_by_store']),
-                                color: opsForestGreen,
-                                onTap: onCash,
-                              ),
-                              const SizedBox(height: 4),
-                              const Text(
-                                'All-time receipts',
-                                style: TextStyle(fontSize: 10, color: opsMuted),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const OpsHeading('Quick actions'),
+                  const SizedBox(height: 22),
+
+                  // 4. Quick Actions Command Dock
+                  const OpsHeading('Operations Command Hub'),
                   LayoutBuilder(
                     builder: (_, c) => Wrap(
                       spacing: 10,
                       runSpacing: 10,
                       children: [
                         for (final action
-                            in <(String, IconData, VoidCallback, Color, Color)>[
+                            in <(String, IconData, VoidCallback, Color, Color, String)>[
                               (
-                                'Add product',
-                                Icons.add_box_outlined,
+                                'Add Product',
+                                Icons.add_box_rounded,
                                 onAddProduct,
-                                opsInfo,
-                                opsInfoBg,
+                                const Color(0xFF0284C7),
+                                const Color(0xFFE0F2FE),
+                                'Scan barcode or publish item',
                               ),
                               (
-                                'Receive cash',
-                                Icons.payments_outlined,
+                                'Collect Cash',
+                                Icons.payments_rounded,
                                 onCash,
-                                opsWarning,
-                                opsWarningBg,
+                                const Color(0xFFD97706),
+                                const Color(0xFFFEF3C7),
+                                'Staff cash reconciliation',
                               ),
                               (
-                                'Assign delivery',
-                                Icons.route_outlined,
+                                'Assign Delivery',
+                                Icons.route_rounded,
                                 () => onOrders('Unassigned'),
                                 opsForestGreen,
                                 opsMint,
+                                'Route pending shipments',
                               ),
                               (
-                                'Reports',
+                                'Reports & Tax',
                                 Icons.bar_chart_rounded,
                                 onReports,
-                                opsRed,
-                                opsRedBg,
+                                const Color(0xFFE11D48),
+                                const Color(0xFFFFE4E6),
+                                'Profit, loss & GST reports',
                               ),
                             ])
                           SizedBox(
@@ -462,35 +707,302 @@ class OperationsDashboard extends ConsumerWidget {
                               onTap: action.$3,
                               color: action.$4,
                               background: action.$5,
+                              detail: action.$6,
                             ),
                           ),
                       ],
                     ),
                   ),
+
+                  // 5. Store Categories Hub (Quick Category Filtering)
+                  const SizedBox(height: 22),
+                  OpsHeading(
+                    'Product Categories · வகைகள்',
+                    action: 'All 140 Products',
+                    onAction: () => onInventory('all'),
+                  ),
+                  LayoutBuilder(
+                    builder: (ctx, c) {
+                      final itemWidth = (c.maxWidth - 10) / 2;
+                      final categories = [
+                        (
+                          id: 'Groceries',
+                          tamil: 'அரிசி & தானியங்கள்',
+                          english: 'Rice & Grains',
+                          count: '20 Items',
+                          icon: Icons.grain_rounded,
+                          color: const Color(0xFF0F7645),
+                          bgColor: const Color(0xFFE8F7EE),
+                          borderColor: const Color(0xFFC7EBD4),
+                        ),
+                        (
+                          id: 'பருப்பு வகைகள்',
+                          tamil: 'பருப்பு வகைகள்',
+                          english: 'Dals & Pulses',
+                          count: '20 Items',
+                          icon: Icons.spa_rounded,
+                          color: const Color(0xFFD97706),
+                          bgColor: const Color(0xFFFEF3C7),
+                          borderColor: const Color(0xFFFDE68A),
+                        ),
+                        (
+                          id: 'மாவு வகைகள்',
+                          tamil: 'மாவு வகைகள்',
+                          english: 'Flours & Rava',
+                          count: '20 Items',
+                          icon: Icons.bakery_dining_rounded,
+                          color: const Color(0xFFB45309),
+                          bgColor: const Color(0xFFFFFBEB),
+                          borderColor: const Color(0xFFFED7AA),
+                        ),
+                        (
+                          id: 'எண்ணெய் வகைகள்',
+                          tamil: 'எண்ணெய் வகைகள்',
+                          english: 'Oils & Pure Ghee',
+                          count: '20 Items',
+                          icon: Icons.opacity_rounded,
+                          color: const Color(0xFFEA580C),
+                          bgColor: const Color(0xFFFFEDD5),
+                          borderColor: const Color(0xFFFDBA74),
+                        ),
+                        (
+                          id: 'மசாலா வகைகள்',
+                          tamil: 'மசாலா வகைகள்',
+                          english: 'Spices & Masalas',
+                          count: '20 Items',
+                          icon: Icons.local_fire_department_rounded,
+                          color: const Color(0xFFDC2626),
+                          bgColor: const Color(0xFFFEE2E2),
+                          borderColor: const Color(0xFFFECACA),
+                        ),
+                        (
+                          id: 'பானங்கள்',
+                          tamil: 'பானங்கள்',
+                          english: 'Tea & Coffee',
+                          count: '20 Items',
+                          icon: Icons.coffee_rounded,
+                          color: const Color(0xFF7C3AED),
+                          bgColor: const Color(0xFFEDE9FE),
+                          borderColor: const Color(0xFFDDD6FE),
+                        ),
+                        (
+                          id: 'மளிகைப் பொருட்கள்',
+                          tamil: 'மளிகைப் பொருட்கள்',
+                          english: 'Pantry Staples',
+                          count: '20 Items',
+                          icon: Icons.shopping_basket_rounded,
+                          color: const Color(0xFF0D9488),
+                          bgColor: const Color(0xFFCCFBF1),
+                          borderColor: const Color(0xFF99F6E4),
+                        ),
+                      ];
+
+                      return Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          for (final cat in categories)
+                            SizedBox(
+                              width: itemWidth,
+                              child: Material(
+                                color: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                  side: BorderSide(
+                                    color: cat.borderColor,
+                                    width: 1.2,
+                                  ),
+                                ),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(18),
+                                  onTap: () => onCategory?.call(cat.id),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                color: cat.bgColor,
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: Icon(
+                                                cat.icon,
+                                                size: 18,
+                                                color: cat.color,
+                                              ),
+                                            ),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 7,
+                                                vertical: 3,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: cat.bgColor,
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                              ),
+                                              child: Text(
+                                                cat.count,
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: cat.color,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Text(
+                                          cat.tamil,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFF15211A),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                cat.english,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: opsMuted,
+                                                ),
+                                              ),
+                                            ),
+                                            Icon(
+                                              Icons.arrow_forward_ios_rounded,
+                                              size: 11,
+                                              color: cat.color,
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+
+                  // 6. Critical Attention Alerts Radar (if any)
                   if (alerts.isNotEmpty) ...[
-                    const SizedBox(height: 20),
-                    const OpsHeading('Needs attention'),
+                    const SizedBox(height: 22),
+                    const OpsHeading('Critical Attention Radar'),
                     for (final alert in alerts)
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: OpsPanel(
-                          color: opsWarningBg,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 4,
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Material(
+                          color: const Color(0xFFFFFBEB),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            side: BorderSide(
+                              color: const Color(0xFFF59E0B).withOpacity(0.35),
+                              width: 1.2,
+                            ),
                           ),
-                          child: _AttentionRow(
-                            alert: alert,
+                          child: InkWell(
                             onTap: () => _alertAction(alert['key']),
+                            borderRadius: BorderRadius.circular(18),
+                            child: Padding(
+                              padding: const EdgeInsets.all(14),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFEF3C7),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: const Color(0xFFF59E0B).withOpacity(0.4),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.warning_amber_rounded,
+                                      color: Color(0xFFD97706),
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '${alert['title']}',
+                                          style: const TextStyle(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.w800,
+                                            color: storeInk,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          '${alert['detail']}',
+                                          style: const TextStyle(
+                                            fontSize: 11.5,
+                                            color: opsMuted,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFD97706),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      '${alert['count']}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
                   ],
-                  const SizedBox(height: 16),
+
+                  const SizedBox(height: 20),
                   Text(
-                    'Updated ${opsTime(data['generated_at'])} · Pull down to refresh',
+                    'Last synchronized ${opsTime(data['generated_at'])} · Pull down to refresh live console',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 10, color: opsMuted),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: opsMuted,
+                    ),
                   ),
                 ],
               ),
@@ -581,55 +1093,6 @@ class _SmallMetric extends StatelessWidget {
   );
 }
 
-class _AttentionRow extends StatelessWidget {
-  final Map<String, dynamic> alert;
-  final VoidCallback onTap;
-  const _AttentionRow({required this.alert, required this.onTap});
-  @override
-  Widget build(BuildContext context) {
-    final icon = switch (alert['key']) {
-      'cash' => Icons.payments_outlined,
-      'stock' => Icons.inventory_2_outlined,
-      'team' => Icons.person_off_outlined,
-      'assignment' => Icons.person_add_alt,
-      'delayed' => Icons.schedule,
-      'attempted' => Icons.report_outlined,
-      _ => Icons.receipt_long_outlined,
-    };
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(vertical: 4),
-      onTap: onTap,
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFF4DE),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: opsWarning, size: 19),
-      ),
-      title: Text(
-        '${alert['title']}',
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-      ),
-      subtitle: Text(
-        '${alert['detail']}',
-        style: const TextStyle(fontSize: 10, color: opsMuted),
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '${alert['count']}',
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-          ),
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right, size: 16, color: opsMuted),
-        ],
-      ),
-    );
-  }
-}
-
 class DeliveryPreviewCard extends StatelessWidget {
   final StoreOrder order;
   final VoidCallback onTap;
@@ -638,135 +1101,191 @@ class DeliveryPreviewCard extends StatelessWidget {
     required this.order,
     required this.onTap,
   });
+
   @override
   Widget build(BuildContext context) {
     final person = order.data['assigned_to_details'] as Map?;
     final name = '${person?['name'] ?? ''}';
-    final eta = DateTime.tryParse('${order.data['estimated_delivery_at']}');
-    final started = DateTime.tryParse('${order.data['dispatched_at']}');
-    return OpsPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  order.shortId,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-              AdminStatusBadge(order.status),
-            ],
-          ),
-          if (order.items.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: ProductPhoto(
-                      '${order.items.first['image_url'] ?? ''}',
-                      height: 40,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    order.items
-                        .map(
-                          (item) =>
-                              '${productLabel(item)} ? ${item['quantity']}',
-                        )
-                        .join(', '),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11, color: opsMuted),
-                  ),
-                ),
-              ],
-            ),
-          ],
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: opsMint,
-                child: Text(
-                  opsInitial(name),
-                  style: const TextStyle(
-                    color: opsGreen,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name.isEmpty ? 'No employee assigned' : name,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '${order.data['delivery_address'] ?? ''}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: opsMuted, fontSize: 11),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  eta != null
-                      ? 'Expected ${opsTime(eta.toIso8601String())}'
-                      : started != null
-                      ? '${DateTime.now().difference(started).inMinutes.clamp(0, 100000)} min since dispatch'
-                      : 'Arrival estimate not set',
-                  style: const TextStyle(fontSize: 11, color: opsMuted),
-                ),
-              ),
-              Text(
-                order.paymentStatus == 'cod'
-                    ? '${money(order.total)} COD'
-                    : 'Paid',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: onTap,
-              icon: const Icon(Icons.route, size: 17),
-              label: const Text('Track delivery'),
-            ),
+    final date = DateTime.tryParse('${order.data['delivered_at'] ?? order.data['updated_at'] ?? order.data['created_at']}');
+    final isDelivered = order.status == 'Delivered';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2EBE5), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F3B25).withOpacity(0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
         ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Row: #ID + Status Pill
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '#${order.shortId.toUpperCase()}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    AdminStatusBadge(order.status),
+                  ],
+                ),
+                const SizedBox(height: 4),
+
+                // Subtitle: Delivered on ... OR Expected by ...
+                Text(
+                  isDelivered
+                      ? (date != null
+                          ? 'Delivered on ${date.day}/${date.month}/${date.year} • ${TimeOfDay.fromDateTime(date).format(context)}'
+                          : 'Delivered successfully')
+                      : 'Expected by Today, ${order.data['delivery_slot'] ?? 'Express delivery'}',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                if (isDelivered) ...[
+                  // 4-Step Horizontal Tracker Line (Screen 4 Card 1)
+                  AdminOrderProgressTracker(order: order),
+                ] else ...[
+                  // 4 Product Thumbnails Row (Screen 4 Card 2)
+                  if (order.items.isNotEmpty) ...[
+                    Row(
+                      children: [
+                        for (final item in order.items.take(4))
+                          Container(
+                            width: 52,
+                            height: 56,
+                            margin: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: ProductPhoto(
+                              '${item['image_url'] ?? ''}',
+                              height: 48,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
+                  // Delivery Rider Card with Scooter & Arriving Soon Pill
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFF0FDF4), Color(0xFFECFDF5)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFC7EBD4)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF16A05D),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.two_wheeler_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name.isNotEmpty ? name : 'Agaram Express Partner',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  Text(
+                                    '${order.data['delivery_address'] ?? 'Customer address'}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFFD1FAE5)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.eco_rounded, size: 14, color: Color(0xFF16A05D)),
+                              SizedBox(width: 5),
+                              Text(
+                                'Your order is on the way! Arriving soon...',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF15803D),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
