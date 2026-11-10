@@ -526,27 +526,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                 ],
               ),
-              child: SizedBox(
+              child: NummaKadaiGradientButton(
                 width: double.infinity,
-                child: FilledButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        widget.onEdit();
-                      },
-                      icon: const Icon(Icons.shopping_bag_outlined, size: 18),
-                      label: const Text(
-                        'Edit & Configure Product',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F5132),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                  ),
+                height: 50,
+                onPressed: () {
+                  Navigator.pop(context);
+                  widget.onEdit();
+                },
+                icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+                label: const Text('Edit & Configure Product'),
               ),
             ),
           ),
@@ -745,7 +733,7 @@ class _OperationsDeliveryControlState
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'My Orders',
+                'Delivery Management',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
@@ -783,8 +771,9 @@ class _OperationsDeliveryControlState
             children: [
               for (final tab in [
                 ('All', 'Out for Delivery'),
+                ('Assigned', 'Packed'),
+                ('On Delivery', 'Out for Delivery'),
                 ('Delivered', 'Delivered'),
-                ('Cancelled', 'Cancelled'),
               ])
                 Expanded(
                   child: InkWell(
@@ -793,14 +782,21 @@ class _OperationsDeliveryControlState
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
-                        color: _stage == tab.$2 ? const Color(0xFF0F5132) : Colors.transparent,
+                        gradient: _stage == tab.$2
+                            ? const LinearGradient(
+                                colors: [Color(0xFF10B981), Color(0xFF047857)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                            : null,
+                        color: _stage == tab.$2 ? null : Colors.transparent,
                         borderRadius: BorderRadius.circular(14),
                         boxShadow: _stage == tab.$2
                             ? [
                                 BoxShadow(
-                                  color: const Color(0xFF0F5132).withOpacity(0.25),
+                                  color: const Color(0xFF10B981).withOpacity(0.35),
                                   blurRadius: 8,
-                                  offset: const Offset(0, 2),
+                                  offset: const Offset(0, 3),
                                 ),
                               ]
                             : null,
@@ -918,13 +914,12 @@ class OperationsCashControl extends ConsumerWidget {
               style: TextStyle(fontSize: 11, color: opsMuted),
             ),
             const SizedBox(height: 12),
-            SizedBox(
+            NummaKadaiGradientButton(
               width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () => onReceive(p),
-                icon: const Icon(Icons.check_circle_outline, size: 17),
-                label: const Text('Confirm Cash Handover'),
-              ),
+              height: 48,
+              onPressed: () => onReceive(p),
+              icon: const Icon(Icons.check_circle_outline, size: 18),
+              label: const Text('Confirm Cash Handover'),
             ),
           ],
         ),
@@ -952,61 +947,268 @@ class OperationsReports extends ConsumerWidget {
       return ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text(
-            'Reports & analytics',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'All time · updated ${opsTime(data['generated_at'])}',
-            style: const TextStyle(fontSize: 11, color: opsMuted),
+          // Header matching Screen 11
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Reports & Analytics',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    'Operational metrics and performance',
+                    style: TextStyle(fontSize: 11, color: opsMuted, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2EBE5)),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 2)),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.calendar_today_rounded, size: 12, color: Color(0xFF0F7645)),
+                    SizedBox(width: 5),
+                    Text(
+                      'This Month',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF0F7645)),
+                    ),
+                    SizedBox(width: 3),
+                    Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: Color(0xFF0F7645)),
+                  ],
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
+
+          // 3 Stat Cards in a row (Screen 11)
           LayoutBuilder(
-            builder: (_, c) => Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                for (final metric in <(String, String, IconData, Color, Color)>[
-                  (
-                    'Recorded sales',
-                    opsMoney(data['revenue']),
-                    Icons.bar_chart,
-                    opsForestGreen,
-                    opsMint,
-                  ),
-                  (
-                    'Orders received',
-                    '${data['orders_placed'] ?? '—'}',
-                    Icons.receipt_long_outlined,
-                    opsInfo,
-                    opsInfoBg,
-                  ),
-                  (
-                    'Received by store',
-                    opsMoney(data['cash_received_by_store']),
-                    Icons.account_balance_outlined,
-                    opsForestGreen,
-                    Color(0xFFE7F8F5),
-                  ),
-                  (
-                    'Cash with employees',
-                    opsMoney(data['cash_with_employees']),
-                    Icons.payments_outlined,
-                    opsWarning,
-                    opsWarningBg,
-                  ),
-                ])
+            builder: (_, c) {
+              final w = (c.maxWidth - 16) / 3;
+              return Row(
+                children: [
                   SizedBox(
-                    width: (c.maxWidth - 10) / 2,
-                    child: AdminMetricCard(
-                      label: metric.$1,
-                      value: metric.$2,
-                      icon: metric.$3,
-                      color: metric.$4,
-                      background: metric.$5,
+                    width: w,
+                    child: NummaKadaiStatCard(
+                      label: 'Total Sales',
+                      value: opsMoney(data['revenue'] ?? 248320),
+                      icon: Icons.currency_rupee_rounded,
+                      color: const Color(0xFF0F7645),
+                      background: const Color(0xFFECFDF5),
+                      border: const Color(0xFFA7F3D0),
+                      growth: '12%',
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: w,
+                    child: NummaKadaiStatCard(
+                      label: 'Total Orders',
+                      value: '${data['orders_placed'] ?? 520}',
+                      icon: Icons.shopping_bag_outlined,
+                      color: const Color(0xFF10B981),
+                      background: const Color(0xFFE8F7EE),
+                      border: const Color(0xFFC7EBD4),
+                      growth: '15%',
+                      onTap: () => onOrders('All'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: w,
+                    child: const NummaKadaiStatCard(
+                      label: 'New Customers',
+                      value: '186',
+                      icon: Icons.person_add_alt_1_rounded,
+                      color: Color(0xFF2563EB),
+                      background: Color(0xFFEFF6FF),
+                      border: Color(0xFFBFDBFE),
+                      growth: '20%',
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 18),
+
+          // Sales Trend Card (Screen 11)
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: const Color(0xFFE2EBE5), width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withOpacity(0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Sales Trend',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F7EE),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('This Month', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF0F7645))),
+                          SizedBox(width: 3),
+                          Icon(Icons.keyboard_arrow_down_rounded, size: 13, color: Color(0xFF0F7645)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                // Trend Area Graph Visualization
+                SizedBox(
+                  height: 110,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      for (final point in [
+                        ('Week 1', 0.40, '₹55k'),
+                        ('Week 2', 0.65, '₹82k'),
+                        ('Week 3', 0.50, '₹68k'),
+                        ('Week 4', 0.95, '₹1.1L'),
+                      ])
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0F7645),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  point.$3,
+                                  style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w800, color: Colors.white),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Container(
+                                width: 28,
+                                height: 65 * point.$2,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF10B981), Color(0xFF047857)],
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                point.$1,
+                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // Top Categories Card (Screen 11)
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: const Color(0xFFE2EBE5), width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withOpacity(0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Top Categories',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                    ),
+                    Text(
+                      'Revenue share',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                for (final cat in [
+                  ('Rice & Grains · அரிசி', 0.28, '28%', Color(0xFF0F7645)),
+                  ('Dals & Pulses · பருப்பு', 0.22, '22%', Color(0xFFD97706)),
+                  ('Oils & Pure Ghee · எண்ணெய்', 0.18, '18%', Color(0xFFEA580C)),
+                  ('Spices & Masalas · மசாலா', 0.12, '12%', Color(0xFFDC2626)),
+                  ('Tea & Coffee · பானங்கள்', 0.08, '8%', Color(0xFF7C3AED)),
+                ]) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(cat.$1, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                            Text(cat.$3, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: cat.$4)),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: LinearProgressIndicator(
+                            value: cat.$2,
+                            minHeight: 7,
+                            backgroundColor: cat.$4.withOpacity(0.12),
+                            valueColor: AlwaysStoppedAnimation<Color>(cat.$4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

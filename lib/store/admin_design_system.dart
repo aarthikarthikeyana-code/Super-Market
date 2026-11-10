@@ -651,26 +651,41 @@ class AdminBottomNavigation extends StatelessWidget {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Container(
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 5,
+                                  horizontal: 16,
+                                  vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: selected == item.$1
-                                      ? const Color(0xFFE8F7EE)
-                                      : Colors.transparent,
+                                  gradient: selected == item.$1
+                                      ? const LinearGradient(
+                                          colors: [Color(0xFF10B981), Color(0xFF047857)],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        )
+                                      : null,
+                                  color: selected == item.$1 ? null : Colors.transparent,
                                   borderRadius: BorderRadius.circular(16),
+                                  boxShadow: selected == item.$1
+                                      ? [
+                                          BoxShadow(
+                                            color: const Color(0xFF10B981).withOpacity(0.35),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                        ]
+                                      : null,
                                 ),
                                 child: Icon(
                                   item.$2.$1,
-                                  size: 21,
+                                  size: 20,
                                   color: selected == item.$1
-                                      ? const Color(0xFF047857)
+                                      ? Colors.white
                                       : const Color(0xFF94A3B8),
                                 ),
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: 3),
                               Text(
                                 item.$2.$2,
                                 maxLines: 1,
@@ -680,7 +695,7 @@ class AdminBottomNavigation extends StatelessWidget {
                                       ? FontWeight.w900
                                       : FontWeight.w600,
                                   color: selected == item.$1
-                                      ? const Color(0xFF047857)
+                                      ? const Color(0xFF0F7645)
                                       : const Color(0xFF64748B),
                                 ),
                               ),
@@ -704,127 +719,133 @@ class AdminWorkflowBanner extends StatelessWidget {
   final String title, subtitle;
   final String? ctaLabel;
   final VoidCallback? onCta;
+  final String? imageAsset;
   const AdminWorkflowBanner({
     super.key,
     required this.title,
     required this.subtitle,
     this.ctaLabel,
     this.onCta,
+    this.imageAsset,
   });
 
   @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(22),
-    child: Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFFFFBEB), // Soft warm cream
-            Color(0xFFEDF8F1), // Gentle mint
-            Color(0xFFD1FAE5), // Fresh light emerald
+  Widget build(BuildContext context) {
+    final asset = imageAsset ?? 'assets/images/admin_products_banner.jpg';
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFE2EBE5), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF087247).withOpacity(0.06),
+              blurRadius: 18,
+              offset: const Offset(0, 4),
+            ),
           ],
-          stops: [0.0, 0.55, 1.0],
         ),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE2EBE5), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF087247).withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -10,
-            bottom: -15,
-            top: -15,
-            width: 170,
-            child: Opacity(
-              opacity: 0.95,
+        child: Stack(
+          children: [
+            // Background Image filling the ENTIRE container corner-to-corner
+            Positioned.fill(
               child: Image.asset(
-                'assets/images/admin-dashboard-banner.png',
-                fit: BoxFit.contain,
+                asset,
+                fit: BoxFit.cover,
                 alignment: Alignment.centerRight,
                 excludeFromSemantics: true,
-                errorBuilder: (_, error, stackTrace) =>
-                    const SizedBox.shrink(),
+                errorBuilder: (context, error, stackTrace) => Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFFFFFBEB),
+                        Color(0xFFEDF8F1),
+                        Color(0xFFD1FAE5),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(18),
-            child: FractionallySizedBox(
-              widthFactor: .68,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF0F3B25),
-                      letterSpacing: -0.3,
-                    ),
+            // Semi-transparent scrim overlay from left to right ensuring text pops out clearly
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      Colors.white.withOpacity(0.93),
+                      Colors.white.withOpacity(0.78),
+                      Colors.white.withOpacity(0.18),
+                    ],
+                    stops: const [0.0, 0.58, 1.0],
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      height: 1.4,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF475569),
-                    ),
-                  ),
-                  if (ctaLabel != null) ...[
-                    const SizedBox(height: 12),
-                    FilledButton(
-                      onPressed: onCta,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F5132),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        minimumSize: const Size(0, 36),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                ),
+              ),
+            ),
+            // Banner content
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              child: FractionallySizedBox(
+                widthFactor: 0.68,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F3B25),
+                        letterSpacing: -0.3,
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            ctaLabel!,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.4,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF334155),
+                      ),
+                    ),
+                    if (ctaLabel != null) ...[
+                      const SizedBox(height: 12),
+                      NummaKadaiGradientButton(
+                        compact: true,
+                        onPressed: onCta,
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              ctaLabel!,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.arrow_forward_rounded, size: 14),
-                        ],
+                            const SizedBox(width: 4),
+                            const Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class AdminOrderCard extends StatelessWidget {
@@ -1069,7 +1090,8 @@ class AdminOrderCard extends StatelessWidget {
                       const SizedBox(height: 10),
                       Align(
                         alignment: Alignment.centerRight,
-                        child: FilledButton.icon(
+                        child: NummaKadaiGradientButton(
+                          compact: true,
                           onPressed: onAction,
                           icon: Icon(
                             actionLabel!.contains('Prepare') ||
@@ -1081,28 +1103,9 @@ class AdminOrderCard extends StatelessWidget {
                                 ? Icons.two_wheeler_rounded
                                 : Icons.arrow_forward_rounded,
                             size: 15,
+                            color: Colors.white,
                           ),
-                          label: Text(
-                            actionLabel!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF16A05D),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
+                          label: Text(actionLabel!),
                         ),
                       ),
                     ],
@@ -2207,6 +2210,528 @@ class _ExecutiveAuroraHeroCardState extends State<ExecutiveAuroraHeroCard>
           ],
         ),
       ],
+    );
+  }
+}
+
+
+// ==========================================
+// NUMMAKADAI FRESH GROCERY ADMIN SUITE (REF THEME)
+// ==========================================
+
+/// Fresh Grocery Welcome Banner with Admin Panel badge and basket illustration.
+class NummaKadaiWelcomeBanner extends StatelessWidget {
+  final String adminName;
+  final String dateText;
+  final Widget statusBeacon;
+
+  const NummaKadaiWelcomeBanner({
+    super.key,
+    required this.adminName,
+    required this.dateText,
+    required this.statusBeacon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFFFFFFFF),
+            Color(0xFFF7FCF9),
+            Color(0xFFEFF9F3),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFD1FAE5), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF16A05D).withOpacity(0.07),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F7EE),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'Admin Panel',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F7645),
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Welcome back, ${adminName.isEmpty ? 'Admin' : adminName} 👋',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  dateText,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              statusBeacon,
+              const SizedBox(height: 8),
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F7EE),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFC7EBD4), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF10B981).withOpacity(0.18),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: const Text('🧺', style: TextStyle(fontSize: 22)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// NummaKadai 2x2 Metric Card with growth badge and pastel background.
+class NummaKadaiStatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+  final Color background;
+  final Color border;
+  final String? growth;
+  final VoidCallback? onTap;
+
+  const NummaKadaiStatCard({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+    required this.background,
+    required this.border,
+    this.growth,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return BouncingTap(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: border, width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.06),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withOpacity(0.12),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(icon, size: 20, color: color),
+                ),
+                if (growth != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: border),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.arrow_upward_rounded, size: 11, color: color),
+                        const SizedBox(width: 2),
+                        Text(
+                          growth!,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: color,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF64748B),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF0F172A),
+                letterSpacing: -0.4,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// NummaKadai Weekly Sales Bar Chart matching Screen 2.
+class NummaKadaiWeeklySalesChart extends StatelessWidget {
+  final Map<String, dynamic> data;
+  final VoidCallback onReports;
+
+  const NummaKadaiWeeklySalesChart({
+    super.key,
+    required this.data,
+    required this.onReports,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final revNum = (data['revenue'] is num)
+        ? (data['revenue'] as num).toDouble()
+        : (double.tryParse('') ?? 600.0);
+
+    final weights = [0.12, 0.14, 0.10, 0.18, 0.22, 0.28, 0.16];
+    const maxWeight = 0.28;
+    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2EBE5), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Sales Overview',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Weekly revenue performance',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+              BouncingTap(
+                onTap: onReports,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F7EE),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFC7EBD4)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'This Week',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F7645),
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: Color(0xFF0F7645)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          SizedBox(
+            height: 138,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (int i = 0; i < 7; i++)
+                  _buildBar(
+                    day: dayNames[i],
+                    fraction: (weights[i] / maxWeight).clamp(0.18, 1.0),
+                    isPeak: weights[i] == maxWeight,
+                    amount: '₹${(revNum * weights[i]).toStringAsFixed(0)}',
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBar({
+    required String day,
+    required double fraction,
+    required bool isPeak,
+    required String amount,
+  }) {
+    return Expanded(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          if (isPeak)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F7645),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  amount,
+                  style: const TextStyle(
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          Container(
+            width: 22,
+            height: (72 * fraction).clamp(20.0, 72.0),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isPeak
+                    ? [const Color(0xFF10B981), const Color(0xFF047857)]
+                    : [const Color(0xFF34D399), const Color(0xFF059669)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF10B981).withOpacity(isPeak ? 0.35 : 0.15),
+                  blurRadius: isPeak ? 8 : 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            day,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: isPeak ? FontWeight.w800 : FontWeight.w600,
+              color: isPeak ? const Color(0xFF0F7645) : const Color(0xFF64748B),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+class NummaKadaiGradientButton extends StatelessWidget {
+  final Widget? icon;
+  final Widget label;
+  final VoidCallback? onPressed;
+  final double? width;
+  final double height;
+  final double borderRadius;
+  final List<Color>? gradientColors;
+  final bool compact;
+  final EdgeInsetsGeometry? padding;
+  final TextStyle? textStyle;
+
+  const NummaKadaiGradientButton({
+    super.key,
+    this.icon,
+    required this.label,
+    required this.onPressed,
+    this.width,
+    this.height = 48,
+    this.borderRadius = 16,
+    this.gradientColors,
+    this.compact = false,
+    this.padding,
+    this.textStyle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+    final colors = gradientColors ?? const [Color(0xFF10B981), Color(0xFF047857)];
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: width,
+      height: compact ? 36 : height,
+      decoration: BoxDecoration(
+        gradient: enabled
+            ? LinearGradient(
+                colors: colors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : const LinearGradient(
+                colors: [Color(0xFFCBD5E1), Color(0xFF94A3B8)],
+              ),
+        borderRadius: BorderRadius.circular(borderRadius),
+        boxShadow: enabled
+            ? [
+                BoxShadow(
+                  color: colors.first.withOpacity(0.35),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(borderRadius),
+          onTap: onPressed,
+          child: Padding(
+            padding: padding ??
+                EdgeInsets.symmetric(
+                  horizontal: compact ? 12 : 18,
+                  vertical: compact ? 6 : 10,
+                ),
+            child: Row(
+              mainAxisSize: width == null ? MainAxisSize.min : MainAxisSize.max,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (icon != null) ...[
+                  IconTheme(
+                    data: const IconThemeData(color: Colors.white, size: 17),
+                    child: icon!,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                DefaultTextStyle(
+                  style: textStyle ??
+                      TextStyle(
+                        fontFamily: 'NotoSansTamil',
+                        fontSize: compact ? 12 : 14.5,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: -0.2,
+                      ),
+                  child: label,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
