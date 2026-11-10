@@ -876,6 +876,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
             const AdminWorkflowBanner(
               title: 'Your product catalogue',
               subtitle: 'Add products, check stock and control availability.',
+              imageAsset: 'assets/images/admin_products_banner.jpg',
             ),
             const SizedBox(height: 12),
             Row(
@@ -1206,6 +1207,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
             const AdminWorkflowBanner(
               title: 'Manage orders',
               subtitle: 'Prepare, pack and assign. Your team handles delivery.',
+              imageAsset: 'assets/images/admin_orders_banner.jpg',
             ),
             const SizedBox(height: 12),
             Row(

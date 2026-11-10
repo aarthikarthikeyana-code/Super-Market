@@ -719,115 +719,133 @@ class AdminWorkflowBanner extends StatelessWidget {
   final String title, subtitle;
   final String? ctaLabel;
   final VoidCallback? onCta;
+  final String? imageAsset;
   const AdminWorkflowBanner({
     super.key,
     required this.title,
     required this.subtitle,
     this.ctaLabel,
     this.onCta,
+    this.imageAsset,
   });
 
   @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(22),
-    child: Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFFFFBEB), // Soft warm cream
-            Color(0xFFEDF8F1), // Gentle mint
-            Color(0xFFD1FAE5), // Fresh light emerald
+  Widget build(BuildContext context) {
+    final asset = imageAsset ?? 'assets/images/admin_products_banner.jpg';
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFE2EBE5), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF087247).withOpacity(0.06),
+              blurRadius: 18,
+              offset: const Offset(0, 4),
+            ),
           ],
-          stops: [0.0, 0.55, 1.0],
         ),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE2EBE5), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF087247).withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -10,
-            bottom: -15,
-            top: -15,
-            width: 170,
-            child: Opacity(
-              opacity: 0.95,
+        child: Stack(
+          children: [
+            // Background Image filling the ENTIRE container corner-to-corner
+            Positioned.fill(
               child: Image.asset(
-                'assets/images/admin-dashboard-banner.png',
-                fit: BoxFit.contain,
+                asset,
+                fit: BoxFit.cover,
                 alignment: Alignment.centerRight,
                 excludeFromSemantics: true,
-                errorBuilder: (_, error, stackTrace) =>
-                    const SizedBox.shrink(),
+                errorBuilder: (context, error, stackTrace) => Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFFFFFBEB),
+                        Color(0xFFEDF8F1),
+                        Color(0xFFD1FAE5),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(18),
-            child: FractionallySizedBox(
-              widthFactor: .68,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF0F3B25),
-                      letterSpacing: -0.3,
-                    ),
+            // Semi-transparent scrim overlay from left to right ensuring text pops out clearly
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      Colors.white.withOpacity(0.93),
+                      Colors.white.withOpacity(0.78),
+                      Colors.white.withOpacity(0.18),
+                    ],
+                    stops: const [0.0, 0.58, 1.0],
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      height: 1.4,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF475569),
-                    ),
-                  ),
-                  if (ctaLabel != null) ...[
-                    const SizedBox(height: 12),
-                    NummaKadaiGradientButton(
-                      compact: true,
-                      onPressed: onCta,
-                      label: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            ctaLabel!,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
-                        ],
+                ),
+              ),
+            ),
+            // Banner content
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              child: FractionallySizedBox(
+                widthFactor: 0.68,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F3B25),
+                        letterSpacing: -0.3,
                       ),
                     ),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.4,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF334155),
+                      ),
+                    ),
+                    if (ctaLabel != null) ...[
+                      const SizedBox(height: 12),
+                      NummaKadaiGradientButton(
+                        compact: true,
+                        onPressed: onCta,
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              ctaLabel!,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class AdminOrderCard extends StatelessWidget {
