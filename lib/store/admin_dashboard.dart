@@ -195,7 +195,7 @@ class OperationsDashboard extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               sliver: SliverList.list(
                 children: [
-                  // 1. NummaKadai Welcome Banner (Reference Theme)
+                  // 1. Agaram Welcome Banner (Reference Theme)
                   Builder(
                     builder: (context) {
                       final adminName = '${adminProfile['name'] ?? ''}'.trim();
@@ -204,7 +204,7 @@ class OperationsDashboard extends ConsumerWidget {
                       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                       final dateFormatted = '${weekdays[now.weekday - 1]}, ${now.day} ${months[now.month - 1]} ${now.year}';
 
-                      return NummaKadaiWelcomeBanner(
+                      return AgaramWelcomeBanner(
                         adminName: adminName,
                         dateText: dateFormatted,
                         statusBeacon: LivePulseBeacon(
@@ -234,7 +234,7 @@ class OperationsDashboard extends ConsumerWidget {
                   ),
                   const SizedBox(height: 14),
 
-                  // 2. NummaKadai 4 Key Stats 2x2 Grid (Reference Screen 2)
+                  // 2. Agaram 4 Key Stats 2x2 Grid (Reference Screen 2)
                   LayoutBuilder(
                     builder: (_, c) {
                       final itemW = (c.maxWidth - 10) / 2;
@@ -250,7 +250,7 @@ class OperationsDashboard extends ConsumerWidget {
                         children: [
                           SizedBox(
                             width: itemW,
-                            child: NummaKadaiStatCard(
+                            child: AgaramStatCard(
                               label: 'Total Orders',
                               value: totalOrdersVal,
                               icon: Icons.shopping_bag_rounded,
@@ -263,7 +263,7 @@ class OperationsDashboard extends ConsumerWidget {
                           ),
                           SizedBox(
                             width: itemW,
-                            child: NummaKadaiStatCard(
+                            child: AgaramStatCard(
                               label: 'Total Customers',
                               value: totalCustomersVal,
                               icon: Icons.people_alt_rounded,
@@ -276,7 +276,7 @@ class OperationsDashboard extends ConsumerWidget {
                           ),
                           SizedBox(
                             width: itemW,
-                            child: NummaKadaiStatCard(
+                            child: AgaramStatCard(
                               label: 'Total Products',
                               value: '$totalProductsVal Items',
                               icon: Icons.apple_rounded,
@@ -288,7 +288,7 @@ class OperationsDashboard extends ConsumerWidget {
                           ),
                           SizedBox(
                             width: itemW,
-                            child: NummaKadaiStatCard(
+                            child: AgaramStatCard(
                               label: 'Total Sales',
                               value: totalSalesVal,
                               icon: Icons.emoji_events_rounded,
@@ -304,8 +304,8 @@ class OperationsDashboard extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // 3. NummaKadai Sales Overview Weekly Bar Chart (Reference Screen 2)
-                  NummaKadaiWeeklySalesChart(
+                  // 3. Agaram Sales Overview Weekly Bar Chart (Reference Screen 2)
+                  AgaramWeeklySalesChart(
                     data: data,
                     onReports: onReports,
                   ),

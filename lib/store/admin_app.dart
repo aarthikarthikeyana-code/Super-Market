@@ -367,7 +367,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${profile['email'] ?? 'admin@nummakadai.com'}',
+                  '${profile['email'] ?? 'admin@agaram.com'}',
                   style: const TextStyle(
                     fontSize: 12.5,
                     color: Color(0xFF64748B),
@@ -428,14 +428,14 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                             ('Help & Support', Icons.help_outline_rounded, () {
                               Navigator.pop(ctx);
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Support line: support@nummakadai.com')),
+                                const SnackBar(content: Text('Support line: support@agaram.com')),
                               );
                             }),
-                            ('About NummaKadai', Icons.info_outline_rounded, () {
+                            ('About Agaram', Icons.info_outline_rounded, () {
                               Navigator.pop(ctx);
                               showAboutDialog(
                                 context: context,
-                                applicationName: 'NummaKadai Operations',
+                                applicationName: 'Agaram Operations',
                                 applicationVersion: '2.0.0 (Premium Green)',
                                 children: const [
                                   Text('Fresh groceries and retail supermarket platform.'),
@@ -673,7 +673,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                       ),
                     ),
                     if (facet)
-                      NummaKadaiGradientButton(
+                      AgaramGradientButton(
                         compact: true,
                         onPressed: () {
                           Navigator.pop(ctx);
@@ -780,7 +780,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                         ListTile(
                           leading: const AdminIcon(Icons.storefront_outlined, color: Color(0xFF0F7645), background: Color(0xFFE8F7EE)),
                           title: const Text('Store Name', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                          subtitle: Text('${store['name'] ?? 'NummaKadai'}', style: const TextStyle(fontSize: 12)),
+                          subtitle: Text('${store['name'] ?? 'Agaram'}', style: const TextStyle(fontSize: 12)),
                         ),
                         const Divider(height: 1, indent: 56, endIndent: 16, color: Color(0xFFF1F5F9)),
                         ListTile(
@@ -891,7 +891,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                     ),
                   ),
                 ),
-                NummaKadaiGradientButton(
+                AgaramGradientButton(
                   compact: true,
                   icon: const Icon(Icons.add, size: 18),
                   label: const Text('Add Product'),
@@ -1132,7 +1132,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
               onPressed: () => Navigator.pop(ctx),
               child: const Text('Cancel'),
             ),
-            NummaKadaiGradientButton(
+            AgaramGradientButton(
               compact: true,
               onPressed: () {
                 if (form.currentState!.validate()) {
@@ -1421,7 +1421,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
             if (_selectedOrders.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: NummaKadaiGradientButton(
+                child: AgaramGradientButton(
                   width: double.infinity,
                   height: 48,
                   onPressed: _batchBusy ? null : _assignSelected,
@@ -1560,7 +1560,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                NummaKadaiGradientButton(
+                AgaramGradientButton(
                   width: double.infinity,
                   height: 48,
                   onPressed: () => Navigator.pop(ctx, true),
@@ -1669,7 +1669,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                     style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800),
                   ),
                 ),
-                NummaKadaiGradientButton(
+                AgaramGradientButton(
                   compact: true,
                   onPressed: () => _editPerson(),
                   icon: const Icon(Icons.add, size: 17),
@@ -1984,7 +1984,7 @@ class _AdminSignInState extends ConsumerState<AdminSignInScreen> {
                 ),
                 const SizedBox(height: 14),
                 const Text(
-                  'NummaKadai',
+                  'Agaram',
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.w900,
@@ -2049,7 +2049,7 @@ class _AdminSignInState extends ConsumerState<AdminSignInScreen> {
                           autofillHints: const [AutofillHints.username],
                           decoration: InputDecoration(
                             labelText: 'Admin email',
-                            hintText: 'admin@nummakadai.com',
+                            hintText: 'admin@agaram.com',
                             prefixIcon: const Icon(
                               Icons.mail_outline_rounded,
                               color: Color(0xFF0F7645),
@@ -2207,7 +2207,7 @@ class _AdminSignInState extends ConsumerState<AdminSignInScreen> {
                           ),
 
                         // Login Button (Screen 1)
-                        NummaKadaiGradientButton(
+                        AgaramGradientButton(
                           width: double.infinity,
                           height: 50,
                           onPressed: _busy ? null : _login,
@@ -2546,7 +2546,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
               onPressed: saving ? null : () => Navigator.pop(dialogContext),
               child: const Text('Cancel'),
             ),
-            NummaKadaiGradientButton(
+            AgaramGradientButton(
               compact: true,
               onPressed: saving
                   ? null
@@ -2761,7 +2761,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
           top: false,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-            child: NummaKadaiGradientButton(
+            child: AgaramGradientButton(
               width: double.infinity,
               height: 50,
               onPressed: _busy || _uploading || _namePending ? null : _save,
@@ -4060,7 +4060,7 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
                 top: false,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-                  child: NummaKadaiGradientButton(
+                  child: AgaramGradientButton(
                     width: double.infinity,
                     height: 50,
                     onPressed: _busy ? null : _advance,

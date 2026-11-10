@@ -526,7 +526,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                 ],
               ),
-              child: NummaKadaiGradientButton(
+              child: AgaramGradientButton(
                 width: double.infinity,
                 height: 50,
                 onPressed: () {
@@ -914,7 +914,7 @@ class OperationsCashControl extends ConsumerWidget {
               style: TextStyle(fontSize: 11, color: opsMuted),
             ),
             const SizedBox(height: 12),
-            NummaKadaiGradientButton(
+            AgaramGradientButton(
               width: double.infinity,
               height: 48,
               onPressed: () => onReceive(p),
@@ -1001,7 +1001,7 @@ class OperationsReports extends ConsumerWidget {
                 children: [
                   SizedBox(
                     width: w,
-                    child: NummaKadaiStatCard(
+                    child: AgaramStatCard(
                       label: 'Total Sales',
                       value: opsMoney(data['revenue'] ?? 248320),
                       icon: Icons.currency_rupee_rounded,
@@ -1014,7 +1014,7 @@ class OperationsReports extends ConsumerWidget {
                   const SizedBox(width: 8),
                   SizedBox(
                     width: w,
-                    child: NummaKadaiStatCard(
+                    child: AgaramStatCard(
                       label: 'Total Orders',
                       value: '${data['orders_placed'] ?? 520}',
                       icon: Icons.shopping_bag_outlined,
@@ -1028,7 +1028,7 @@ class OperationsReports extends ConsumerWidget {
                   const SizedBox(width: 8),
                   SizedBox(
                     width: w,
-                    child: const NummaKadaiStatCard(
+                    child: const AgaramStatCard(
                       label: 'New Customers',
                       value: '186',
                       icon: Icons.person_add_alt_1_rounded,

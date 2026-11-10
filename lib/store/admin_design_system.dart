@@ -818,7 +818,7 @@ class AdminWorkflowBanner extends StatelessWidget {
                     ),
                     if (ctaLabel != null) ...[
                       const SizedBox(height: 12),
-                      NummaKadaiGradientButton(
+                      AgaramGradientButton(
                         compact: true,
                         onPressed: onCta,
                         label: Row(
@@ -1090,7 +1090,7 @@ class AdminOrderCard extends StatelessWidget {
                       const SizedBox(height: 10),
                       Align(
                         alignment: Alignment.centerRight,
-                        child: NummaKadaiGradientButton(
+                        child: AgaramGradientButton(
                           compact: true,
                           onPressed: onAction,
                           icon: Icon(
@@ -2216,16 +2216,16 @@ class _ExecutiveAuroraHeroCardState extends State<ExecutiveAuroraHeroCard>
 
 
 // ==========================================
-// NUMMAKADAI FRESH GROCERY ADMIN SUITE (REF THEME)
+// AGARAM FRESH GROCERY ADMIN SUITE (REF THEME)
 // ==========================================
 
 /// Fresh Grocery Welcome Banner with Admin Panel badge and basket illustration.
-class NummaKadaiWelcomeBanner extends StatelessWidget {
+class AgaramWelcomeBanner extends StatelessWidget {
   final String adminName;
   final String dateText;
   final Widget statusBeacon;
 
-  const NummaKadaiWelcomeBanner({
+  const AgaramWelcomeBanner({
     super.key,
     required this.adminName,
     required this.dateText,
@@ -2336,8 +2336,8 @@ class NummaKadaiWelcomeBanner extends StatelessWidget {
   }
 }
 
-/// NummaKadai 2x2 Metric Card with growth badge and pastel background.
-class NummaKadaiStatCard extends StatelessWidget {
+/// Agaram 2x2 Metric Card with growth badge and pastel background.
+class AgaramStatCard extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
@@ -2347,7 +2347,7 @@ class NummaKadaiStatCard extends StatelessWidget {
   final String? growth;
   final VoidCallback? onTap;
 
-  const NummaKadaiStatCard({
+  const AgaramStatCard({
     super.key,
     required this.label,
     required this.value,
@@ -2456,12 +2456,12 @@ class NummaKadaiStatCard extends StatelessWidget {
   }
 }
 
-/// NummaKadai Weekly Sales Bar Chart matching Screen 2.
-class NummaKadaiWeeklySalesChart extends StatelessWidget {
+/// Agaram Weekly Sales Bar Chart matching Screen 2.
+class AgaramWeeklySalesChart extends StatelessWidget {
   final Map<String, dynamic> data;
   final VoidCallback onReports;
 
-  const NummaKadaiWeeklySalesChart({
+  const AgaramWeeklySalesChart({
     super.key,
     required this.data,
     required this.onReports,
@@ -2637,7 +2637,7 @@ class NummaKadaiWeeklySalesChart extends StatelessWidget {
 }
 
 
-class NummaKadaiGradientButton extends StatelessWidget {
+class AgaramGradientButton extends StatelessWidget {
   final Widget? icon;
   final Widget label;
   final VoidCallback? onPressed;
@@ -2649,7 +2649,7 @@ class NummaKadaiGradientButton extends StatelessWidget {
   final EdgeInsetsGeometry? padding;
   final TextStyle? textStyle;
 
-  const NummaKadaiGradientButton({
+  const AgaramGradientButton({
     super.key,
     this.icon,
     required this.label,
@@ -2735,3 +2735,4 @@ class NummaKadaiGradientButton extends StatelessWidget {
     );
   }
 }
+
