@@ -2548,7 +2548,7 @@ class NummaKadaiWeeklySalesChart extends StatelessWidget {
           const SizedBox(height: 20),
 
           SizedBox(
-            height: 125,
+            height: 138,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -2599,7 +2599,7 @@ class NummaKadaiWeeklySalesChart extends StatelessWidget {
             ),
           Container(
             width: 22,
-            height: (90 * fraction).clamp(24.0, 90.0),
+            height: (72 * fraction).clamp(20.0, 72.0),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: isPeak
