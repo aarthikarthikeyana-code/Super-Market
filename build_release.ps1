@@ -1,5 +1,5 @@
 # ==============================================================================
-# Supermarket App Release Build & Auto-Increment Script
+# Agaram App Release Build & Auto-Increment Script
 # ==============================================================================
 param(
     [switch]$Install,
@@ -12,7 +12,7 @@ Set-Location $rootDir
 
 $propsFile = Join-Path $rootDir "version.properties"
 if (-not (Test-Path $propsFile)) {
-    @"
+@"
 major=0
 minor=0
 versionCode=1
@@ -26,10 +26,11 @@ $minor = if ($props.minor) { $props.minor.Trim() } else { "0" }
 $code = if ($props.versionCode) { [int]$props.versionCode.Trim() } else { 1 }
 
 $versionName = "$major.$minor"
-$targetApkName = "supermarket-version-$versionName.apk"
+$targetApkName = "Agaram-Version $versionName.apk"
+$targetApkNameHyphen = "Agaram-Version-$versionName.apk"
 
 Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host "BUILDING SUPERMARKET RELEASE APK" -ForegroundColor Green
+Write-Host "BUILDING AGARAM RELEASE APK" -ForegroundColor Green
 Write-Host "Target Version: $versionName" -ForegroundColor Yellow
 Write-Host "Target APK:     $targetApkName" -ForegroundColor Yellow
 Write-Host "============================================================" -ForegroundColor Cyan
@@ -40,7 +41,7 @@ Copy-Item -Path $propsFile -Destination $appPropsFile -Force
 
 # Run flutter release build
 Write-Host "Running flutter build apk --release ..." -ForegroundColor Gray
-flutter build apk --release
+& "C:\Users\Admin\Downloads\flutter\bin\flutter.bat" build apk --release
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Build failed with exit code $LASTEXITCODE" -ForegroundColor Red
@@ -58,14 +59,17 @@ if (-not (Test-Path $releaseFolder)) {
     New-Item -ItemType Directory -Path $releaseFolder -Force | Out-Null
 }
 $finalReleasePath = Join-Path $releaseFolder $targetApkName
+$finalReleasePathHyphen = Join-Path $releaseFolder $targetApkNameHyphen
 
 if (Test-Path $releaseApkPath) {
     Copy-Item -Path $releaseApkPath -Destination $namedApkPath -Force
+    Copy-Item -Path $releaseApkPath -Destination (Join-Path $outputDir $targetApkNameHyphen) -Force
     Copy-Item -Path $releaseApkPath -Destination $finalReleasePath -Force
+    Copy-Item -Path $releaseApkPath -Destination $finalReleasePathHyphen -Force
 }
 
-if (-not (Test-Path $namedApkPath)) {
-    Write-Host "Could not find output APK at $namedApkPath" -ForegroundColor Red
+if (-not (Test-Path $finalReleasePath)) {
+    Write-Host "Could not find output APK at $finalReleasePath" -ForegroundColor Red
     exit 1
 }
 
@@ -92,7 +96,7 @@ versionCode=$nextCode
 
 Copy-Item -Path $propsFile -Destination $appPropsFile -Force
 
-Write-Host "Next build version auto-incremented to: supermarket-version-$major.$nextMinor (Code: $nextCode)`n" -ForegroundColor Magenta
+Write-Host "Next build version auto-incremented to: Agaram-Version $major.$nextMinor (Code: $nextCode)`n" -ForegroundColor Magenta
 
 # Optional: Install to connected Android device
 if ($Install) {

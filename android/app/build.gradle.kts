@@ -82,25 +82,26 @@ tasks.register("createSupermarketReleaseApk") {
         }
 
         if (foundApk != null) {
-            val apkName = "supermarket-version-$appVersionName.apk"
+            val apkName = "Agaram-Version $appVersionName.apk"
+            val apkNameHyphen = "Agaram-Version-$appVersionName.apk"
 
             // 1. Copy into flutter-apk directory
             val flutterApkDir = File(buildDir, "outputs/flutter-apk")
             if (!flutterApkDir.exists()) flutterApkDir.mkdirs()
-            val targetFlutterApk = File(flutterApkDir, apkName)
-            foundApk.copyTo(targetFlutterApk, overwrite = true)
+            foundApk.copyTo(File(flutterApkDir, apkName), overwrite = true)
+            foundApk.copyTo(File(flutterApkDir, apkNameHyphen), overwrite = true)
 
             // 2. Also copy to root project release directory
             val rootReleaseDir = File(rootDir.parentFile, "release_apks")
             if (!rootReleaseDir.exists()) rootReleaseDir.mkdirs()
-            val targetRootApk = File(rootReleaseDir, apkName)
-            foundApk.copyTo(targetRootApk, overwrite = true)
+            foundApk.copyTo(File(rootReleaseDir, apkName), overwrite = true)
+            foundApk.copyTo(File(rootReleaseDir, apkNameHyphen), overwrite = true)
 
             println("\n========================================================")
-            println("🎉 SUPERMARKET RELEASE APK CREATED SUCCESSFULLY!")
+            println("🎉 AGARAM RELEASE APK CREATED SUCCESSFULLY!")
             println("📦 APK Name: $apkName")
-            println("📂 Path 1: ${targetFlutterApk.absolutePath}")
-            println("📂 Path 2: ${targetRootApk.absolutePath}")
+            println("📂 Path 1: ${File(flutterApkDir, apkName).absolutePath}")
+            println("📂 Path 2: ${File(rootReleaseDir, apkName).absolutePath}")
             println("========================================================\n")
 
             // Auto-increment version for next build
@@ -109,17 +110,17 @@ tasks.register("createSupermarketReleaseApk") {
             versionProps["minor"] = nextMinor.toString()
             versionProps["versionCode"] = nextCode.toString()
             FileOutputStream(versionPropsFile).use {
-                versionProps.store(it, "Supermarket Auto-Incremented Version")
+                versionProps.store(it, "Agaram Auto-Incremented Version")
             }
 
             val rootProps = File(rootDir.parentFile, "version.properties")
             if (rootProps.exists() && rootProps.absolutePath != versionPropsFile.absolutePath) {
                 FileOutputStream(rootProps).use {
-                    versionProps.store(it, "Supermarket Auto-Incremented Version")
+                    versionProps.store(it, "Agaram Auto-Incremented Version")
                 }
             }
 
-            println("➡️  Next release version auto-incremented to: supermarket-version-$appMajor.$nextMinor\n")
+            println("➡️  Next release version auto-incremented to: Agaram-Version $appMajor.$nextMinor\n")
         }
     }
 }
