@@ -56,7 +56,7 @@ class _CustomerOrdersListState extends ConsumerState<CustomerOrdersList> {
   ) async {
     // Customer orders API intentionally stays unchanged. Scan real API pages
     // until this UI filter has a match or the actual history has ended.
-    final seen = <String>{if (cursor != null) cursor};
+    final seen = <String>{?cursor};
     while (true) {
       final page = await api.orderPage(cursor: cursor);
       final matching = page.items.where(filter.matches).toList();
