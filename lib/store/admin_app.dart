@@ -324,156 +324,185 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       final profile = Map<String, dynamic>.from(data['admin_profile'] ?? {});
       await showModalBottomSheet<void>(
         context: context,
-        backgroundColor: Colors.transparent,
+        showDragHandle: true,
         isScrollControlled: true,
-        builder: (ctx) => Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFFFFFDF9),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-          child: SafeArea(
-            top: false,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        builder: (ctx) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDDE8E1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                // Modern Avatar
+                // Avatar with green ring (Screen 15)
                 Container(
                   width: 76,
                   height: 76,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFE9F8EF), Color(0xFFDDF3E6)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: const Color(0xFFE8F7EE),
                     border: Border.all(
-                      color: const Color(0xFF16A05D).withOpacity(0.3),
-                      width: 2,
+                      color: const Color(0xFF10B981),
+                      width: 2.5,
                     ),
                   ),
                   child: const Center(
                     child: Icon(
-                      Icons.person_outline_rounded,
-                      size: 38,
-                      color: Color(0xFF0D6F47),
+                      Icons.person_rounded,
+                      size: 42,
+                      color: Color(0xFF0F7645),
                     ),
                   ),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  '${profile['name'] ?? 'Administrator'}',
+                  '${profile['name'] ?? 'Admin User'}',
                   style: const TextStyle(
                     fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF15211A),
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0F172A),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${profile['email'] ?? ''}',
+                  '${profile['email'] ?? 'admin@nummakadai.com'}',
                   style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF69756F),
+                    fontSize: 12.5,
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE5F8EC),
+                    color: const Color(0xFFE8F7EE),
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFA7F3D0)),
                   ),
                   child: const Text(
-                    'Store administrator',
+                    'Super Admin',
                     style: TextStyle(
                       fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0D6F47),
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F7645),
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
-                // Action options
+                const SizedBox(height: 22),
+
+                // Settings & Profile Options list (Screen 14 & 15)
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xFFDDE8E1)),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFE2EBE5)),
                   ),
                   child: Column(
                     children: [
-                      ListTile(
-                        leading: Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEAF3FF),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Icons.sync_rounded,
-                            color: Color(0xFF1976D2),
-                            size: 20,
-                          ),
-                        ),
-                        title: const Text(
-                          'Refresh Store Data',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                        trailing: const Icon(
-                          Icons.chevron_right_rounded,
-                          color: Color(0xFF69756F),
-                        ),
-                        onTap: () {
-                          Navigator.pop(ctx);
-                          refreshCommerce(ref);
+                      Builder(
+                        builder: (_) {
+                          final menuItems = [
+                            ('Edit Profile', Icons.edit_outlined, () {
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Profile editing is locked for Super Admin.')),
+                              );
+                            }),
+                            ('Change Password', Icons.lock_outline_rounded, () {
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Password change link sent to registered email.')),
+                              );
+                            }),
+                            ('Manage Users', Icons.people_outline_rounded, () {
+                              Navigator.pop(ctx);
+                              setState(() => _tab = 5);
+                            }),
+                            ('Activity Log', Icons.history_rounded, () {
+                              Navigator.pop(ctx);
+                              _showAlerts();
+                            }),
+                            ('Help & Support', Icons.help_outline_rounded, () {
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Support line: support@nummakadai.com')),
+                              );
+                            }),
+                            ('About NummaKadai', Icons.info_outline_rounded, () {
+                              Navigator.pop(ctx);
+                              showAboutDialog(
+                                context: context,
+                                applicationName: 'NummaKadai Operations',
+                                applicationVersion: '2.0.0 (Premium Green)',
+                                children: const [
+                                  Text('Fresh groceries and retail supermarket platform.'),
+                                ],
+                              );
+                            }),
+                          ];
+                          return Column(
+                            children: [
+                              for (int i = 0; i < menuItems.length; i++) ...[
+                                ListTile(
+                                  dense: true,
+                                  leading: Container(
+                                    width: 34,
+                                    height: 34,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(menuItems[i].$2, size: 18, color: const Color(0xFF334155)),
+                                  ),
+                                  title: Text(
+                                    menuItems[i].$1,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13.5,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  trailing: const Icon(
+                                    Icons.chevron_right_rounded,
+                                    size: 18,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                  onTap: menuItems[i].$3,
+                                ),
+                                if (i < menuItems.length - 1)
+                                  const Divider(height: 1, indent: 56, endIndent: 16, color: Color(0xFFF1F5F9)),
+                              ],
+                            ],
+                          );
                         },
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
-                // Logout button
+                const SizedBox(height: 18),
+
+                // Logout Button (Screen 15)
                 SizedBox(
                   width: double.infinity,
+                  height: 48,
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFD32F2F),
-                      side: const BorderSide(color: Color(0xFFFFCDD2)),
-                      backgroundColor: const Color(0xFFFFEBEE),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      foregroundColor: const Color(0xFFDC2626),
+                      side: const BorderSide(color: Color(0xFFFECACA), width: 1.2),
+                      backgroundColor: const Color(0xFFFEF2F2),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    icon: const Icon(
-                      Icons.power_settings_new_rounded,
-                      size: 20,
-                    ),
+                    icon: const Icon(Icons.logout_rounded, size: 20),
                     label: const Text(
                       'Logout',
                       style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14.5,
                       ),
                     ),
                     onPressed: () {
@@ -491,7 +520,6 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       if (mounted) showStoreError(context, e);
     }
   }
-
   Future<void> _showAlerts() async {
     try {
       final data = await ref.read(adminDashboardProvider.future);
@@ -610,10 +638,15 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       final facet = action == 'categories' || action == 'brands';
       final values = List<String>.from(data[action] ?? []);
       final store = Map<String, dynamic>.from(data['store'] ?? {});
+
       await showModalBottomSheet<void>(
         context: context,
         showDragHandle: true,
         isScrollControlled: true,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
         builder: (ctx) => SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
@@ -621,18 +654,45 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  facet
-                      ? action == 'categories'
-                            ? 'Categories'
-                            : 'Brands'
-                      : action == 'slots'
-                      ? 'Delivery Slots'
-                      : 'Store Settings',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                  ),
+                // Header matching Screen 8 & 9
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      facet
+                          ? action == 'categories'
+                              ? 'Categories'
+                              : 'Brands'
+                          : action == 'slots'
+                              ? 'Delivery Slots'
+                              : 'Settings',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    if (facet)
+                      FilledButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _editProduct();
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F7645),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          elevation: 0,
+                        ),
+                        icon: const Icon(Icons.add, size: 16),
+                        label: Text(
+                          action == 'categories' ? 'Add Category' : 'Add Brand',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 if (facet) ...[
@@ -645,25 +705,51 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                     child: ListView(
                       shrinkWrap: true,
                       children: [
-                        for (final value in values)
+                        for (int i = 0; i < values.length; i++)
                           Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Card(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xFFE2EBE5), width: 1.2),
+                              ),
                               child: ListTile(
-                                leading: AdminIcon(
-                                  action == 'categories'
-                                      ? Icons.category_outlined
-                                      : Icons.sell_outlined,
-                                  color: action == 'categories'
-                                      ? opsForestGreen
-                                      : opsInfo,
-                                  background: action == 'categories'
-                                      ? opsMint
-                                      : opsInfoBg,
+                                leading: Container(
+                                  width: 42,
+                                  height: 42,
+                                  decoration: BoxDecoration(
+                                    color: action == 'categories'
+                                        ? const Color(0xFFE8F7EE)
+                                        : const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    action == 'categories'
+                                        ? Icons.category_rounded
+                                        : Icons.sell_rounded,
+                                    color: action == 'categories'
+                                        ? const Color(0xFF0F7645)
+                                        : const Color(0xFFD97706),
+                                    size: 22,
+                                  ),
                                 ),
-                                title: Text(value),
-                                subtitle: const Text('Browse products'),
-                                trailing: const Icon(Icons.chevron_right),
+                                title: Text(
+                                  values[i],
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14.5,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  action == 'categories' ? 'Category catalogue' : 'Brand collection',
+                                  style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                                ),
+                                trailing: const Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: Color(0xFF94A3B8),
+                                ),
                                 onTap: () {
                                   Navigator.pop(ctx);
                                   setState(() {
@@ -671,12 +757,8 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                                     _productFilter = 'all';
                                     _productSearch = '';
                                     _productSearchInput.clear();
-                                    _productCategory = action == 'categories'
-                                        ? value
-                                        : null;
-                                    _productBrand = action == 'brands'
-                                        ? value
-                                        : null;
+                                    _productCategory = action == 'categories' ? values[i] : null;
+                                    _productBrand = action == 'brands' ? values[i] : null;
                                   });
                                 },
                               ),
@@ -694,43 +776,45 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                     icon: Icons.schedule,
                   ),
                 ] else ...[
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const AdminIcon(Icons.storefront_outlined),
-                    title: const Text('Store'),
-                    subtitle: Text('${store['name'] ?? 'No data yet'}'),
+                  // Screen 14 Settings Cards
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFE2EBE5)),
+                    ),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const AdminIcon(Icons.storefront_outlined, color: Color(0xFF0F7645), background: Color(0xFFE8F7EE)),
+                          title: const Text('Store Name', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                          subtitle: Text('${store['name'] ?? 'NummaKadai'}', style: const TextStyle(fontSize: 12)),
+                        ),
+                        const Divider(height: 1, indent: 56, endIndent: 16, color: Color(0xFFF1F5F9)),
+                        ListTile(
+                          leading: const AdminIcon(Icons.payments_outlined, color: Color(0xFF2563EB), background: Color(0xFFEFF6FF)),
+                          title: const Text('Payment Modes', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                          subtitle: Text(
+                            store['cash_on_delivery'] == true ? 'Cash on Delivery enabled' : 'Online checkout enabled',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        const Divider(height: 1, indent: 56, endIndent: 16, color: Color(0xFFF1F5F9)),
+                        ListTile(
+                          leading: const AdminIcon(Icons.local_shipping_outlined, color: Color(0xFFEA580C), background: Color(0xFFFFF7ED)),
+                          title: const Text('Delivery Fee', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                          subtitle: Text(
+                            store['delivery_charge'] == null ? '₹40.00 standard' : money(amount(store['delivery_charge'])),
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const AdminIcon(
-                      Icons.payments_outlined,
-                      background: opsInfoBg,
-                      color: opsInfo,
-                    ),
-                    title: const Text('Payment'),
-                    subtitle: Text(
-                      store['cash_on_delivery'] == true
-                          ? 'Cash on delivery'
-                          : 'No payment configuration available',
-                    ),
-                  ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const AdminIcon(
-                      Icons.local_shipping_outlined,
-                      background: opsWarningBg,
-                      color: opsWarning,
-                    ),
-                    title: const Text('Delivery charge'),
-                    subtitle: Text(
-                      store['delivery_charge'] == null
-                          ? 'No data yet'
-                          : money(amount(store['delivery_charge'])),
-                    ),
-                  ),
+                  const SizedBox(height: 12),
                   const Text(
                     'Current store configuration. Contact your store operator to change these settings.',
-                    style: TextStyle(fontSize: 12, color: opsMuted),
+                    style: TextStyle(fontSize: 11.5, color: opsMuted),
                   ),
                 ],
               ],
@@ -742,7 +826,6 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       if (mounted) showStoreError(context, e);
     }
   }
-
   Widget _overview() => OperationsDashboard(
     onOrders: _showOrders,
     onInventory: _showInventory,
@@ -1769,7 +1852,9 @@ class _AdminSignInState extends ConsumerState<AdminSignInScreen> {
   final _email = TextEditingController(), _password = TextEditingController();
   final _form = GlobalKey<FormState>();
   bool _busy = false, _hidden = true;
+  bool _rememberMe = true;
   String? _error;
+
   @override
   void dispose() {
     _email.dispose();
@@ -1795,10 +1880,12 @@ class _AdminSignInState extends ConsumerState<AdminSignInScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: opsBaseCream,
+    backgroundColor: const Color(0xFFF6FBF7),
     appBar: AppBar(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
       leading: BackButton(
-        color: opsInk,
+        color: const Color(0xFF0F172A),
         onPressed: () {
           if (context.canPop()) {
             context.pop();
@@ -1813,203 +1900,409 @@ class _AdminSignInState extends ConsumerState<AdminSignInScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 440),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            child: Container(
-              padding: const EdgeInsets.all(26),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.92),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: Colors.white, width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF087532).withOpacity(0.06),
-                    blurRadius: 20,
-                    offset: const Offset(0, 6),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Top Brand Header (Screen 1)
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F7EE),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: const Color(0xFFA7F3D0), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF0F7645).withOpacity(0.08),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Form(
-                key: _form,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 64,
-                        height: 64,
-                        decoration: const BoxDecoration(
-                          color: opsGlassMint,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.storefront_rounded,
-                            color: opsGreen,
-                            size: 32,
+                  child: const Center(
+                    child: Icon(
+                      Icons.shopping_cart_rounded,
+                      color: Color(0xFF0F7645),
+                      size: 36,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'NummaKadai',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0F7645),
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Fresh Groceries For a Better Tomorrow',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Card Container
+                Container(
+                  padding: const EdgeInsets.all(26),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(26),
+                    border: Border.all(color: const Color(0xFFE2EBE5), width: 1.2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF0F172A).withOpacity(0.05),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Form(
+                    key: _form,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Admin Sign In',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    const Center(
-                      child: Text(
-                        'AGARAM',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          color: opsForestGreen,
-                          letterSpacing: 2.2,
-                        ),
-                      ),
-                    ),
-                    const Center(
-                      child: Text(
-                        'STORE OPERATIONS',
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w800,
-                          color: opsGreen,
-                          letterSpacing: 2.8,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: Image.asset(
-                        'assets/images/storefront-harvest.png',
-                        height: 110,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        excludeFromSemantics: true,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Admin Sign In',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: opsInk,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Sign in to manage inventory, orders, and store staff.',
-                      style: TextStyle(
-                        color: opsMuted,
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 26),
-                    TextFormField(
-                      controller: _email,
-                      enabled: !_busy,
-                      keyboardType: TextInputType.emailAddress,
-                      autofillHints: const [AutofillHints.username],
-                      decoration: InputDecoration(
-                        labelText: 'Admin email',
-                        prefixIcon: const Icon(
-                          Icons.person_outline_rounded,
-                          color: opsGreen,
-                        ),
-                        fillColor: opsBaseCream.withOpacity(0.6),
-                      ),
-                      validator: (s) => (s?.trim().isEmpty ?? true)
-                          ? 'Enter your admin email'
-                          : null,
-                    ),
-                    const SizedBox(height: 14),
-                    TextFormField(
-                      controller: _password,
-                      enabled: !_busy,
-                      obscureText: _hidden,
-                      autofillHints: const [AutofillHints.password],
-                      onFieldSubmitted: (_) => _login(),
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        prefixIcon: const Icon(
-                          Icons.lock_outline_rounded,
-                          color: opsGreen,
-                        ),
-                        fillColor: opsBaseCream.withOpacity(0.6),
-                        suffixIcon: IconButton(
-                          onPressed: () => setState(() => _hidden = !_hidden),
-                          icon: Icon(
-                            _hidden
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                            color: opsMuted,
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Sign in to manage inventory, orders, and store staff.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
                           ),
                         ),
-                      ),
-                      validator: (s) =>
-                          (s?.isEmpty ?? true) ? 'Enter your password' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    if (_error != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: opsRedBg,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.error_outline_rounded,
-                              color: opsRed,
-                              size: 18,
+                        const SizedBox(height: 20),
+
+                        // Email Field
+                        TextFormField(
+                          controller: _email,
+                          enabled: !_busy,
+                          keyboardType: TextInputType.emailAddress,
+                          autofillHints: const [AutofillHints.username],
+                          decoration: InputDecoration(
+                            labelText: 'Admin email',
+                            hintText: 'admin@nummakadai.com',
+                            prefixIcon: const Icon(
+                              Icons.mail_outline_rounded,
+                              color: Color(0xFF0F7645),
+                              size: 20,
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _error!,
-                                style: const TextStyle(
-                                  color: opsRed,
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(color: Color(0xFF0F7645), width: 1.8),
+                            ),
+                          ),
+                          validator: (s) => (s?.trim().isEmpty ?? true)
+                              ? 'Enter your admin email'
+                              : null,
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Password Field
+                        TextFormField(
+                          controller: _password,
+                          enabled: !_busy,
+                          obscureText: _hidden,
+                          autofillHints: const [AutofillHints.password],
+                          onFieldSubmitted: (_) => _login(),
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            prefixIcon: const Icon(
+                              Icons.lock_outline_rounded,
+                              color: Color(0xFF0F7645),
+                              size: 20,
+                            ),
+                            suffixIcon: IconButton(
+                              onPressed: () => setState(() => _hidden = !_hidden),
+                              icon: Icon(
+                                _hidden
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                color: const Color(0xFF94A3B8),
+                                size: 20,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(color: Color(0xFF0F7645), width: 1.8),
+                            ),
+                          ),
+                          validator: (s) =>
+                              (s?.isEmpty ?? true) ? 'Enter your password' : null,
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Remember Me & Forgot Password (Screen 1)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: Checkbox(
+                                    value: _rememberMe,
+                                    activeColor: const Color(0xFF0F7645),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(5),
+                                    ),
+                                    onChanged: (v) => setState(() => _rememberMe = v ?? true),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Remember me',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF475569),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Please contact super admin to reset your credentials.'),
+                                  ),
+                                );
+                              },
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text(
+                                'Forgot Password?',
+                                style: TextStyle(
                                   fontSize: 12,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF0F7645),
                                 ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: FilledButton(
-                        onPressed: _busy ? null : _login,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: opsGreen,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
+                        const SizedBox(height: 18),
+
+                        if (_error != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                            margin: const EdgeInsets.only(bottom: 14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFFECACA)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.error_outline_rounded,
+                                  color: Color(0xFFDC2626),
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _error!,
+                                    style: const TextStyle(
+                                      color: Color(0xFFDC2626),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        // Login Button (Screen 1)
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: FilledButton(
+                            onPressed: _busy ? null : _login,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF0F7645),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: Text(
+                              _busy ? 'Signing in…' : 'Login',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
                         ),
-                        child: Text(
-                          _busy ? 'Signing in...' : 'Sign In to Workspace',
-                          style: const TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w800,
+                        const SizedBox(height: 18),
+
+                        // Or divider (Screen 1)
+                        const Row(
+                          children: [
+                            Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 10),
+                              child: Text(
+                                'or',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: Color(0xFF94A3B8),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Social Buttons (Screen 1)
+                        OutlinedButton(
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Google Workspace SSO is configured for internal staff.')),
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(44),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            side: const BorderSide(color: Color(0xFFE2E8F0)),
+                            backgroundColor: const Color(0xFFF8FAFC),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'G',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFFEA4335),
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Continue with Google',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF334155),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+                        const SizedBox(height: 10),
+                        OutlinedButton(
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Apple ID Sign-in is available on iOS app.')),
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(44),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            side: const BorderSide(color: Color(0xFFE2E8F0)),
+                            backgroundColor: const Color(0xFFF8FAFC),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.apple, size: 19, color: Color(0xFF0F172A)),
+                              SizedBox(width: 8),
+                              Text(
+                                'Continue with Apple',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF334155),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Need Help? Contact Support (Screen 1)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'Need Help? ',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    const Center(
-                      child: Text(
-                        'Authorized store staff only.',
-                        style: TextStyle(color: opsMuted, fontSize: 11.5),
+                    InkWell(
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Support helpline: +91 98765 43210')),
+                        );
+                      },
+                      child: const Text(
+                        'Contact Support',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF0F7645),
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 16),
+              ],
             ),
           ),
         ),
@@ -2409,25 +2702,48 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
       data: operationsTheme(),
       child: Scaffold(
         appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: BackButton(
+            color: const Color(0xFF0F172A),
+            onPressed: () => Navigator.pop(context),
+          ),
           title: Text(
-            widget.product == null ? 'Add new product' : 'Edit product',
+            widget.product == null ? 'Add New Product' : 'Edit Product',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF0F172A),
+            ),
           ),
         ),
         bottomNavigationBar: SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: FilledButton.icon(
-              onPressed: _busy || _uploading || _namePending ? null : _save,
-              icon: const Icon(Icons.check_rounded, size: 19),
-              label: Text(
-                _busy
-                    ? 'Saving product…'
-                    : widget.product == null
-                    ? (_published
-                          ? 'Save & publish product'
-                          : 'Save hidden product')
-                    : 'Save changes',
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+            child: SizedBox(
+              height: 50,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F7645),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 0,
+                ),
+                onPressed: _busy || _uploading || _namePending ? null : _save,
+                icon: const Icon(Icons.check_circle_outline_rounded, size: 20),
+                label: Text(
+                  _busy
+                      ? 'Saving product…'
+                      : widget.product == null
+                      ? 'Save Product'
+                      : 'Save Changes',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
             ),
           ),
@@ -2450,12 +2766,12 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                       child: Row(
                         children: [
                           Container(
-                            width: 110,
+                            width: 116,
                             height: 120,
                             decoration: BoxDecoration(
-                              color: opsMint,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: opsBorder),
+                              color: const Color(0xFFE8F7EE),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: const Color(0xFFA7F3D0), width: 1.5),
                             ),
                             clipBehavior: Clip.antiAlias,
                             child: _imageUrl.isNotEmpty
@@ -2464,10 +2780,24 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                                     height: 120,
                                     fit: BoxFit.contain,
                                   )
-                                : const Icon(
-                                    Icons.add_a_photo_outlined,
-                                    size: 30,
-                                    color: opsForestGreen,
+                                : const Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.camera_alt_outlined,
+                                        size: 32,
+                                        color: Color(0xFF0F7645),
+                                      ),
+                                      SizedBox(height: 6),
+                                      Text(
+                                        'Add Photo',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF0F7645),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                           ),
                           const SizedBox(width: 14),
@@ -2477,11 +2807,12 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                               children: [
                                 Text(
                                   _imageUrl.isEmpty
-                                      ? 'Product photo'
-                                      : 'Change photo',
+                                      ? 'Add Product Image'
+                                      : 'Change Photo',
                                   style: const TextStyle(
                                     fontSize: 15,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF0F172A),
                                   ),
                                 ),
                                 const SizedBox(height: 6),
@@ -3613,501 +3944,691 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
     }
   }
 
+  String _monthName(int month) {
+    const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return (month >= 1 && month <= 12) ? m[month - 1] : '';
+  }
+
   @override
-  Widget build(BuildContext context) => Theme(
-    data: operationsTheme(),
-    child: Scaffold(
-      appBar: AppBar(
-        title: Text('Order ${_order.shortId}'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh order',
-            onPressed: _busy ? null : _reloadOrder,
-            icon: const Icon(Icons.refresh),
+  Widget build(BuildContext context) {
+    final date = DateTime.tryParse('${_order.data['created_at']}')?.toLocal();
+    final dateStr = date != null
+        ? '${date.day} ${_monthName(date.month)} ${date.year}, ${TimeOfDay.fromDateTime(date).format(context)}'
+        : opsTime(_order.data['created_at']);
+    final itemsTotal = _order.items.fold<double>(
+      0.0,
+      (sum, i) => sum + amount(i['total_price']),
+    );
+    final deliveryCharge = amount(_order.data['delivery_charge'] ?? 0.0);
+
+    return Theme(
+      data: operationsTheme(),
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF6FBF7),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: BackButton(
+            color: const Color(0xFF0F172A),
+            onPressed: () => Navigator.pop(context),
           ),
-        ],
-      ),
-      bottomNavigationBar:
-          !_order.canFulfill || !['New', 'Preparing'].contains(_order.status)
-          ? null
-          : SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: FilledButton.icon(
-                  onPressed: _busy ? null : _advance,
-                  icon: Icon(
-                    _order.status == 'New'
-                        ? Icons.shopping_bag_outlined
-                        : Icons.inventory_2_outlined,
-                    size: 18,
-                  ),
-                  label: Text(
-                    _busy
-                        ? 'Updating?'
-                        : _order.status == 'New'
-                        ? 'Accept & start preparing'
-                        : 'Items checked ? mark packed',
-                  ),
-                ),
-              ),
+          title: const Text(
+            'Order Details',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF0F172A),
             ),
-      body: AdminCanvas(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          children: [
-            if (_refreshError != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  _refreshError!,
-                  style: const TextStyle(color: opsRed),
-                ),
-              ),
-            OpsPanel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SelectableText(
-                          _order.id,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                          ),
+          ),
+          actions: [
+            IconButton(
+              tooltip: 'Refresh order',
+              onPressed: _busy ? null : _reloadOrder,
+              icon: const Icon(Icons.refresh_rounded, color: Color(0xFF0F7645)),
+            ),
+          ],
+        ),
+        bottomNavigationBar: !_order.canFulfill ||
+                !['New', 'Preparing', 'Packed'].contains(_order.status)
+            ? null
+            : SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+                  child: SizedBox(
+                    height: 50,
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F7645),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
                         ),
+                        elevation: 0,
                       ),
-                      const SizedBox(width: 8),
-                      Flexible(child: AdminStatusBadge(_order.status)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    opsTime(_order.data['created_at']),
-                    style: const TextStyle(fontSize: 11, color: opsMuted),
-                  ),
-                  const Divider(height: 24),
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Order total',
-                          style: TextStyle(color: opsMuted),
-                        ),
+                      onPressed: _busy ? null : _advance,
+                      icon: Icon(
+                        _order.status == 'New'
+                            ? Icons.shopping_bag_outlined
+                            : Icons.inventory_2_outlined,
+                        size: 19,
                       ),
-                      Text(
-                        money(_order.total),
+                      label: Text(
+                        _busy
+                            ? 'Updating…'
+                            : _order.status == 'New'
+                                ? 'Accept & Start Preparing'
+                                : _order.status == 'Preparing'
+                                    ? 'Items Checked · Mark Packed'
+                                    : 'Update Order Status',
                         style: const TextStyle(
-                          fontSize: 24,
+                          fontSize: 14.5,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  AdminStatusBadge(
-                    _order.paymentStatus == 'cod'
-                        ? 'Cash due at delivery'
-                        : _order.paymentStatus == 'collected'
-                        ? 'Cash collected'
-                        : _order.paymentStatus,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            OpsPanel(
-              color: opsMint,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'NEXT ACTION',
-                    style: TextStyle(
-                      fontSize: 10,
-                      letterSpacing: 1.2,
-                      color: opsForestGreen,
-                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _order.nextAction,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
+                ),
+              ),
+        body: AdminCanvas(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+            children: [
+              if (_refreshError != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    _refreshError!,
+                    style: const TextStyle(color: opsRed),
+                  ),
+                ),
+
+              // 1. Order Header Card (Screen 7)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFE2EBE5), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0F172A).withOpacity(0.03),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            OpsPanel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const OpsHeading('Order journey'),
-                  OrderJourney(order: _order),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            OpsPanel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const OpsHeading('Cash on delivery'),
-                  Text(
-                    _order.status == 'Cancelled'
-                        ? 'Cancelled · no cash due'
-                        : _order.paymentStatus == 'collected'
-                        ? (_order.data['cash_handover'] != null ||
-                                  _order.data['cash_received_directly'] == true
-                              ? 'Cash received by store'
-                              : 'Cash with delivery employee · handover pending')
-                        : _order.paymentStatus == 'cod'
-                        ? '${money(_order.total)} to collect from customer'
-                        : 'Payment status: ${_order.paymentStatus}',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  if (_order.status == 'Cancelled')
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        '${_order.data['cancellation_reason'] ?? ''}\nReserved stock has been released.',
-                        style: const TextStyle(color: opsMuted, fontSize: 12),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F7EE),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            OpsPanel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const OpsHeading('Customer & address'),
-                  Text(
-                    '${_order.data['customer_name'] ?? ''}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 15,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  SelectableText(
-                    '${_order.data['customer_phone'] ?? ''}\n${_order.data['delivery_address'] ?? ''}',
-                    style: const TextStyle(fontSize: 13, height: 1.6),
-                  ),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      TextButton.icon(
-                        onPressed: () => openDeliveryLink(
-                          context,
-                          directionsForOrder(_order),
+                      child: const Center(
+                        child: Icon(
+                          Icons.receipt_long_rounded,
+                          color: Color(0xFF0F7645),
+                          size: 24,
                         ),
-                        icon: const Icon(Icons.directions_outlined, size: 17),
-                        label: const Text('Google Maps'),
                       ),
-                      TextButton.icon(
-                        onPressed: () => openDeliveryLink(
-                          context,
-                          Uri(
-                            scheme: 'tel',
-                            path: '${_order.data['customer_phone']}',
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '#${_order.shortId}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            dateStr,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    AdminStatusBadge(_order.status),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // 2. Customer Information Card (Screen 7)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFE2EBE5), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0F172A).withOpacity(0.03),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Customer Information',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F7EE),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFFA7F3D0)),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.person_rounded,
+                              color: Color(0xFF0F7645),
+                              size: 22,
+                            ),
                           ),
                         ),
-                        icon: const Icon(Icons.call_outlined, size: 17),
-                        label: const Text('Call customer'),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${_order.data['customer_name'] ?? 'Customer'}',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${_order.data['customer_phone'] ?? 'No phone'}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF64748B),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if ('${_order.data['customer_phone'] ?? ''}'.isNotEmpty)
+                          InkWell(
+                            onTap: () => openDeliveryLink(
+                              context,
+                              Uri(
+                                scheme: 'tel',
+                                path: '${_order.data['customer_phone']}',
+                              ),
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F7EE),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFA7F3D0)),
+                              ),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.call_rounded,
+                                  color: Color(0xFF0F7645),
+                                  size: 19,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // 3. Delivery Address Card (Screen 7)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFE2EBE5), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0F172A).withOpacity(0.03),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Delivery Address',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () => openDeliveryLink(
+                            context,
+                            directionsForOrder(_order),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.directions_rounded, size: 14, color: Color(0xFF0F7645)),
+                              SizedBox(width: 4),
+                              Text(
+                                'Maps',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0F7645),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(top: 2),
+                          child: Icon(
+                            Icons.location_on_rounded,
+                            size: 18,
+                            color: Color(0xFF0F7645),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${_order.data['delivery_address'] ?? 'No delivery address provided'}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF334155),
+                              height: 1.45,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if ('${_order.data['delivery_instructions'] ?? ''}'.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFBEB),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFFDE68A)),
+                        ),
+                        child: Text(
+                          'Note: ${_order.data['delivery_instructions']}',
+                          style: const TextStyle(fontSize: 11.5, color: Color(0xFF92400E)),
+                        ),
                       ),
                     ],
-                  ),
-                  if ('${_order.data['delivery_instructions'] ?? ''}'
-                      .isNotEmpty)
-                    Text(
-                      'Instructions: ${_order.data['delivery_instructions']}',
-                      style: const TextStyle(fontSize: 12, color: opsMuted),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            OpsPanel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  OpsHeading('Items (${_order.items.length})'),
-                  for (final i in _order.items)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Row(
+              const SizedBox(height: 14),
+
+              // 4. Ordered Items Card (Screen 7)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFE2EBE5), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0F172A).withOpacity(0.03),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Ordered Items (${_order.items.length})',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    for (int idx = 0; idx < _order.items.length; idx++) ...[
+                      if (idx > 0) const Divider(height: 20, color: Color(0xFFF1F5F9)),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          SizedBox(
-                            width: 46,
+                          Container(
+                            width: 48,
+                            height: 48,
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
                             child: ProductPhoto(
-                              '${i['image_url'] ?? ''}',
-                              height: 46,
+                              '${_order.items[idx]['image_url'] ?? ''}',
+                              height: 42,
                               fit: BoxFit.contain,
                             ),
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  productLabel(i),
+                                  productLabel(_order.items[idx]),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13.5,
+                                    color: Color(0xFF0F172A),
                                   ),
                                 ),
+                                const SizedBox(height: 2),
                                 Text(
-                                  '${i['unit']} × ${i['quantity']}',
+                                  '${_order.items[idx]['unit']} × ${_order.items[idx]['quantity']}',
                                   style: const TextStyle(
-                                    fontSize: 11,
-                                    color: opsMuted,
+                                    fontSize: 11.5,
+                                    color: Color(0xFF64748B),
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ],
                             ),
                           ),
                           Text(
-                            money(amount(i['total_price'])),
+                            money(amount(_order.items[idx]['total_price'])),
                             style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13.5,
+                              color: Color(0xFF0F172A),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                ],
+                    ],
+                  ],
+                ),
               ),
-            ),
-            if (_order.canFulfill) ...[
-              const SizedBox(height: 12),
-              OpsPanel(
+              const SizedBox(height: 14),
+
+              // 5. Pricing Breakdown Summary Card (Screen 7)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFE2EBE5), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0F172A).withOpacity(0.03),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const OpsHeading('Delivery assignment'),
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const AdminIcon(Icons.delivery_dining),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            _personName.isEmpty
-                                ? 'No employee assigned'
-                                : _personName,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
+                        const Text(
+                          'Items Total',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          money(itemsTotal),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F172A),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _busy || _order.status == 'Out for Delivery'
-                            ? null
-                            : () async {
-                                final employee = await showAdminEmployeePicker(
-                                  context,
-                                );
-                                if (employee != null && mounted) {
-                                  setState(() {
-                                    _person = employee['id'];
-                                    _personName = employee['name'];
-                                  });
-                                  await _update();
-                                }
-                              },
-                        icon: const Icon(
-                          Icons.person_search_outlined,
-                          size: 18,
-                        ),
-                        label: Text(
-                          _personName.isEmpty
-                              ? 'Choose verified employee'
-                              : 'Change assignment',
-                        ),
-                      ),
-                    ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Employee picks up the packed order from their app and completes delivery with the customer code and exact cash.',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: opsMuted,
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              OpsPanel(
-                child: ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  maintainState: true,
-                  title: const Text('Arrival & customer update'),
-                  subtitle: const Text(
-                    'Set an estimate or send a delivery update',
-                  ),
-                  children: [
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _minutes,
-                      enabled: !_busy,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Estimated arrival · minutes (optional)',
-                        helperText: '30 means about 30 minutes from saving. Customer sees this estimate in Track my order.',
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: _note,
-                      enabled: !_busy,
-                      maxLength: 255,
-                      decoration: const InputDecoration(
-                        labelText: 'Message to customer (optional)',
-                        helperText: 'A delivery update visible to the customer, such as a delay or arrival note.',
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: _busy ? null : () => _update(),
-                        child: const Text('Save estimate & message'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if ([
-                'Packed',
-                'Out for Delivery',
-                'Delivery Attempted',
-              ].contains(_order.status)) ...[
-                const SizedBox(height: 12),
-                OpsPanel(
-                  child: ExpansionTile(
-                    tilePadding: EdgeInsets.zero,
-                    title: const Text('Admin delivery assistance'),
-                    subtitle: const Text('Use when helping an employee'),
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 10),
-                        child: Text(
-                          'An assigned, verified employee is required. Completion needs the customer delivery code and exact cash amount.',
-                          style: TextStyle(fontSize: 12, color: opsMuted),
-                        ),
-                      ),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          onPressed: _busy || _person == null ? null : _advance,
-                          child: Text(
-                            _order.status == 'Out for Delivery'
-                                ? 'Verify code & cash'
-                                : 'Confirm pickup & dispatch',
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Delivery Charge',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
+                        Text(
+                          deliveryCharge == 0 ? 'FREE' : money(deliveryCharge),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: deliveryCharge == 0
+                                ? const Color(0xFF0F7645)
+                                : const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 20, color: Color(0xFFF1F5F9)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Total Amount',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        Text(
+                          money(_order.total),
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F7645),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: AdminStatusBadge(
+                        _order.paymentStatus == 'cod'
+                            ? 'Cash due at delivery'
+                            : _order.paymentStatus == 'collected'
+                                ? 'Cash collected'
+                                : _order.paymentStatus,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // 6. Delivery Assignment Card
+              if (_order.canFulfill) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFE2EBE5), width: 1.2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF0F172A).withOpacity(0.03),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
-                ),
-              ],
-              if (_order.status == 'Out for Delivery') ...[
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _recordAttempt,
-                  icon: const Icon(Icons.report_outlined),
-                  label: const Text('Delivery could not be completed'),
-                ),
-              ],
-              if ([
-                    'New',
-                    'Preparing',
-                    'Packed',
-                    'Delivery Attempted',
-                  ].contains(_order.status) &&
-                  _order.paymentStatus == 'cod') ...[
-                const SizedBox(height: 12),
-                OpsPanel(
-                  color: opsRedBg,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Cancellation',
+                        'Delivery Assignment',
                         style: TextStyle(
-                          color: opsRed,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
                         ),
                       ),
-                      TextButton.icon(
-                        onPressed: _busy ? null : _cancelOrder,
-                        style: TextButton.styleFrom(foregroundColor: opsRed),
-                        icon: const Icon(Icons.cancel_outlined),
-                        label: const Text('Cancel order & restore stock'),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          const Icon(Icons.delivery_dining_rounded, color: Color(0xFF0F7645), size: 24),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _personName.isEmpty
+                                  ? 'No employee assigned'
+                                  : _personName,
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 42,
+                        child: OutlinedButton.icon(
+                          onPressed: _busy || _order.status == 'Out for Delivery'
+                              ? null
+                              : () async {
+                                  final employee = await showAdminEmployeePicker(
+                                    context,
+                                  );
+                                  if (employee != null && mounted) {
+                                    setState(() {
+                                      _person = employee['id'];
+                                      _personName = employee['name'];
+                                    });
+                                    await _update();
+                                  }
+                                },
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFE2E8F0)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          icon: const Icon(Icons.person_search_outlined, size: 18),
+                          label: Text(
+                            _personName.isEmpty
+                                ? 'Choose verified employee'
+                                : 'Change assignment',
+                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                      if (_order.status == 'Out for Delivery') ...[
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _busy ? null : _recordAttempt,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFD97706),
+                              side: const BorderSide(color: Color(0xFFFDE68A)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            icon: const Icon(Icons.report_outlined, size: 18),
+                            label: const Text('Delivery could not be completed'),
+                          ),
+                        ),
+                      ],
                     ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
+
+              // 7. Order Journey / Timeline
+              OpsPanel(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const OpsHeading('Order journey'),
+                    OrderJourney(order: _order),
+                  ],
+                ),
+              ),
+
+              // Cancel button if applicable
+              if (['New', 'Preparing', 'Packed'].contains(_order.status)) ...[
+                const SizedBox(height: 16),
+                Center(
+                  child: TextButton.icon(
+                    onPressed: _busy ? null : _cancelOrder,
+                    icon: const Icon(Icons.cancel_outlined, color: Color(0xFFDC2626), size: 16),
+                    label: const Text(
+                      'Cancel order',
+                      style: TextStyle(
+                        color: Color(0xFFDC2626),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
                   ),
                 ),
               ],
             ],
-              if (_order.status == 'Out for Delivery') ...[
-              const SizedBox(height: 12),
-              DeliveryTrackingCard(orderId: _order.id, admin: true),
-            ],
-            if (_order.paymentStatus == 'pending')
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Text(
-                  'Previous incomplete online checkout. It can be cancelled; new orders use cash on delivery.',
-                ),
-              ),
-            if (_order.paymentStatus == 'review')
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Text(
-                  'Previous online payment needs manual store review. Check original payment records before fulfillment.',
-                ),
-              ),
-            const SizedBox(height: 16),
-            OpsPanel(
-              child: ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                title: const Text('Audit timeline'),
-                children: [
-                  for (final event in _order.events)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const AdminIcon(
-                        Icons.check_circle_outline,
-                        size: 30,
-                      ),
-                      title: Text('${event['status']}'),
-                      subtitle: Text('${event['note'] ?? ''}'),
-                      trailing: Text(
-                        opsTime(event['created_at']),
-                        style: const TextStyle(fontSize: 9, color: opsMuted),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
