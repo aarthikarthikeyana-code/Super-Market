@@ -526,27 +526,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                 ],
               ),
-              child: SizedBox(
+              child: NummaKadaiGradientButton(
                 width: double.infinity,
-                child: FilledButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        widget.onEdit();
-                      },
-                      icon: const Icon(Icons.shopping_bag_outlined, size: 18),
-                      label: const Text(
-                        'Edit & Configure Product',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F5132),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                  ),
+                height: 50,
+                onPressed: () {
+                  Navigator.pop(context);
+                  widget.onEdit();
+                },
+                icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+                label: const Text('Edit & Configure Product'),
               ),
             ),
           ),
@@ -919,13 +907,12 @@ class OperationsCashControl extends ConsumerWidget {
               style: TextStyle(fontSize: 11, color: opsMuted),
             ),
             const SizedBox(height: 12),
-            SizedBox(
+            NummaKadaiGradientButton(
               width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () => onReceive(p),
-                icon: const Icon(Icons.check_circle_outline, size: 17),
-                label: const Text('Confirm Cash Handover'),
-              ),
+              height: 48,
+              onPressed: () => onReceive(p),
+              icon: const Icon(Icons.check_circle_outline, size: 18),
+              label: const Text('Confirm Cash Handover'),
             ),
           ],
         ),

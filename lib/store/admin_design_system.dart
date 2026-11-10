@@ -786,22 +786,10 @@ class AdminWorkflowBanner extends StatelessWidget {
                   ),
                   if (ctaLabel != null) ...[
                     const SizedBox(height: 12),
-                    FilledButton(
+                    NummaKadaiGradientButton(
+                      compact: true,
                       onPressed: onCta,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F5132),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        minimumSize: const Size(0, 36),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Row(
+                      label: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
@@ -812,7 +800,7 @@ class AdminWorkflowBanner extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 4),
-                          const Icon(Icons.arrow_forward_rounded, size: 14),
+                          const Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
                         ],
                       ),
                     ),
@@ -1069,7 +1057,8 @@ class AdminOrderCard extends StatelessWidget {
                       const SizedBox(height: 10),
                       Align(
                         alignment: Alignment.centerRight,
-                        child: FilledButton.icon(
+                        child: NummaKadaiGradientButton(
+                          compact: true,
                           onPressed: onAction,
                           icon: Icon(
                             actionLabel!.contains('Prepare') ||
@@ -1081,28 +1070,9 @@ class AdminOrderCard extends StatelessWidget {
                                 ? Icons.two_wheeler_rounded
                                 : Icons.arrow_forward_rounded,
                             size: 15,
+                            color: Colors.white,
                           ),
-                          label: Text(
-                            actionLabel!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF16A05D),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
+                          label: Text(actionLabel!),
                         ),
                       ),
                     ],
@@ -2628,6 +2598,106 @@ class NummaKadaiWeeklySalesChart extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+
+class NummaKadaiGradientButton extends StatelessWidget {
+  final Widget? icon;
+  final Widget label;
+  final VoidCallback? onPressed;
+  final double? width;
+  final double height;
+  final double borderRadius;
+  final List<Color>? gradientColors;
+  final bool compact;
+  final EdgeInsetsGeometry? padding;
+  final TextStyle? textStyle;
+
+  const NummaKadaiGradientButton({
+    super.key,
+    this.icon,
+    required this.label,
+    required this.onPressed,
+    this.width,
+    this.height = 48,
+    this.borderRadius = 16,
+    this.gradientColors,
+    this.compact = false,
+    this.padding,
+    this.textStyle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+    final colors = gradientColors ?? const [Color(0xFF10B981), Color(0xFF047857)];
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: width,
+      height: compact ? 36 : height,
+      decoration: BoxDecoration(
+        gradient: enabled
+            ? LinearGradient(
+                colors: colors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : const LinearGradient(
+                colors: [Color(0xFFCBD5E1), Color(0xFF94A3B8)],
+              ),
+        borderRadius: BorderRadius.circular(borderRadius),
+        boxShadow: enabled
+            ? [
+                BoxShadow(
+                  color: colors.first.withOpacity(0.35),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(borderRadius),
+          onTap: onPressed,
+          child: Padding(
+            padding: padding ??
+                EdgeInsets.symmetric(
+                  horizontal: compact ? 12 : 18,
+                  vertical: compact ? 6 : 10,
+                ),
+            child: Row(
+              mainAxisSize: width == null ? MainAxisSize.min : MainAxisSize.max,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (icon != null) ...[
+                  IconTheme(
+                    data: const IconThemeData(color: Colors.white, size: 17),
+                    child: icon!,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                DefaultTextStyle(
+                  style: textStyle ??
+                      TextStyle(
+                        fontFamily: 'NotoSansTamil',
+                        fontSize: compact ? 12 : 14.5,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: -0.2,
+                      ),
+                  child: label,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

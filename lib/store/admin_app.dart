@@ -673,23 +673,15 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                       ),
                     ),
                     if (facet)
-                      FilledButton.icon(
+                      NummaKadaiGradientButton(
+                        compact: true,
                         onPressed: () {
                           Navigator.pop(ctx);
                           _editProduct();
                         },
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF0F7645),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          elevation: 0,
-                        ),
                         icon: const Icon(Icons.add, size: 16),
                         label: Text(
                           action == 'categories' ? 'Add Category' : 'Add Brand',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
                         ),
                       ),
                   ],
@@ -898,24 +890,10 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                     ),
                   ),
                 ),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF16A05D),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
+                NummaKadaiGradientButton(
+                  compact: true,
                   icon: const Icon(Icons.add, size: 18),
-                  label: const Text(
-                    'Add Product',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                  ),
+                  label: const Text('Add Product'),
                   onPressed: () => _editProduct(),
                 ),
               ],
@@ -1140,7 +1118,8 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
               onPressed: () => Navigator.pop(ctx),
               child: const Text('Cancel'),
             ),
-            FilledButton(
+            NummaKadaiGradientButton(
+              compact: true,
               onPressed: () {
                 if (form.currentState!.validate()) {
                   Navigator.pop(ctx, {
@@ -1149,7 +1128,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                   });
                 }
               },
-              child: const Text('Save stock'),
+              label: const Text('Save stock'),
             ),
           ],
         ),
@@ -1366,16 +1345,15 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
             if (_selectedOrders.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: SizedBox(
+                child: NummaKadaiGradientButton(
                   width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _batchBusy ? null : _assignSelected,
-                    icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
-                    label: Text(
-                      _batchBusy
-                          ? 'Assigning…'
-                          : 'Assign ${_selectedOrders.length} packed orders',
-                    ),
+                  height: 48,
+                  onPressed: _batchBusy ? null : _assignSelected,
+                  icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
+                  label: Text(
+                    _batchBusy
+                        ? 'Assigning…'
+                        : 'Assign ${_selectedOrders.length} packed orders',
                   ),
                 ),
               ),
@@ -1506,12 +1484,11 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                SizedBox(
+                NummaKadaiGradientButton(
                   width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: Text(_orderActionLabel(order)),
-                  ),
+                  height: 48,
+                  onPressed: () => Navigator.pop(ctx, true),
+                  label: Text(_orderActionLabel(order)),
                 ),
               ],
             ),
@@ -1616,7 +1593,8 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                     style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800),
                   ),
                 ),
-                FilledButton.icon(
+                NummaKadaiGradientButton(
+                  compact: true,
                   onPressed: () => _editPerson(),
                   icon: const Icon(Icons.add, size: 17),
                   label: const Text('Employee'),
@@ -2153,27 +2131,11 @@ class _AdminSignInState extends ConsumerState<AdminSignInScreen> {
                           ),
 
                         // Login Button (Screen 1)
-                        SizedBox(
+                        NummaKadaiGradientButton(
                           width: double.infinity,
-                          height: 48,
-                          child: FilledButton(
-                            onPressed: _busy ? null : _login,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: const Color(0xFF0F7645),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              elevation: 0,
-                            ),
-                            child: Text(
-                              _busy ? 'Signing in…' : 'Login',
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
+                          height: 50,
+                          onPressed: _busy ? null : _login,
+                          label: Text(_busy ? 'Signing in…' : 'Login'),
                         ),
                         const SizedBox(height: 18),
 
@@ -2507,7 +2469,8 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
               onPressed: saving ? null : () => Navigator.pop(dialogContext),
               child: const Text('Cancel'),
             ),
-            FilledButton(
+            NummaKadaiGradientButton(
+              compact: true,
               onPressed: saving
                   ? null
                   : () async {
@@ -2535,7 +2498,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                         }
                       }
                     },
-              child: Text(saving ? 'Saving...' : 'Save'),
+              label: Text(saving ? 'Saving...' : 'Save'),
             ),
           ],
         ),
@@ -2721,29 +2684,17 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
           top: false,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-            child: SizedBox(
+            child: NummaKadaiGradientButton(
+              width: double.infinity,
               height: 50,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F7645),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  elevation: 0,
-                ),
-                onPressed: _busy || _uploading || _namePending ? null : _save,
-                icon: const Icon(Icons.check_circle_outline_rounded, size: 20),
-                label: Text(
-                  _busy
-                      ? 'Saving product…'
-                      : widget.product == null
-                      ? 'Save Product'
-                      : 'Save Changes',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+              onPressed: _busy || _uploading || _namePending ? null : _save,
+              icon: const Icon(Icons.check_circle_outline_rounded, size: 20),
+              label: Text(
+                _busy
+                    ? 'Saving product…'
+                    : widget.product == null
+                    ? 'Save Product'
+                    : 'Save Changes',
               ),
             ),
           ),
@@ -3995,36 +3946,24 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
                 top: false,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-                  child: SizedBox(
+                  child: NummaKadaiGradientButton(
+                    width: double.infinity,
                     height: 50,
-                    child: FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F7645),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        elevation: 0,
-                      ),
-                      onPressed: _busy ? null : _advance,
-                      icon: Icon(
-                        _order.status == 'New'
-                            ? Icons.shopping_bag_outlined
-                            : Icons.inventory_2_outlined,
-                        size: 19,
-                      ),
-                      label: Text(
-                        _busy
-                            ? 'Updating…'
-                            : _order.status == 'New'
-                                ? 'Accept & Start Preparing'
-                                : _order.status == 'Preparing'
-                                    ? 'Items Checked · Mark Packed'
-                                    : 'Update Order Status',
-                        style: const TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
+                    onPressed: _busy ? null : _advance,
+                    icon: Icon(
+                      _order.status == 'New'
+                          ? Icons.shopping_bag_outlined
+                          : Icons.inventory_2_outlined,
+                      size: 19,
+                    ),
+                    label: Text(
+                      _busy
+                          ? 'Updating…'
+                          : _order.status == 'New'
+                              ? 'Accept & Start Preparing'
+                              : _order.status == 'Preparing'
+                                  ? 'Items Checked · Mark Packed'
+                                  : 'Update Order Status',
                     ),
                   ),
                 ),
