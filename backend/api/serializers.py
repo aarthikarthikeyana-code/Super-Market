@@ -3,6 +3,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.utils import timezone
+import re
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError
 from .commerce import cash_total, is_grocery_category
@@ -34,7 +35,7 @@ class ProductSerializer(serializers.ModelSerializer):
     tamil_name = serializers.CharField(required=True, allow_blank=False, max_length=120)
     english_name = serializers.CharField(required=False, allow_blank=True, default='', max_length=120)
     category = serializers.CharField(max_length=60, required=True)
-    unit = serializers.RegexField(r'^\d+(?:\.\d{1,2})? (?:kg|g)$', max_length=40, required=True)
+    unit = serializers.RegexField(r'(?i)^\d+(?:\.\d+)?(?:\s*(?:kg|g|l|ml|pcs|pack|items?|units?))?$', max_length=40, required=True)
     image_url = serializers.SerializerMethodField()
     image = serializers.PrimaryKeyRelatedField(queryset=ProductImage.objects.all(), required=False, allow_null=True)
     price = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01'), required=False)
@@ -92,9 +93,15 @@ class ProductSerializer(serializers.ModelSerializer):
         return selected.name
 
     def validate_unit(self, unit):
-        if Decimal(unit.split()[0]) <= 0:
+        match = re.match(r'^\s*(\d+(?:\.\d+)?)\s*(.*)$', unit)
+        if not match:
+            raise serializers.ValidationError('Selling quantity must be a positive number.')
+        if Decimal(match.group(1)) <= 0:
             raise serializers.ValidationError('Selling quantity must be positive.')
-        return unit
+        unit_name = match.group(2).strip().lower()
+        if unit_name == 'l':
+            unit_name = 'L'
+        return f'{match.group(1)} {unit_name}'.strip() if unit_name else match.group(1)
 
     class Meta:
         model = Product

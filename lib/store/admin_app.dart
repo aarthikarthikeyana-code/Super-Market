@@ -2423,7 +2423,8 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
       r'^(\d+(?:\.\d+)?)\s*(kg|g|l|ml)$',
       caseSensitive: false,
     ).firstMatch(p?.unit.trim() ?? '');
-    _unitKind = unit?.group(2)?.toLowerCase() ?? 'kg';
+    final rawKind = unit?.group(2)?.toLowerCase() ?? 'kg';
+    _unitKind = rawKind == 'l' ? 'L' : rawKind;
     _unit = TextEditingController(text: unit?.group(1) ?? '');
     _description = TextEditingController(text: p?.description ?? '');
     _offer = TextEditingController(
@@ -2989,10 +2990,10 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                       const SizedBox(height: 16),
                       Row(
                         children: [
-                          for (final unit in ['kg', 'g', 'L'])
+                          for (final unit in ['kg', 'g', 'L', 'ml'])
                             Expanded(
                               child: Padding(
-                                padding: EdgeInsets.only(right: unit == 'L' ? 0 : 8),
+                                padding: EdgeInsets.only(right: unit == 'ml' ? 0 : 8),
                                 child: InkWell(
                                   borderRadius: BorderRadius.circular(12),
                                   onTap: _busy ? null : () => setState(() => _unitKind = unit),
@@ -3000,16 +3001,16 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                                     duration: const Duration(milliseconds: 200),
                                     padding: const EdgeInsets.symmetric(vertical: 10),
                                     decoration: BoxDecoration(
-                                      gradient: _unitKind == unit
+                                      gradient: _unitKind.toLowerCase() == unit.toLowerCase()
                                           ? const LinearGradient(
                                               colors: [Color(0xFF10B981), Color(0xFF047857)],
                                               begin: Alignment.topLeft,
                                               end: Alignment.bottomRight,
                                             )
                                           : null,
-                                      color: _unitKind == unit ? null : const Color(0xFFF1F5F9),
+                                      color: _unitKind.toLowerCase() == unit.toLowerCase() ? null : const Color(0xFFF1F5F9),
                                       borderRadius: BorderRadius.circular(12),
-                                      boxShadow: _unitKind == unit
+                                      boxShadow: _unitKind.toLowerCase() == unit.toLowerCase()
                                           ? [
                                               BoxShadow(
                                                 color: const Color(0xFF10B981).withOpacity(0.35),
@@ -3025,7 +3026,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                                         style: TextStyle(
                                           fontWeight: FontWeight.w800,
                                           fontSize: 13,
-                                          color: _unitKind == unit ? Colors.white : const Color(0xFF475569),
+                                          color: _unitKind.toLowerCase() == unit.toLowerCase() ? Colors.white : const Color(0xFF475569),
                                         ),
                                       ),
                                     ),
