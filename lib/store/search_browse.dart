@@ -320,48 +320,31 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
 
   Widget _buildSearchHeader() {
     return Container(
-      decoration: BoxDecoration(
-        color: storeCream.withOpacity(0.95),
+      decoration: const BoxDecoration(
+        color: Colors.white,
         border: Border(
-          bottom: BorderSide(color: Colors.white.withOpacity(0.8), width: 1),
+          bottom: BorderSide(color: Color(0xFFF1F5F9), width: 1),
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(10, 8, 12, 10),
+      padding: const EdgeInsets.fromLTRB(6, 8, 16, 8),
       child: Row(
         children: [
-          InkWell(
-            onTap: () => Navigator.pop(context),
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white, width: 1.2),
-              ),
-              child: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: storeInk,
-                size: 19,
-              ),
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Color(0xFF0F172A),
+              size: 20,
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
           Expanded(
             child: Container(
-              height: 50,
+              height: 48,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.95),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white, width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF087532).withOpacity(0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
               ),
               child: TextField(
                 controller: _controller,
@@ -371,15 +354,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                 textInputAction: TextInputAction.search,
                 style: const TextStyle(
                   fontSize: 14.5,
-                  fontWeight: FontWeight.w700,
-                  color: storeInk,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF0F172A),
                 ),
                 decoration: InputDecoration(
-                  hintText: 'Search groceries, brands or essentials',
-                  hintStyle: const TextStyle(color: storeGrey, fontSize: 13.5),
+                  hintText: 'Search groceries, brands ...',
+                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
                   prefixIcon: const Icon(
                     Icons.search_rounded,
-                    color: storePrimaryGreen,
+                    color: Color(0xFF0F7645),
                     size: 22,
                   ),
                   suffixIcon: Row(
@@ -389,7 +372,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                         IconButton(
                           icon: const Icon(
                             Icons.clear_rounded,
-                            color: storeGrey,
+                            color: Color(0xFF94A3B8),
                             size: 18,
                           ),
                           onPressed: () {
@@ -727,7 +710,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         // Sort & Filter Toolbar
         Container(
           color: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
               Expanded(
@@ -736,59 +719,71 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                       ? '"$_currentQuery"'
                       : (collectionLabel ??
                             _selectedBrand ??
-                            _selectedCategory ??
-                            'Products'),
+                            (_selectedCategory == null || _selectedCategory == 'All'
+                                ? 'All'
+                                : _selectedCategory!)),
                   style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: storeInk,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.5,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: storeBorder),
+                  side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
+                  backgroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
+                    horizontal: 14,
+                    vertical: 8,
                   ),
                 ),
                 icon: const Icon(
                   Icons.swap_vert_rounded,
-                  size: 18,
-                  color: storeForestGreen,
+                  size: 19,
+                  color: Color(0xFF0F7645),
                 ),
                 label: const Text(
                   'Sort',
-                  style: TextStyle(color: storeInk, fontSize: 12),
+                  style: TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
                 ),
                 onPressed: _openSortDialog,
               ),
               const SizedBox(width: 8),
               FilledButton.icon(
                 style: FilledButton.styleFrom(
-                  backgroundColor: storeMint,
-                  foregroundColor: storeForestGreen,
+                  backgroundColor: const Color(0xFFE8F7EE),
+                  foregroundColor: const Color(0xFF0F7645),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(16),
+                    side: const BorderSide(color: Color(0xFFC7EBD4), width: 1.2),
                   ),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
+                    horizontal: 14,
+                    vertical: 8,
                   ),
                 ),
                 icon: const Icon(
                   Icons.tune_rounded,
                   size: 18,
-                  color: storeForestGreen,
+                  color: Color(0xFF0F7645),
                 ),
                 label: const Text(
                   'Filter',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                  style: TextStyle(
+                    color: Color(0xFF0F7645),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
                 ),
                 onPressed: () => _openFilterSheet(context),
               ),
@@ -816,21 +811,24 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                     showCheckmark: false,
                     label: Text(chip),
                     labelStyle: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 12,
                       fontWeight: _activeQuickChip == chip
                           ? FontWeight.w800
-                          : FontWeight.w500,
-                      color: _activeQuickChip == chip ? Colors.white : storeInk,
+                          : FontWeight.w600,
+                      color: _activeQuickChip == chip
+                          ? Colors.white
+                          : const Color(0xFF334155),
                     ),
                     selected: _activeQuickChip == chip,
-                    selectedColor: storeForestGreen,
-                    backgroundColor: const Color(0xFFF2F4F2),
+                    selectedColor: const Color(0xFF0A5C36),
+                    backgroundColor: const Color(0xFFF1F5F9),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(18),
                       side: BorderSide(
                         color: _activeQuickChip == chip
-                            ? storeForestGreen
-                            : storeBorder,
+                            ? const Color(0xFF0A5C36)
+                            : const Color(0xFFE2E8F0),
+                        width: 1,
                       ),
                     ),
                     onSelected: (_) => _applyQuickChip(chip),
@@ -839,7 +837,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
             ],
           ),
         ),
-        const Divider(color: storeBorder, height: 1),
+        const Divider(color: Color(0xFFE2E8F0), height: 1),
 
         // Product Results Grid
         Expanded(

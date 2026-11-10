@@ -2349,11 +2349,11 @@ class QuantitySelector extends StatelessWidget {
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: storeCtaGreen,
-        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFF0A5C36),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: storeCtaGreen.withOpacity(0.25),
+            color: const Color(0xFF0A5C36).withOpacity(0.25),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -4114,21 +4114,17 @@ class PremiumProductCard extends StatelessWidget {
                           height: imageHeight,
                           width: double.infinity,
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFF9FCFA), Color(0xFFEFF6F1)],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
+                            color: const Color(0xFFF8FAFC),
                             border: Border.all(
-                              color: const Color(0xFFEAF2ED),
+                              color: const Color(0xFFF1F5F9),
                               width: 1,
                             ),
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          padding: const EdgeInsets.all(6),
+                          padding: const EdgeInsets.all(8),
                           child: ProductPhoto(
                             product.imageUrl,
-                            height: imageHeight - 12,
+                            height: imageHeight - 16,
                             fit: BoxFit.contain,
                           ),
                         ),
@@ -4172,25 +4168,21 @@ class PremiumProductCard extends StatelessWidget {
 
                       // Wishlist Button top-right
                       Positioned(
-                        right: 4,
-                        top: 4,
+                        right: 6,
+                        top: 6,
                         child: GestureDetector(
                           onTap: onToggleWishlist,
                           child: Container(
                             width: compact ? 30 : 34,
                             height: compact ? 30 : 34,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.94),
+                              color: Colors.white,
                               shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 1.2,
-                              ),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withOpacity(0.08),
-                                  blurRadius: 5,
-                                  offset: const Offset(0, 2),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 1),
                                 ),
                               ],
                             ),
@@ -4200,7 +4192,7 @@ class PremiumProductCard extends StatelessWidget {
                                   : Icons.favorite_border_rounded,
                               color: isWishlisted
                                   ? const Color(0xFFE53935)
-                                  : const Color(0xFF8F9F95),
+                                  : const Color(0xFF64748B),
                               size: compact ? 17 : 19,
                             ),
                           ),
@@ -4332,70 +4324,47 @@ class PremiumProductCard extends StatelessWidget {
 
                   // High-Conversion Modern ADD Button / Stepper
                   SizedBox(
-                    height: compact ? 36 : 38,
+                    height: compact ? 36 : 40,
                     width: double.infinity,
                     child: cartQuantity > 0
                         ? QuantitySelector(
-                            height: compact ? 36 : 38,
+                            height: compact ? 36 : 40,
                             quantity: cartQuantity,
                             onIncrement: onIncrement ?? onAddToCart,
                             onDecrement: onDecrement ?? () {},
                           )
                         : InkWell(
                             onTap: product.available ? onAddToCart : null,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(14),
                             child: Container(
-                              height: compact ? 36 : 38,
+                              height: compact ? 36 : 40,
                               decoration: BoxDecoration(
-                                gradient: product.available
-                                    ? const LinearGradient(
-                                        colors: [
-                                          Color(0xFF0D8247),
-                                          Color(0xFF065E32),
-                                        ],
-                                      )
-                                    : null,
                                 color: product.available
-                                    ? null
+                                    ? const Color(0xFF0A5C36)
                                     : const Color(0xFFE2E7E4),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(14),
                                 boxShadow: product.available
                                     ? [
                                         BoxShadow(
-                                          color: const Color(0xFF0D8247)
-                                              .withOpacity(0.3),
-                                          blurRadius: 8,
-                                          offset: const Offset(0, 3),
+                                          color: const Color(0xFF0A5C36)
+                                              .withOpacity(0.25),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
                                         ),
                                       ]
                                     : null,
                               ),
                               child: Center(
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (product.available) ...[
-                                      const Icon(
-                                        Icons.add_rounded,
-                                        color: Colors.white,
-                                        size: 17,
-                                      ),
-                                      const SizedBox(width: 4),
-                                    ],
-                                    Text(
-                                      product.available
-                                          ? 'ADD'
-                                          : 'Out of stock',
-                                      style: TextStyle(
-                                        color: product.available
-                                            ? Colors.white
-                                            : const Color(0xFF7D8E84),
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ],
+                                child: Text(
+                                  product.available ? '+ ADD' : 'Out of stock',
+                                  style: TextStyle(
+                                    color: product.available
+                                        ? Colors.white
+                                        : const Color(0xFF7D8E84),
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.8,
+                                  ),
                                 ),
                               ),
                             ),

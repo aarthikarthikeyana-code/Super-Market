@@ -34,6 +34,87 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
   bool _accountActionBusy = false;
   final Set<String> _savingWishlist = {};
 
+  // Categories View Sort & Filter state (matching reference screen)
+  String _activeCategoryQuickChip = 'All';
+  String _categorySortBy = 'recommended';
+  double? _categoryMaxPrice;
+  bool _categoryInStockOnly = false;
+
+  void _openCategorySortDialog() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                child: Text(
+                  'Sort Products By',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+              const Divider(),
+              _catSortTile('Product name', 'recommended'),
+              _catSortTile('Price: Low to High', 'price_asc'),
+              _catSortTile('Price: High to Low', 'price_desc'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _catSortTile(String title, String value) {
+    final selected = _categorySortBy == value;
+    return ListTile(
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+          color: selected ? const Color(0xFF0F7645) : const Color(0xFF0F172A),
+        ),
+      ),
+      trailing: selected
+          ? const Icon(Icons.check_rounded, color: Color(0xFF0F7645))
+          : null,
+      onTap: () {
+        Navigator.pop(context);
+        setState(() => _categorySortBy = value);
+      },
+    );
+  }
+
+  void _applyCategoryQuickChip(String chip) {
+    setState(() {
+      _activeCategoryQuickChip = chip;
+      if (chip == 'All') {
+        _categoryMaxPrice = null;
+        _categoryInStockOnly = false;
+      } else if (chip == 'Under ₹100') {
+        _categoryMaxPrice = 99.99;
+        _categoryInStockOnly = false;
+      } else if (chip == 'Under ₹200') {
+        _categoryMaxPrice = 199.99;
+        _categoryInStockOnly = false;
+      } else if (chip == 'In Stock') {
+        _categoryMaxPrice = null;
+        _categoryInStockOnly = true;
+      }
+    });
+  }
+
   Future<bool> _addToCart(StoreProduct product) async {
     if (_accountActionBusy) return false;
     _accountActionBusy = true;
@@ -588,131 +669,334 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
         ),
     ];
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: SearchBarWidget(
-            controller: _searchInput,
-            onChanged: (text) {
-              _searchDebounce?.cancel();
-              _searchDebounce = Timer(const Duration(milliseconds: 350), () {
-                if (mounted) setState(() => _search = text.trim());
-              });
-            },
-          ),
-        ),
-        SizedBox(
-          height: 48,
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            scrollDirection: Axis.horizontal,
-            itemCount: allCats.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 8),
-            itemBuilder: (_, i) {
-              final cat = allCats[i];
-              final isSelected = _category == cat.$1;
-              return ChoiceChip(
-                showCheckmark: false,
-                avatar: i == 0
-                    ? Icon(
-                        cat.$2,
-                        size: 16,
-                        color: isSelected ? Colors.white : storePrimaryGreen,
-                      )
-                    : ClipOval(
-                        child: Image.asset(
-                          homeGroceryCategories[i - 1]['asset']!,
-                          width: 24,
-                          height: 24,
-                          fit: BoxFit.cover,
+    String? backendOrdering;
+    if (_categorySortBy == 'price_asc') backendOrdering = 'price';
+    if (_categorySortBy == 'price_desc') backendOrdering = '-price';
+
+    return Container(
+      color: const Color(0xFFFAFBF9),
+      child: Column(
+        children: [
+          // 1. Search Bar Header with Back Button (Matching reference screen)
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(6, 8, 16, 8),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () => setState(() => _tab = 0),
+                  icon: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: Color(0xFF0F172A),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Container(
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: const Color(0xFFE2E8F0),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: TextField(
+                      controller: _searchInput,
+                      onChanged: (text) {
+                        _searchDebounce?.cancel();
+                        _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+                          if (mounted) setState(() => _search = text.trim());
+                        });
+                      },
+                      textInputAction: TextInputAction.search,
+                      style: const TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0F172A),
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Search groceries, brands ...',
+                        hintStyle: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 13.5,
+                        ),
+                        prefixIcon: const Icon(
+                          Icons.search_rounded,
+                          color: Color(0xFF0F7645),
+                          size: 22,
+                        ),
+                        suffixIcon: _searchInput.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(
+                                  Icons.clear_rounded,
+                                  color: Color(0xFF94A3B8),
+                                  size: 18,
+                                ),
+                                onPressed: () {
+                                  _searchInput.clear();
+                                  setState(() => _search = '');
+                                },
+                              )
+                            : null,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 13,
                         ),
                       ),
-                label: Text(
-                  i == 0
-                      ? 'All Groceries'
-                      : homeGroceryCategories[i - 1]['tamil']!,
-                ),
-                labelStyle: TextStyle(
-                  color: isSelected ? Colors.white : storeInk,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                  fontSize: 12.5,
-                ),
-                selectedColor: storeCtaGreen,
-                backgroundColor: isSelected
-                    ? storeCtaGreen
-                    : Colors.white.withOpacity(0.85),
-                selected: isSelected,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(
-                    color: isSelected ? storeCtaGreen : Colors.white,
-                    width: 1.2,
+                    ),
                   ),
                 ),
-                onSelected: (_) => setState(() => _category = cat.$1),
-              );
-            },
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final api = ref.watch(storeApiProvider);
-              final cart = ref.watch(storeCartProvider);
-              final cartQuantityMap = {
-                for (final l in cart) l.product.id: l.quantity,
-              };
-              final wishlistIds =
-                  ref.watch(wishlistIdsProvider).asData?.value ?? <String>[];
 
-              return PagedFeed<StoreProduct>(
-                queryKey: ('category_view', _search, _category),
-                changes: api.feedChanges,
-                load: (cursor) => api.productPage(
-                  cursor: cursor,
-                  search: _search,
-                  category: _category,
-                ),
-                identity: (p) => p.id,
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: constraints.maxWidth > 700 ? 4 : 2,
-                  mainAxisExtent: groceryProductCardExtent(
-                    context,
-                    (constraints.maxWidth -
-                            32 -
-                            (constraints.maxWidth > 700 ? 3 : 1) * 12) /
-                        (constraints.maxWidth > 700 ? 4 : 2),
+          // 2. Title & Sort/Filter Toolbar
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _search.isNotEmpty
+                        ? '"$_search"'
+                        : (_category == 'All' ? 'All' : _category),
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.5,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
                 ),
-                itemBuilder: (_, product, _) {
-                  final quantity = cartQuantityMap[product.id] ?? 0;
-                  final wishlisted = wishlistIds.contains(product.id);
-                  return ProductCard(
-                    product: product,
-                    cartQuantity: quantity,
-                    isWishlisted: wishlisted,
-                    onTap: () => _showProduct(product),
-                    onAddToCart: () => _addToCart(product),
-                    onIncrement: () =>
-                        ref.read(storeCartProvider.notifier).add(product),
-                    onDecrement: () => ref
-                        .read(storeCartProvider.notifier)
-                        .change(product.id, -1),
-                    onToggleWishlist: () => _toggleWishlist(product),
-                  );
-                },
-                emptyTitle: 'No items in this category',
-                emptyMessage: 'Select another category to view products.',
-              );
-            },
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
+                    backgroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                  ),
+                  icon: const Icon(
+                    Icons.swap_vert_rounded,
+                    size: 19,
+                    color: Color(0xFF0F7645),
+                  ),
+                  label: const Text(
+                    'Sort',
+                    style: TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                  onPressed: _openCategorySortDialog,
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFE8F7EE),
+                    foregroundColor: const Color(0xFF0F7645),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: const BorderSide(color: Color(0xFFC7EBD4), width: 1.2),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                  ),
+                  icon: const Icon(
+                    Icons.tune_rounded,
+                    size: 18,
+                    color: Color(0xFF0F7645),
+                  ),
+                  label: const Text(
+                    'Filter',
+                    style: TextStyle(
+                      color: Color(0xFF0F7645),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SearchScreen(initialCategory: _category),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+
+          // 3. Quick Filter Chips
+          Container(
+            height: 44,
+            color: Colors.white,
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              scrollDirection: Axis.horizontal,
+              children: [
+                for (final chip in [
+                  'All',
+                  'Under ₹100',
+                  'Under ₹200',
+                  'In Stock',
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      showCheckmark: false,
+                      label: Text(chip),
+                      labelStyle: TextStyle(
+                        fontSize: 12,
+                        fontWeight: _activeCategoryQuickChip == chip
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                        color: _activeCategoryQuickChip == chip
+                            ? Colors.white
+                            : const Color(0xFF334155),
+                      ),
+                      selected: _activeCategoryQuickChip == chip,
+                      selectedColor: const Color(0xFF0A5C36),
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                        side: BorderSide(
+                          color: _activeCategoryQuickChip == chip
+                              ? const Color(0xFF0A5C36)
+                              : const Color(0xFFE2E8F0),
+                          width: 1,
+                        ),
+                      ),
+                      onSelected: (_) => _applyCategoryQuickChip(chip),
+                    ),
+                  ),
+                // Additional Category Pills
+                for (int i = 1; i < allCats.length; i++) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      showCheckmark: false,
+                      label: Text(homeGroceryCategories[i - 1]['tamil']!),
+                      labelStyle: TextStyle(
+                        fontSize: 12,
+                        fontWeight: _category == allCats[i].$1
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                        color: _category == allCats[i].$1
+                            ? Colors.white
+                            : const Color(0xFF334155),
+                      ),
+                      selected: _category == allCats[i].$1,
+                      selectedColor: const Color(0xFF0A5C36),
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                        side: BorderSide(
+                          color: _category == allCats[i].$1
+                              ? const Color(0xFF0A5C36)
+                              : const Color(0xFFE2E8F0),
+                          width: 1,
+                        ),
+                      ),
+                      onSelected: (_) {
+                        setState(() {
+                          _category =
+                              _category == allCats[i].$1 ? 'All' : allCats[i].$1;
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const Divider(color: Color(0xFFE2E8F0), height: 1),
+
+          // 4. Products Grid
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final api = ref.watch(storeApiProvider);
+                final cart = ref.watch(storeCartProvider);
+                final cartQuantityMap = {
+                  for (final l in cart) l.product.id: l.quantity,
+                };
+                final wishlistIds =
+                    ref.watch(wishlistIdsProvider).asData?.value ?? <String>[];
+
+                return PagedFeed<StoreProduct>(
+                  queryKey: (
+                    'category_view',
+                    _search,
+                    _category,
+                    _activeCategoryQuickChip,
+                    _categorySortBy,
+                  ),
+                  changes: api.feedChanges,
+                  load: (cursor) => api.productPage(
+                    cursor: cursor,
+                    search: _search,
+                    category: _category,
+                    minPrice: null,
+                    maxPrice: _categoryMaxPrice,
+                    inStock: _categoryInStockOnly,
+                    ordering: backendOrdering,
+                  ),
+                  identity: (p) => p.id,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: constraints.maxWidth > 700 ? 4 : 2,
+                    mainAxisExtent: groceryProductCardExtent(
+                      context,
+                      (constraints.maxWidth -
+                              32 -
+                              (constraints.maxWidth > 700 ? 3 : 1) * 12) /
+                          (constraints.maxWidth > 700 ? 4 : 2),
+                    ),
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  itemBuilder: (_, product, _) {
+                    final quantity = cartQuantityMap[product.id] ?? 0;
+                    final wishlisted = wishlistIds.contains(product.id);
+                    return ProductCard(
+                      product: product,
+                      cartQuantity: quantity,
+                      isWishlisted: wishlisted,
+                      onTap: () => _showProduct(product),
+                      onAddToCart: () => _addToCart(product),
+                      onIncrement: () =>
+                          ref.read(storeCartProvider.notifier).add(product),
+                      onDecrement: () => ref
+                          .read(storeCartProvider.notifier)
+                          .change(product.id, -1),
+                      onToggleWishlist: () => _toggleWishlist(product),
+                    );
+                  },
+                  emptyTitle: 'No items in this category',
+                  emptyMessage: 'Select another category to view products.',
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
