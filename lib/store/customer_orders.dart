@@ -14,7 +14,6 @@ const _gold = Color(0xFFF5B400);
 const _mint = Color(0xFFF4F9F5);
 const _ink = Color(0xFF17211D);
 const _muted = Color(0xFF6F7C76);
-const _illustration = 'assets/images/order_grocery_illustration.png';
 
 enum CustomerOrderFilter {
   all('All Orders', Icons.inventory_2_outlined),
@@ -166,15 +165,6 @@ class OrdersHero extends StatelessWidget {
                       ),
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: (constraints.maxWidth * .36).clamp(80.0, 144.0),
-                child: Image.asset(
-                  _illustration,
-                  fit: BoxFit.contain,
-                  excludeFromSemantics: true,
                 ),
               ),
             ],
@@ -688,14 +678,6 @@ class OrdersEmptyState extends StatelessWidget {
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Image.asset(
-          _illustration,
-          width: 130,
-          height: 115,
-          fit: BoxFit.contain,
-          excludeFromSemantics: true,
-        ),
-        const SizedBox(height: 14),
         Text(
           title,
           textAlign: TextAlign.center,
@@ -722,7 +704,7 @@ class _OrdersCaughtUp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     margin: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-    padding: const EdgeInsets.fromLTRB(12, 14, 16, 14),
+    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(24),
       gradient: const LinearGradient(
@@ -731,14 +713,6 @@ class _OrdersCaughtUp extends StatelessWidget {
     ),
     child: Row(
       children: [
-        Image.asset(
-          _illustration,
-          width: 74,
-          height: 76,
-          fit: BoxFit.contain,
-          excludeFromSemantics: true,
-        ),
-        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

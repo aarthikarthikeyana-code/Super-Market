@@ -3921,12 +3921,14 @@ class _CollectionChipRowState extends State<CollectionChipRow> {
 
 class HomeSectionHeader extends StatelessWidget {
   final String title;
+  final String? subtitle;
   final String action;
   final VoidCallback? onAction;
 
   const HomeSectionHeader({
     super.key,
     required this.title,
+    this.subtitle,
     this.action = 'See All >',
     this.onAction,
   });
@@ -3935,18 +3937,37 @@ class HomeSectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Expanded(
-          child: Text(
-            title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color: homeTextDark,
-              letterSpacing: -0.3,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: homeTextDark,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              if (subtitle != null && subtitle!.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle!,
+                  style: const TextStyle(
+                    fontFamily: 'NotoSansTamil',
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: homePrimaryGreen,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
         if (onAction != null)
@@ -3999,7 +4020,8 @@ double groceryProductCardExtent(
       ? (cardWidth - 16).clamp(76.0, 180.0)
       : (cardWidth - 20).clamp(104.0, 220.0);
   final scale = MediaQuery.textScalerOf(context).scale(1);
-  return imageHeight + (compact ? 80 : 100) + (compact ? 74 : 86) * scale;
+  final baseline = imageHeight + (compact ? 80 : 100) + (compact ? 74 : 86) * scale;
+  return baseline + (compact ? 14 : 18);
 }
 
 class PremiumProductCard extends StatelessWidget {

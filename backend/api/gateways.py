@@ -72,6 +72,7 @@ def reverse_geocode(latitude, longitude):
 
 
 def upload_image(file):
+    import io
     import cloudinary
     import cloudinary.uploader
     from cloudinary.exceptions import AuthorizationRequired, NotAllowed
@@ -83,8 +84,18 @@ def upload_image(file):
         image = Image.open(file)
         if image.format not in ['JPEG', 'PNG', 'WEBP'] or image.width * image.height > 25_000_000:
             raise ValidationError({'image': 'Use a JPEG, PNG or WebP photo, up to 25 megapixels.'})
-        image.verify()
-        file.seek(0)
+        image.load()
+
+        # Convert image to RGB / RGBA for WebP compression
+        if image.mode in ('RGBA', 'LA') or (image.mode == 'P' and 'transparency' in image.info):
+            converted_image = image.convert('RGBA')
+        else:
+            converted_image = image.convert('RGB')
+
+        # Compress and convert to WebP in memory
+        webp_buffer = io.BytesIO()
+        converted_image.save(webp_buffer, format='WEBP', quality=82, method=6)
+        webp_buffer.seek(0)
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
         raise ValidationError({'image': 'This file is not a valid product photo.'}) from None
     if not all([settings.CLOUDINARY_CLOUD_NAME, settings.CLOUDINARY_API_KEY, settings.CLOUDINARY_API_SECRET]):
@@ -92,8 +103,8 @@ def upload_image(file):
     cloudinary.config(cloud_name=settings.CLOUDINARY_CLOUD_NAME, api_key=settings.CLOUDINARY_API_KEY,
                       api_secret=settings.CLOUDINARY_API_SECRET, secure=True)
     try:
-        return cloudinary.uploader.upload(file, folder='agaram/products', resource_type='image',
-                                         unique_filename=True, overwrite=False, allowed_formats=['jpg', 'png', 'webp'])
+        return cloudinary.uploader.upload(webp_buffer, folder='agaram/products', resource_type='image',
+                                         format='webp', unique_filename=True, overwrite=False, allowed_formats=['webp'])
     except NotAllowed:
         logger.warning('Cloudinary rejected product upload: missing asset create permission.')
         raise ServiceUnavailable(

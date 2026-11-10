@@ -16,6 +16,41 @@ final catalogBrowseProvider = FutureProvider<Map<String, dynamic>>((ref) {
   ref.onDispose(() => api.feedChanges.removeListener(changed));
   return api.browseCatalog();
 });
+final homeCuratedSectionsProvider =
+    FutureProvider<Map<String, List<StoreProduct>>>((ref) async {
+  final api = ref.watch(storeApiProvider);
+  void changed() => ref.invalidateSelf();
+  api.feedChanges.addListener(changed);
+  ref.onDispose(() => api.feedChanges.removeListener(changed));
+
+  final browse = await ref.watch(catalogBrowseProvider.future);
+  final rawTop = browse['top_sales'] as List? ?? [];
+  final rawNew = browse['new_launch'] as List? ?? [];
+
+  List<StoreProduct> topSales = [
+    for (final j in rawTop) StoreProduct.fromJson(Map<String, dynamic>.from(j))
+  ];
+  List<StoreProduct> newLaunch = [
+    for (final j in rawNew) StoreProduct.fromJson(Map<String, dynamic>.from(j))
+  ];
+
+  if (topSales.isEmpty || newLaunch.isEmpty) {
+    try {
+      final page = await api.productPage();
+      if (topSales.isEmpty) {
+        topSales = page.items.take(10).toList();
+      }
+      if (newLaunch.isEmpty) {
+        newLaunch = page.items.reversed.take(10).toList();
+      }
+    } catch (_) {}
+  }
+
+  return {
+    'top_sales': topSales.take(10).toList(),
+    'new_launch': newLaunch.take(10).toList(),
+  };
+});
 final storeConfigProvider = FutureProvider<Map<String, dynamic>>(
   (ref) => ref.watch(storeApiProvider).config(),
 );

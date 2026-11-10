@@ -218,6 +218,99 @@ def product_facets(products, field):
             for row in products.exclude(**{field: ''}).values(field).annotate(count=Count('pk'), photo=Subquery(photos[:1])).order_by(field)]
 
 
+def get_top_sales_products(limit=10):
+    from datetime import timedelta
+    from django.utils import timezone
+    from django.db.models import Sum
+    from .models import OrderItem, Product
+
+    catalog = commerce.grocery_products().select_related('image')
+    selected_ids = []
+
+    now = timezone.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday_start = today_start - timedelta(days=1)
+
+    valid_statuses = ['Delivered', 'New', 'Preparing', 'Packed', 'Out for Delivery']
+
+    # Step 1: Sales today
+    today_items = (
+        OrderItem.objects.filter(
+            order__created_at__gte=today_start,
+            order__status__in=valid_statuses,
+            product__in=catalog,
+        )
+        .values('product_id')
+        .annotate(total_qty=Sum('quantity'))
+        .order_by('-total_qty')
+    )
+    for item in today_items:
+        pid = item['product_id']
+        if pid and pid not in selected_ids:
+            selected_ids.append(pid)
+            if len(selected_ids) >= limit:
+                break
+
+    # Step 2: Yesterday's sales if fewer than limit
+    if len(selected_ids) < limit:
+        yesterday_items = (
+            OrderItem.objects.filter(
+                order__created_at__gte=yesterday_start,
+                order__created_at__lt=today_start,
+                order__status__in=valid_statuses,
+                product__in=catalog,
+            )
+            .exclude(product_id__in=selected_ids)
+            .values('product_id')
+            .annotate(total_qty=Sum('quantity'))
+            .order_by('-total_qty')
+        )
+        for item in yesterday_items:
+            pid = item['product_id']
+            if pid and pid not in selected_ids:
+                selected_ids.append(pid)
+                if len(selected_ids) >= limit:
+                    break
+
+    # Step 3: Past sales (10 days ago and all previous sales history)
+    if len(selected_ids) < limit:
+        past_items = (
+            OrderItem.objects.filter(
+                order__created_at__lt=yesterday_start,
+                order__status__in=valid_statuses,
+                product__in=catalog,
+            )
+            .exclude(product_id__in=selected_ids)
+            .values('product_id')
+            .annotate(total_qty=Sum('quantity'))
+            .order_by('-total_qty')
+        )
+        for item in past_items:
+            pid = item['product_id']
+            if pid and pid not in selected_ids:
+                selected_ids.append(pid)
+                if len(selected_ids) >= limit:
+                    break
+
+    # Step 4: Fallback if store is new with few sales
+    if len(selected_ids) < limit:
+        remaining_count = limit - len(selected_ids)
+        fallback_pids = list(
+            catalog.exclude(id__in=selected_ids)
+            .order_by('-updated_at')
+            .values_list('id', flat=True)[:remaining_count]
+        )
+        selected_ids.extend(fallback_pids)
+
+    products_by_id = {p.id: p for p in catalog.filter(id__in=selected_ids)}
+    return [products_by_id[pid] for pid in selected_ids if pid in products_by_id][:limit]
+
+
+def get_new_launch_products(limit=10):
+    catalog = commerce.grocery_products().select_related('image')
+    return list(catalog.order_by('-updated_at', '-id')[:limit])
+
+
 @api_view(['GET'])
 @authentication_classes([])
 @permission_classes([AllowAny])
@@ -234,9 +327,13 @@ def browse_catalog(request):
         if count:
             photo = queryset.filter(image__isnull=False).order_by('pk').values_list('image__secure_url', flat=True).first()
             collections.append({'key': key, 'label': label, 'count': count, 'image_url': photo or ''})
+    top_sales = get_top_sales_products(10)
+    new_launch = get_new_launch_products(10)
     return Response({'categories': product_facets(products, 'category'), 'brands': product_facets(products, 'brand'),
-        'collections': collections, 'capabilities': {'deals': products.filter(offer_percent__gt=0, base_price__gt=F('price')).exists(), 'new_arrivals': False, 'value_packs': False},
-        'total_products': products.count()})
+        'collections': collections, 'capabilities': {'deals': products.filter(offer_percent__gt=0, base_price__gt=F('price')).exists(), 'new_arrivals': True, 'value_packs': False},
+        'total_products': products.count(),
+        'top_sales': ProductSerializer(top_sales, many=True).data,
+        'new_launch': ProductSerializer(new_launch, many=True).data})
 
 
 @api_view(['GET'])
@@ -287,10 +384,12 @@ def get_products(request):
         products = products.filter(term)
     collection = request.query_params.get('collection', '')
     ordering = request.query_params.get('ordering', '')
-    if collection in ['best_sellers', 'most_bought']:
-        metric = 'units_sold' if collection == 'best_sellers' else 'purchase_count'
+    if collection in ['best_sellers', 'most_bought', 'top_sales']:
+        metric = 'units_sold' if collection in ['best_sellers', 'top_sales'] else 'purchase_count'
         products = ranked_products(products, metric).filter(**{metric + '__gt': 0})
         cursor_order = ('-' + metric, 'pk')
+    elif collection == 'new_launch':
+        cursor_order = ('-updated_at', 'pk')
     elif collection == 'under_100':
         products = products.filter(price__lt=100)
         cursor_order = ('price', 'pk')

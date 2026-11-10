@@ -202,43 +202,32 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
       final wishlistIds =
           ref.watch(wishlistIdsProvider).asData?.value ?? <String>[];
 
+      final isFiltered = _search.isNotEmpty || _category != 'All';
+      final curated = ref.watch(homeCuratedSectionsProvider).asData?.value;
+      final rawTopSales = (browse['top_sales'] as List? ?? []);
+      final rawNewLaunch = (browse['new_launch'] as List? ?? []);
+
+      final topSales = curated?['top_sales'] ?? [
+        for (final j in rawTopSales)
+          StoreProduct.fromJson(Map<String, dynamic>.from(j))
+      ];
+      final newLaunch = curated?['new_launch'] ?? [
+        for (final j in rawNewLaunch)
+          StoreProduct.fromJson(Map<String, dynamic>.from(j))
+      ];
+
       return Container(
         color: const Color(0xFFF4F9F5),
         child: Stack(
           children: [
-            PagedFeed<StoreProduct>(
-              beforeRefresh: api.clearPublicCache,
-              queryKey: (_search, _category),
-              changes: api.feedChanges,
-              load: (cursor) => api.productPage(
-                cursor: cursor,
-                search: _search,
-                category: _category,
-              ),
-              identity: (p) => p.id,
-              onMetadata: (data) {
-                if (!mounted) return;
-                setState(() {
-                  _categories = [
-                    'All',
-                    ...(data['categories'] as List? ?? [])
-                        .map((c) => '$c')
-                        .where((c) => c.isNotEmpty && c != 'All'),
-                  ];
-                  if (!_categories.contains(_category) &&
-                      !homeGroceryCategories.any(
-                        (item) => item['query'] == _category,
-                      )) {
-                    _category = 'All';
-                  }
-                });
-              },
-              header: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+            if (!isFiltered)
+              SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(14, 8, 14, cart.isEmpty ? 24 : 96),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 1. Delivery Location Bar with COD badge
+                    // 1. Search Bar
                     HomeSearchBar(
                       onTap: () {
                         Navigator.push(
@@ -259,7 +248,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    // 3. Hero 3-Banner Carousel (3s auto-play, swipe, indicators)
+                    // 2. Hero 3-Banner Carousel
                     HomeHeroCarousel(
                       onShopNow: () => Navigator.push(
                         context,
@@ -271,7 +260,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                     ),
                     const SizedBox(height: 18),
 
-                    // 4. Arched Category Grid (2 rows x 4 columns with studio assets)
+                    // 3. Arched Category Grid
                     HomeCategoryGrid(
                       categories: browseCategories,
                       onSelectCategory: (name) => Navigator.push(
@@ -283,7 +272,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                     ),
                     const SizedBox(height: 18),
 
-                    // 5. Collection Chips (Best Sellers, Super Savings, 100 Below)
+                    // 4. Promo Offer Banners
                     CollectionChipRow(
                       collections: collections,
                       onSelectCollection: (key) => Navigator.push(
@@ -293,55 +282,158 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 22),
 
-                    // 6. Real catalog products
+                    // 5. TOP SALES SECTION (Strictly up to 10 products, no numbers in UI)
                     HomeSectionHeader(
-                      title: 'Shop groceries',
+                      title: 'Top Sales',
+                      subtitle: 'அதிகம் விற்பனையானவை',
                       action: 'See All >',
-                      onAction: () => setState(() => _category = 'All'),
+                      onAction: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SearchScreen(
+                            initialCollection: 'top_sales',
+                          ),
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
+                    _buildCuratedGrid(
+                      topSales,
+                      constraints,
+                      cartQuantityMap,
+                      wishlistIds,
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 6. NEW LAUNCH SECTION (Strictly up to 10 products, no numbers in UI)
+                    HomeSectionHeader(
+                      title: 'New Launch',
+                      subtitle: 'புதிய வரவுகள்',
+                      action: 'See All >',
+                      onAction: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SearchScreen(
+                            initialCollection: 'new_launch',
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildCuratedGrid(
+                      newLaunch,
+                      constraints,
+                      cartQuantityMap,
+                      wishlistIds,
+                    ),
+                    const SizedBox(height: 26),
+
+                    // 7. Trust Strip
+                    const HomeTrustStrip(),
                   ],
                 ),
-              ),
-              padding: EdgeInsets.fromLTRB(14, 0, 14, cart.isEmpty ? 24 : 96),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: constraints.maxWidth > 700 ? 4 : 2,
-                mainAxisExtent: groceryProductCardExtent(
-                  context,
-                  (constraints.maxWidth -
-                          28 -
-                          (constraints.maxWidth > 700 ? 3 : 1) * 10) /
-                      (constraints.maxWidth > 700 ? 4 : 2),
+              )
+            else
+              PagedFeed<StoreProduct>(
+                beforeRefresh: api.clearPublicCache,
+                queryKey: (_search, _category),
+                changes: api.feedChanges,
+                load: (cursor) => api.productPage(
+                  cursor: cursor,
+                  search: _search,
+                  category: _category,
                 ),
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 12,
+                identity: (p) => p.id,
+                onMetadata: (data) {
+                  if (!mounted) return;
+                  setState(() {
+                    _categories = [
+                      'All',
+                      ...(data['categories'] as List? ?? [])
+                          .map((c) => '$c')
+                          .where((c) => c.isNotEmpty && c != 'All'),
+                    ];
+                    if (!_categories.contains(_category) &&
+                        !homeGroceryCategories.any(
+                          (item) => item['query'] == _category,
+                        )) {
+                      _category = 'All';
+                    }
+                  });
+                },
+                header: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      HomeSearchBar(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const SearchScreen(),
+                            ),
+                          );
+                        },
+                        onFilterTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const BrowseGroceriesScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                      HomeSectionHeader(
+                        title: _category == 'All' ? 'Search results' : _category,
+                        action: 'Clear',
+                        onAction: () => setState(() {
+                          _search = '';
+                          _category = 'All';
+                          _searchInput.clear();
+                        }),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  ),
+                ),
+                padding: EdgeInsets.fromLTRB(14, 0, 14, cart.isEmpty ? 24 : 96),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: constraints.maxWidth > 700 ? 4 : 2,
+                  mainAxisExtent: groceryProductCardExtent(
+                    context,
+                    (constraints.maxWidth -
+                            28 -
+                            (constraints.maxWidth > 700 ? 3 : 1) * 10) /
+                        (constraints.maxWidth > 700 ? 4 : 2),
+                  ),
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 12,
+                ),
+                itemBuilder: (_, product, _) {
+                  final quantity = cartQuantityMap[product.id] ?? 0;
+                  final wishlisted = wishlistIds.contains(product.id);
+                  return PremiumProductCard(
+                    product: product,
+                    cartQuantity: quantity,
+                    isWishlisted: wishlisted,
+                    onTap: () => _showProduct(product),
+                    onAddToCart: () => _addToCart(product),
+                    onIncrement: () =>
+                        ref.read(storeCartProvider.notifier).add(product),
+                    onDecrement: () => ref
+                        .read(storeCartProvider.notifier)
+                        .change(product.id, -1),
+                    onToggleWishlist: () => _toggleWishlist(product),
+                  );
+                },
+                emptyTitle: 'No matching products',
+                emptyMessage:
+                    'Try searching another grocery name or select another category.',
               ),
-              itemBuilder: (_, product, _) {
-                final quantity = cartQuantityMap[product.id] ?? 0;
-                final wishlisted = wishlistIds.contains(product.id);
-                return PremiumProductCard(
-                  product: product,
-                  cartQuantity: quantity,
-                  isWishlisted: wishlisted,
-                  onTap: () => _showProduct(product),
-                  onAddToCart: () => _addToCart(product),
-                  onIncrement: () =>
-                      ref.read(storeCartProvider.notifier).add(product),
-                  onDecrement: () => ref
-                      .read(storeCartProvider.notifier)
-                      .change(product.id, -1),
-                  onToggleWishlist: () => _toggleWishlist(product),
-                );
-              },
-              emptyTitle: _search.isEmpty && _category == 'All'
-                  ? 'Your grocery shelf is opening soon'
-                  : 'No matching products',
-              emptyMessage: _search.isEmpty && _category == 'All'
-                  ? 'Products published by Agaram will appear here. Pull down to check for updates.'
-                  : 'Try searching another grocery name or select another category.',
-            ),
 
             // Floating View Cart Bar if cart has items
             if (cart.isNotEmpty)
@@ -349,77 +441,138 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                 bottom: 16,
                 left: 16,
                 right: 16,
-                child: InkWell(
-                  onTap: () => setState(() => _showCart = true),
-                  borderRadius: BorderRadius.circular(24),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 14,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF087247),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.4),
-                        width: 1.2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF087247).withOpacity(0.35),
-                          blurRadius: 18,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.shopping_bag_outlined,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            '${cart.fold(0, (s, l) => s + l.quantity)} items · ${money(cart.fold<double>(0, (s, l) => s + l.total))}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14.5,
-                            ),
-                          ),
-                        ),
-                        const Text(
-                          'View Cart',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(
-                          Icons.arrow_forward_rounded,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                child: _floatingCartBar(cart),
               ),
           ],
         ),
       );
     },
+  );
+
+  Widget _buildCuratedGrid(
+    List<StoreProduct> list,
+    BoxConstraints constraints,
+    Map<String, int> cartQuantityMap,
+    List<String> wishlistIds,
+  ) {
+    if (list.isEmpty) {
+      return Container(
+        height: 100,
+        alignment: Alignment.center,
+        child: const SizedBox(
+          width: 26,
+          height: 26,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            color: storePrimaryGreen,
+          ),
+        ),
+      );
+    }
+    final crossAxisCount = constraints.maxWidth > 700 ? 4 : 2;
+    final cardWidth = (constraints.maxWidth -
+            28 -
+            (crossAxisCount - 1) * 10) /
+        crossAxisCount;
+    final extent = groceryProductCardExtent(context, cardWidth);
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      itemCount: list.length,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        mainAxisExtent: extent,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 12,
+      ),
+      itemBuilder: (_, index) {
+        final product = list[index];
+        final quantity = cartQuantityMap[product.id] ?? 0;
+        final wishlisted = wishlistIds.contains(product.id);
+        return PremiumProductCard(
+          product: product,
+          cartQuantity: quantity,
+          isWishlisted: wishlisted,
+          onTap: () => _showProduct(product),
+          onAddToCart: () => _addToCart(product),
+          onIncrement: () =>
+              ref.read(storeCartProvider.notifier).add(product),
+          onDecrement: () => ref
+              .read(storeCartProvider.notifier)
+              .change(product.id, -1),
+          onToggleWishlist: () => _toggleWishlist(product),
+        );
+      },
+    );
+  }
+
+  Widget _floatingCartBar(List<StoreCartLine> cart) => InkWell(
+    onTap: () => setState(() => _showCart = true),
+    borderRadius: BorderRadius.circular(24),
+    child: Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 20,
+        vertical: 14,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFF087247),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.4),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF087247).withOpacity(0.35),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.shopping_bag_outlined,
+              color: Colors.white,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '${cart.fold(0, (s, l) => s + l.quantity)} items · ${money(cart.fold<double>(0, (s, l) => s + l.total))}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 14.5,
+              ),
+            ),
+          ),
+          const Text(
+            'View Cart',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(width: 4),
+          const Icon(
+            Icons.arrow_forward_rounded,
+            color: Colors.white,
+            size: 18,
+          ),
+        ],
+      ),
+    ),
   );
 
   Widget _categoriesView() {
