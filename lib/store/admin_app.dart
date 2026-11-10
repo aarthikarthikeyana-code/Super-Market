@@ -2420,7 +2420,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
     _price = TextEditingController(text: p?.mrp.toStringAsFixed(2) ?? '');
     _stock = TextEditingController(text: p?.stock.toStringAsFixed(2) ?? '');
     final unit = RegExp(
-      r'^(\d+(?:\.\d+)?)\s*(kg|g)$',
+      r'^(\d+(?:\.\d+)?)\s*(kg|g|l|ml)$',
       caseSensitive: false,
     ).firstMatch(p?.unit.trim() ?? '');
     _unitKind = unit?.group(2)?.toLowerCase() ?? 'kg';
@@ -2989,10 +2989,10 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                       const SizedBox(height: 16),
                       Row(
                         children: [
-                          for (final unit in ['kg', 'g'])
+                          for (final unit in ['kg', 'g', 'L'])
                             Expanded(
                               child: Padding(
-                                padding: EdgeInsets.only(right: unit == 'kg' ? 8 : 0),
+                                padding: EdgeInsets.only(right: unit == 'L' ? 0 : 8),
                                 child: InkWell(
                                   borderRadius: BorderRadius.circular(12),
                                   onTap: _busy ? null : () => setState(() => _unitKind = unit),

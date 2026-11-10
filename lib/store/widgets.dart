@@ -3998,12 +3998,15 @@ class HomeSectionHeader extends StatelessWidget {
 /// The same proportions are used wherever a grocery card is displayed.
 String groceryUnitLabel(String value) => value.trim().replaceAllMapped(
   RegExp(
-    r'கிலோகிராம்|கிலோ கிராம்|கிலோ|கிராம்|(?<![A-Za-z])(?:kilograms?|grams?|kgs?|g)(?![A-Za-z])',
+    r'கிலோகிராம்|கிலோ கிராம்|கிலோ|கிராம்|லிட்டர்|மில்லிலிட்டர்|(?<![A-Za-z])(?:kilograms?|grams?|litres?|liters?|kgs?|ml|l|g)(?![A-Za-z])',
     caseSensitive: false,
   ),
   (match) {
     final unit = match[0]!.toLowerCase();
-    return unit.startsWith('கிலோ') || unit.startsWith('k') ? 'kg' : 'g';
+    if (unit.startsWith('கிலோ') || unit.startsWith('k')) return 'kg';
+    if (unit.startsWith('லிட்டர்') || unit == 'l' || unit.startsWith('liter') || unit.startsWith('litre')) return 'L';
+    if (unit.startsWith('மில்லி') || unit == 'ml') return 'ml';
+    return 'g';
   },
 );
 
