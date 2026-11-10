@@ -651,26 +651,41 @@ class AdminBottomNavigation extends StatelessWidget {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Container(
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 5,
+                                  horizontal: 16,
+                                  vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: selected == item.$1
-                                      ? const Color(0xFFE8F7EE)
-                                      : Colors.transparent,
+                                  gradient: selected == item.$1
+                                      ? const LinearGradient(
+                                          colors: [Color(0xFF10B981), Color(0xFF047857)],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        )
+                                      : null,
+                                  color: selected == item.$1 ? null : Colors.transparent,
                                   borderRadius: BorderRadius.circular(16),
+                                  boxShadow: selected == item.$1
+                                      ? [
+                                          BoxShadow(
+                                            color: const Color(0xFF10B981).withOpacity(0.35),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                        ]
+                                      : null,
                                 ),
                                 child: Icon(
                                   item.$2.$1,
-                                  size: 21,
+                                  size: 20,
                                   color: selected == item.$1
-                                      ? const Color(0xFF047857)
+                                      ? Colors.white
                                       : const Color(0xFF94A3B8),
                                 ),
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: 3),
                               Text(
                                 item.$2.$2,
                                 maxLines: 1,
@@ -680,7 +695,7 @@ class AdminBottomNavigation extends StatelessWidget {
                                       ? FontWeight.w900
                                       : FontWeight.w600,
                                   color: selected == item.$1
-                                      ? const Color(0xFF047857)
+                                      ? const Color(0xFF0F7645)
                                       : const Color(0xFF64748B),
                                 ),
                               ),

@@ -952,39 +952,52 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                   ])
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(
-                          filter.$1,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: _productFilter == filter.$2
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            color: _productFilter == filter.$2
-                                ? Colors.white
-                                : const Color(0xFF15211A),
-                          ),
-                        ),
-                        selected: _productFilter == filter.$2,
-                        selectedColor: const Color(0xFF16A05D),
-                        backgroundColor: Colors.white,
-                        surfaceTintColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          side: BorderSide(
-                            color: _productFilter == filter.$2
-                                ? const Color(0xFF16A05D)
-                                : const Color(0xFFDDE8E1),
-                          ),
-                        ),
-                        showCheckmark: false,
-                        onSelected: (_) => setState(() {
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () => setState(() {
                           _productFilter = filter.$2;
                           if (filter.$2 == 'all') {
                             _productCategory = null;
                             _productBrand = null;
                           }
                         }),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                          decoration: BoxDecoration(
+                            gradient: _productFilter == filter.$2
+                                ? const LinearGradient(
+                                    colors: [Color(0xFF10B981), Color(0xFF047857)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  )
+                                : null,
+                            color: _productFilter == filter.$2 ? null : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: _productFilter == filter.$2
+                                  ? Colors.transparent
+                                  : const Color(0xFFDDE8E1),
+                            ),
+                            boxShadow: _productFilter == filter.$2
+                                ? [
+                                    BoxShadow(
+                                      color: const Color(0xFF10B981).withOpacity(0.32),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: Text(
+                            filter.$1,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: _productFilter == filter.$2 ? FontWeight.w800 : FontWeight.w600,
+                              color: _productFilter == filter.$2 ? Colors.white : const Color(0xFF15211A),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                 ],
@@ -1200,21 +1213,48 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                 for (final group in ['Active', 'Delivered', 'Cancelled']) ...[
                   if (group != 'Active') const SizedBox(width: 6),
                   Expanded(
-                    child: FilledButton.tonal(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: _orderGroup == group
-                            ? opsForestGreen
-                            : Colors.white,
-                        foregroundColor: _orderGroup == group
-                            ? Colors.white
-                            : opsMuted,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 10,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => _showOrders(group),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 10),
+                        decoration: BoxDecoration(
+                          gradient: _orderGroup == group
+                              ? const LinearGradient(
+                                  colors: [Color(0xFF10B981), Color(0xFF047857)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                )
+                              : null,
+                          color: _orderGroup == group ? null : Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: _orderGroup == group
+                                ? Colors.transparent
+                                : const Color(0xFFDDE8E1),
+                          ),
+                          boxShadow: _orderGroup == group
+                              ? [
+                                  BoxShadow(
+                                    color: const Color(0xFF10B981).withOpacity(0.35),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Center(
+                          child: Text(
+                            group,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: _orderGroup == group ? FontWeight.w800 : FontWeight.w600,
+                              color: _orderGroup == group ? Colors.white : const Color(0xFF475569),
+                            ),
+                          ),
                         ),
                       ),
-                      onPressed: () => _showOrders(group),
-                      child: Text(group, style: const TextStyle(fontSize: 12)),
                     ),
                   ),
                 ],
@@ -1266,18 +1306,52 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                     ])
                       Padding(
                         padding: const EdgeInsets.only(right: 6),
-                        child: ChoiceChip(
-                          label: Text(
-                            _stageCounts.containsKey(stage.$2)
-                                ? '${stage.$1} (${_stageCounts[stage.$2]})'
-                                : stage.$1,
-                          ),
-                          selected: _orderFilter == stage.$2,
-                          onSelected: (_) => setState(() {
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () => setState(() {
                             _orderFilter = stage.$2;
                             _selectedOrders.clear();
                             _selectOrders = false;
                           }),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                            decoration: BoxDecoration(
+                              gradient: _orderFilter == stage.$2
+                                  ? const LinearGradient(
+                                      colors: [Color(0xFF10B981), Color(0xFF047857)],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    )
+                                  : null,
+                              color: _orderFilter == stage.$2 ? null : Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: _orderFilter == stage.$2
+                                    ? Colors.transparent
+                                    : const Color(0xFFDDE8E1),
+                              ),
+                              boxShadow: _orderFilter == stage.$2
+                                  ? [
+                                      BoxShadow(
+                                        color: const Color(0xFF10B981).withOpacity(0.3),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Text(
+                              _stageCounts.containsKey(stage.$2)
+                                  ? '${stage.$1} (${_stageCounts[stage.$2]})'
+                                  : stage.$1,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: _orderFilter == stage.$2 ? FontWeight.w800 : FontWeight.w600,
+                                color: _orderFilter == stage.$2 ? Colors.white : const Color(0xFF15211A),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                   ],
@@ -2911,16 +2985,53 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                           child: Text(_categoryError!),
                         ),
                       const SizedBox(height: 16),
-                      SegmentedButton<String>(
-                        segments: const [
-                          ButtonSegment(value: 'kg', label: Text('kg')),
-                          ButtonSegment(value: 'g', label: Text('g')),
+                      Row(
+                        children: [
+                          for (final unit in ['kg', 'g'])
+                            Expanded(
+                              child: Padding(
+                                padding: EdgeInsets.only(right: unit == 'kg' ? 8 : 0),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(12),
+                                  onTap: _busy ? null : () => setState(() => _unitKind = unit),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    decoration: BoxDecoration(
+                                      gradient: _unitKind == unit
+                                          ? const LinearGradient(
+                                              colors: [Color(0xFF10B981), Color(0xFF047857)],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            )
+                                          : null,
+                                      color: _unitKind == unit ? null : const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: _unitKind == unit
+                                          ? [
+                                              BoxShadow(
+                                                color: const Color(0xFF10B981).withOpacity(0.35),
+                                                blurRadius: 6,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ]
+                                          : null,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        unit,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 13,
+                                          color: _unitKind == unit ? Colors.white : const Color(0xFF475569),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
-                        selected: {_unitKind},
-                        onSelectionChanged: _busy
-                            ? null
-                            : (values) =>
-                                  setState(() => _unitKind = values.first),
                       ),
                       const SizedBox(height: 12),
                       _field(

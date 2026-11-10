@@ -782,14 +782,21 @@ class _OperationsDeliveryControlState
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
-                        color: _stage == tab.$2 ? const Color(0xFF0F5132) : Colors.transparent,
+                        gradient: _stage == tab.$2
+                            ? const LinearGradient(
+                                colors: [Color(0xFF10B981), Color(0xFF047857)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                            : null,
+                        color: _stage == tab.$2 ? null : Colors.transparent,
                         borderRadius: BorderRadius.circular(14),
                         boxShadow: _stage == tab.$2
                             ? [
                                 BoxShadow(
-                                  color: const Color(0xFF0F5132).withOpacity(0.25),
+                                  color: const Color(0xFF10B981).withOpacity(0.35),
                                   blurRadius: 8,
-                                  offset: const Offset(0, 2),
+                                  offset: const Offset(0, 3),
                                 ),
                               ]
                             : null,
