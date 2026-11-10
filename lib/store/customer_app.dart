@@ -508,7 +508,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
     );
   }
 
-  Widget _floatingCartBar(List<StoreCartLine> cart) => InkWell(
+  Widget _floatingCartBar(List<CartLine> cart) => InkWell(
     onTap: () => setState(() => _showCart = true),
     borderRadius: BorderRadius.circular(24),
     child: Container(
