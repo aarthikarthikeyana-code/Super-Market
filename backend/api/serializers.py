@@ -9,7 +9,7 @@ from rest_framework.exceptions import ValidationError
 from .commerce import cash_total, is_grocery_category
 from decimal import Decimal, ROUND_HALF_UP
 from rest_framework import serializers
-from .models import Product, ProductImage, DeliveryPersonnel, EmployeeCodeSequence, Order, OrderItem, OrderEvent, CustomerProfile, CashHandover, NewItemRequest
+from .models import Product, ProductImage, StockMovement, DeliveryPersonnel, EmployeeCodeSequence, Order, OrderItem, OrderEvent, CustomerProfile, CashHandover, NewItemRequest
 
 
 class NewItemRequestSerializer(serializers.ModelSerializer):
@@ -81,7 +81,29 @@ class ProductSerializer(serializers.ModelSerializer):
                 break
         sequence.save(update_fields=['last_number'])
         validated_data['sku'] = code
-        return super().create(validated_data)
+        product = super().create(validated_data)
+        if product.stock_kg > 0:
+            StockMovement.objects.create(
+                product=product,
+                delta=product.stock_kg,
+                unit=product.unit,
+                movement_type='opening',
+            )
+        return product
+
+    def update(self, instance, validated_data):
+        previous_stock = instance.stock_kg
+        movement_unit = validated_data.get('unit', instance.unit)
+        product = super().update(instance, validated_data)
+        delta = product.stock_kg - previous_stock
+        if delta:
+            StockMovement.objects.create(
+                product=product,
+                delta=delta,
+                unit=movement_unit,
+                movement_type='restock' if delta > 0 else 'adjustment',
+            )
+        return product
 
     def validate_category(self, category):
         if not is_grocery_category(category):

@@ -129,8 +129,20 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
           if (widget.reportType == 'inventory') ...[
             const SizedBox(height: 12),
             const Text(
-              'Stock and category totals are current inventory. Product updates follow the selected period.',
+              'Restock entries count recorded additions. Each quantity stays with its product pack unit.',
               style: TextStyle(fontSize: 11, color: opsMuted),
+            ),
+            const SizedBox(height: 18),
+            _InventoryStockLists(
+              receipts: List<Map<String, dynamic>>.from(
+                Map<String, dynamic>.from(
+                  data['inventory_stock_receipts'] ?? const {},
+                )[_period] ?? const [],
+              ),
+              lowStock: List<Map<String, dynamic>>.from(
+                data['low_stock_products'] ?? const [],
+              ),
+              onViewLowStock: () => widget.onInventory('low'),
             ),
           ],
         ],
@@ -155,7 +167,7 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
           _ReportMetricData('Published', _count(inventory['published']), Icons.inventory_2_outlined),
           _ReportMetricData('Low stock', _count(inventory['low_stock']), Icons.warning_amber_rounded),
           _ReportMetricData('Out of stock', _count(inventory['out_of_stock']), Icons.remove_shopping_cart_outlined),
-          _ReportMetricData('Updated in period', _count(selected['inventory_updates']), Icons.update_rounded),
+          _ReportMetricData('Restock entries', _count(selected['stock_receipts']), Icons.add_box_outlined),
         ];
       case 'delivery':
         return [
@@ -184,20 +196,21 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
     Map<String, dynamic> selected,
   ) {
     if (widget.reportType == 'inventory') {
-      final categories = List<Map<String, dynamic>>.from(
-        data['inventory_categories'] ?? const [],
+      final series = Map<String, dynamic>.from(
+        data['inventory_stock_series'] ?? const {},
       );
+      final rawPoints = series[_period] as List? ?? const [];
       return _ReportChartData(
-        title: 'Products by category',
+        title: 'Stock received · entries per time bucket',
         bars: true,
         points: [
-          for (final category in categories)
+          for (final point in rawPoints)
             _ReportPoint(
-              '${category['category'] ?? 'Uncategorized'}',
-              amount(category['products']),
+              '${point['label'] ?? ''}',
+              amount(point['value']),
             ),
         ],
-        emptyMessage: 'No published product categories',
+        emptyMessage: 'No stock additions recorded for this period',
       );
     }
 
@@ -315,6 +328,225 @@ class _ReportMetricData {
   final String value;
   final IconData icon;
   const _ReportMetricData(this.label, this.value, this.icon);
+}
+
+class _InventoryStockLists extends StatelessWidget {
+  final List<Map<String, dynamic>> receipts;
+  final List<Map<String, dynamic>> lowStock;
+  final VoidCallback onViewLowStock;
+
+  const _InventoryStockLists({
+    required this.receipts,
+    required this.lowStock,
+    required this.onViewLowStock,
+  });
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _InventoryListHeading(title: 'Stock received', count: receipts.length),
+      if (receipts.isEmpty)
+        const _InventoryEmptyRow('No stock additions in this period')
+      else
+        for (final receipt in receipts.take(8)) ...[
+          _StockReceiptRow(receipt: receipt),
+          if (receipt != receipts.take(8).last)
+            const Divider(height: 1, color: Color(0xFFE9EFEB)),
+        ],
+      const SizedBox(height: 22),
+      Row(
+        children: [
+          Expanded(
+            child: _InventoryListHeading(
+              title: 'Low stock',
+              count: lowStock.length,
+            ),
+          ),
+          TextButton(
+            onPressed: onViewLowStock,
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+            child: const Text('View all'),
+          ),
+        ],
+      ),
+      if (lowStock.isEmpty)
+        const _InventoryEmptyRow('No products are currently low on stock')
+      else
+        for (final product in lowStock.take(8)) ...[
+          _LowStockRow(product: product),
+          if (product != lowStock.take(8).last)
+            const Divider(height: 1, color: Color(0xFFE9EFEB)),
+        ],
+    ],
+  );
+}
+
+class _InventoryListHeading extends StatelessWidget {
+  final String title;
+  final int count;
+  const _InventoryListHeading({required this.title, required this.count});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Row(
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(width: 7),
+        Text(
+          '$count',
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: opsMuted,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _StockReceiptRow extends StatelessWidget {
+  final Map<String, dynamic> receipt;
+  const _StockReceiptRow({required this.receipt});
+
+  @override
+  Widget build(BuildContext context) {
+    final product = '${receipt['product__tamil_name'] ?? ''}'.trim();
+    final english = '${receipt['product__english_name'] ?? ''}'.trim();
+    final category = '${receipt['product__category'] ?? 'Uncategorized'}';
+    final unit = '${receipt['unit'] ?? ''}'.trim();
+    final date = DateTime.tryParse('${receipt['created_at'] ?? ''}')?.toLocal();
+    final count = amount(receipt['delta']);
+    final quantity = count == count.truncateToDouble()
+        ? count.toInt().toString()
+        : count.toStringAsFixed(2);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF7F0),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.add_box_outlined,
+              size: 17,
+              color: Color(0xFF087A50),
+            ),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.isNotEmpty ? product : english,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$category · ${date == null ? 'Date not recorded' : '${date.day}/${date.month}/${date.year}'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10, color: opsMuted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '+$quantity${unit.isEmpty ? '' : ' × $unit'}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF087A50),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LowStockRow extends StatelessWidget {
+  final Map<String, dynamic> product;
+  const _LowStockRow({required this.product});
+
+  @override
+  Widget build(BuildContext context) {
+    final tamil = '${product['tamil_name'] ?? ''}'.trim();
+    final english = '${product['english_name'] ?? ''}'.trim();
+    final unit = '${product['unit'] ?? ''}'.trim();
+    final stock = amount(product['stock_kg']);
+    final count = stock == stock.truncateToDouble()
+        ? stock.toInt().toString()
+        : stock.toStringAsFixed(2);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded, size: 18, color: Color(0xFFD97706)),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tamil.isNotEmpty ? tamil : english,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${product['category'] ?? 'Uncategorized'} · ${unit.isEmpty ? 'Unit not set' : '$unit pack'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10, color: opsMuted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '$count left',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFFB45309),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InventoryEmptyRow extends StatelessWidget {
+  final String text;
+  const _InventoryEmptyRow(this.text);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 12),
+    child: Text(text, style: const TextStyle(fontSize: 11, color: opsMuted)),
+  );
 }
 
 const _metricTints = <(Color, Color)>[

@@ -7,7 +7,7 @@ from django.db import transaction
 from django.db.models import F, Sum
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
-from .models import Product, Order, OrderItem, OrderEvent, DeliveryPersonnel
+from .models import Product, Order, OrderItem, OrderEvent, StockMovement, DeliveryPersonnel
 from . import delivery
 
 
@@ -44,6 +44,13 @@ def release_stock(order):
     for item in order.items.order_by('product_id'):
         if item.product_id:
             Product.objects.filter(pk=item.product_id).update(stock_kg=F('stock_kg') + item.quantity)
+            StockMovement.objects.create(
+                product_id=item.product_id,
+                order=order,
+                delta=item.quantity,
+                unit=item.unit,
+                movement_type='return',
+            )
     order.stock_released = True
 
 
@@ -97,6 +104,13 @@ def create_order(customer, data):
                                  quantity=item['quantity'], unit=p.unit, unit_price=p.price, total_price=p.price * item['quantity'])
         p.stock_kg -= item['quantity']
         p.save(update_fields=['stock_kg', 'updated_at'])
+        StockMovement.objects.create(
+            product=p,
+            order=order,
+            delta=-item['quantity'],
+            unit=p.unit,
+            movement_type='sale',
+        )
     OrderEvent.objects.create(order=order, status=order.status, note='Order placed. Pay cash when your groceries arrive.')
     return order
 

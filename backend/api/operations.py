@@ -8,7 +8,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from .commerce import PRODUCE_CATEGORY_PATTERN
-from .models import CashHandover, CustomerProfile, DeliveryPersonnel, Order, OrderEvent, Product
+from .models import CashHandover, CustomerProfile, DeliveryPersonnel, Order, OrderEvent, Product, StockMovement
 from .serializers import OrderSerializer, ProductSerializer
 
 
@@ -169,6 +169,80 @@ def dashboard_data(user):
         if period_start is not None:
             updated = updated.filter(updated_at__gte=period_start, updated_at__lt=period_end)
         period_stats[period]['inventory_updates'] = updated.count()
+
+    receipt_base = StockMovement.objects.filter(
+        movement_type__in=['opening', 'restock'],
+        delta__gt=0,
+    ).exclude(product__category__iregex=PRODUCE_CATEGORY_PATTERN).select_related('product')
+    inventory_stock_series = {}
+    inventory_stock_receipts = {}
+    for period, (period_start, period_end) in period_ranges.items():
+        scoped_receipts = receipt_base
+        if period_start is not None:
+            scoped_receipts = scoped_receipts.filter(
+                created_at__gte=period_start,
+                created_at__lt=period_end,
+            )
+        period_stats[period]['stock_receipts'] = scoped_receipts.count()
+        truncation = chart_configs[period][2]
+        bucket_counts = {
+            row['bucket']: row['count']
+            for row in scoped_receipts.annotate(bucket=truncation)
+            .values('bucket')
+            .annotate(count=Count('pk'))
+            .order_by('bucket')
+        }
+        if period != 'all':
+            labels = [point['label'] for point in chart_series[period]]
+        else:
+            first_receipt = scoped_receipts.order_by('created_at').values_list('created_at', flat=True).first()
+            if first_receipt is None:
+                labels = []
+            else:
+                first_month = timezone.localtime(first_receipt).replace(day=1)
+                month_count = (today.year - first_month.year) * 12 + today.month - first_month.month + 1
+                labels = [
+                    (first_month + timedelta(days=32 * offset)).replace(day=1).strftime('%b %y')
+                    for offset in range(month_count)
+                ]
+        points = []
+        for label in labels:
+            matching_bucket = next(
+                (
+                    bucket
+                    for bucket in bucket_counts
+                    if (
+                        timezone.localtime(bucket).strftime('%H:%M')
+                        if period == 'today'
+                        else bucket.strftime('%a')
+                        if period == 'week'
+                        else bucket.strftime('%d')
+                        if period == 'month'
+                        else bucket.strftime('%b %y')
+                    ) == label
+                ),
+                None,
+            )
+            points.append({'label': label, 'value': bucket_counts.get(matching_bucket, 0)})
+        inventory_stock_series[period] = points
+        inventory_stock_receipts[period] = list(
+            scoped_receipts.order_by('-created_at', '-pk')
+            .values(
+                'delta', 'unit', 'created_at', 'movement_type',
+                'product__tamil_name', 'product__english_name', 'product__category',
+            )[:25]
+        )
+
+    low_stock_products = list(
+        products.filter(
+            is_active=True,
+            is_in_stock=True,
+            stock_kg__gt=0,
+            stock_kg__lte=5,
+        )
+        .order_by('stock_kg', 'category', 'tamil_name')
+        .values('tamil_name', 'english_name', 'category', 'unit', 'stock_kg')[:25]
+    )
     people = DeliveryPersonnel.objects.select_related('user').annotate(
         active_jobs=Count('assigned_orders', filter=Q(assigned_orders__customer__isnull=False) & ~Q(assigned_orders__status__in=['Delivered', 'Cancelled'])),
         road_jobs=Count('assigned_orders', filter=Q(assigned_orders__customer__isnull=False, assigned_orders__status='Out for Delivery')),
@@ -208,6 +282,9 @@ def dashboard_data(user):
     stats.update({
         'generated_at': now, 'today': daily, 'period_stats': period_stats,
         'orders_series': chart_series, 'revenue_series': revenue_series,
+        'inventory_stock_series': inventory_stock_series,
+        'inventory_stock_receipts': inventory_stock_receipts,
+        'low_stock_products': low_stock_products,
         'inventory_categories': inventory_categories,
         'total_customers': CustomerProfile.objects.count(),
         'inventory': inventory, 'total_products': inventory['published'], 'low_stock': inventory['low_stock'],
