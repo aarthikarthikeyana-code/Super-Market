@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'loading.dart';
 import 'models.dart';
 import 'state.dart';
 import 'widgets.dart';
@@ -144,7 +145,7 @@ String opsDate(dynamic value) {
 String opsInitial(String name) =>
     name.trim().isEmpty ? '•' : name.trim().substring(0, 1).toUpperCase();
 
-class OperationsDashboard extends ConsumerWidget {
+class OperationsDashboard extends ConsumerStatefulWidget {
   final void Function(String) onOrders, onInventory;
   final void Function(String category)? onCategory;
   final VoidCallback onAddProduct,
@@ -173,10 +174,48 @@ class OperationsDashboard extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => DataView(
+  ConsumerState<OperationsDashboard> createState() =>
+      _OperationsDashboardState();
+}
+
+class _OperationsDashboardState extends ConsumerState<OperationsDashboard> {
+  String _summaryPeriod = 'today';
+  String _chartPeriod = 'today';
+
+  void Function(String) get onOrders => widget.onOrders;
+  void Function(String) get onInventory => widget.onInventory;
+  void Function(String)? get onCategory => widget.onCategory;
+  VoidCallback get onAddProduct => widget.onAddProduct;
+  VoidCallback get onCreateEmployee => widget.onCreateEmployee;
+  VoidCallback get onTeam => widget.onTeam;
+  VoidCallback get onCash => widget.onCash;
+  VoidCallback get onDelivery => widget.onDelivery;
+  VoidCallback get onReports => widget.onReports;
+  void Function(StoreOrder) get onOrder => widget.onOrder;
+  void Function(StoreProduct) get onProduct => widget.onProduct;
+  void Function(Map<String, dynamic>) get onReceiveCash => widget.onReceiveCash;
+
+  @override
+  Widget build(BuildContext context) => DataView(
     value: ref.watch(adminDashboardProvider),
     retainOnRefresh: true,
     onRetry: () => ref.invalidate(adminDashboardProvider),
+    loading: const SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          children: [
+            AppSkeleton(kind: SkeletonKind.summary, padded: false),
+            SizedBox(height: 12),
+            AppSkeleton(kind: SkeletonKind.grid, padded: false),
+            SizedBox(height: 12),
+            AppSkeleton(kind: SkeletonKind.detail, padded: false),
+            SizedBox(height: 12),
+            AppSkeleton(kind: SkeletonKind.list, count: 2, padded: false),
+          ],
+        ),
+      ),
+    ),
     builder: (data) {
       final today = Map<String, dynamic>.from(data['today'] ?? {});
       final adminProfile = Map<String, dynamic>.from(
@@ -239,15 +278,33 @@ class OperationsDashboard extends ConsumerWidget {
                     builder: (_, c) {
                       final itemW = (c.maxWidth - 10) / 2;
                       final inventory = Map<String, dynamic>.from(data['inventory'] ?? {});
-                      final totalOrdersVal = '${data['total_orders'] ?? data['orders_placed'] ?? ((today['new'] ?? 0) as int) + ((today['preparing'] ?? 0) as int) + ((today['delivered'] ?? 0) as int) + 152}';
-                      const totalCustomersVal = '1,248';
-                      final totalProductsVal = '${inventory['published'] ?? 140}';
-                      final totalSalesVal = opsMoney(data['revenue'] ?? 76240);
+                      final periods = Map<String, dynamic>.from(
+                        data['period_stats'] ?? {},
+                      );
+                      final selected = Map<String, dynamic>.from(
+                        periods[_summaryPeriod] ?? {},
+                      );
+                      final totalOrdersVal = '${selected['orders'] ?? 0}';
+                      final totalCustomersVal = '${data['total_customers'] ?? 0}';
+                      final totalProductsVal = '${inventory['published'] ?? 0}';
+                      final totalSalesVal = opsMoney(selected['sales'] ?? 0);
 
-                      return Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
+                      return Column(
                         children: [
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: AdminPeriodDropdown(
+                              value: _summaryPeriod,
+                              onChanged: (period) => setState(
+                                () => _summaryPeriod = period,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
                           SizedBox(
                             width: itemW,
                             child: AgaramStatCard(
@@ -257,7 +314,6 @@ class OperationsDashboard extends ConsumerWidget {
                               color: const Color(0xFF10B981),
                               background: const Color(0xFFE8F7EE),
                               border: const Color(0xFFC7EBD4),
-                              growth: '12%',
                               onTap: () => onOrders('All'),
                             ),
                           ),
@@ -270,7 +326,6 @@ class OperationsDashboard extends ConsumerWidget {
                               color: const Color(0xFF2563EB),
                               background: const Color(0xFFEFF6FF),
                               border: const Color(0xFFBFDBFE),
-                              growth: '8%',
                               onTap: onTeam,
                             ),
                           ),
@@ -298,6 +353,8 @@ class OperationsDashboard extends ConsumerWidget {
                               onTap: onReports,
                             ),
                           ),
+                            ],
+                          ),
                         ],
                       );
                     },
@@ -307,7 +364,10 @@ class OperationsDashboard extends ConsumerWidget {
                   // 3. Agaram Sales Overview Weekly Bar Chart (Reference Screen 2)
                   AgaramWeeklySalesChart(
                     data: data,
-                    onReports: onReports,
+                    period: _chartPeriod,
+                    onPeriodChanged: (period) => setState(
+                      () => _chartPeriod = period,
+                    ),
                   ),
                   const SizedBox(height: 22),
 

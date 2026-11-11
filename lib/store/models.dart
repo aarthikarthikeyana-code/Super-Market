@@ -56,8 +56,15 @@ class StoreProduct {
     return price;
   }
 
-  int get discountPercent =>
-      mrp > price ? (((mrp - price) / mrp) * 100).round() : 0;
+  int get discountPercent {
+    if (rawMrp != null && rawMrp!.isFinite && rawMrp! > price) {
+      return (((rawMrp! - price) / rawMrp!) * 100).round();
+    }
+    if (offerPercent > 0 && offerPercent.isFinite) {
+      return offerPercent.round();
+    }
+    return 0;
+  }
   factory StoreProduct.fromJson(Map<String, dynamic> j) => StoreProduct(
     published: j['is_active'] != false,
     id: '${j['id']}',

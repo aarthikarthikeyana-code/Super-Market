@@ -2424,7 +2424,15 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
       caseSensitive: false,
     ).firstMatch(p?.unit.trim() ?? '');
     final rawKind = unit?.group(2)?.toLowerCase() ?? 'kg';
-    _unitKind = rawKind == 'l' ? 'L' : rawKind;
+    if (rawKind == 'kg') {
+      _unitKind = 'Kg';
+    } else if (rawKind == 'l') {
+      _unitKind = 'L';
+    } else if (rawKind == 'ml') {
+      _unitKind = 'ML';
+    } else {
+      _unitKind = rawKind;
+    }
     _unit = TextEditingController(text: unit?.group(1) ?? '');
     _description = TextEditingController(text: p?.description ?? '');
     _offer = TextEditingController(
@@ -2990,10 +2998,10 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
                       const SizedBox(height: 16),
                       Row(
                         children: [
-                          for (final unit in ['kg', 'g', 'L', 'ml'])
+                          for (final unit in ['Kg', 'g', 'L', 'ML'])
                             Expanded(
                               child: Padding(
-                                padding: EdgeInsets.only(right: unit == 'ml' ? 0 : 8),
+                                padding: EdgeInsets.only(right: unit == 'ML' ? 0 : 8),
                                 child: InkWell(
                                   borderRadius: BorderRadius.circular(12),
                                   onTap: _busy ? null : () => setState(() => _unitKind = unit),

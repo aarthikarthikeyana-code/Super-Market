@@ -3,11 +3,12 @@ from datetime import datetime, time, timedelta
 from decimal import Decimal
 
 from django.db.models import Count, Q, Sum
+from django.db.models.functions import TruncDate, TruncHour, TruncMonth
 from django.conf import settings
 from django.utils import timezone
 
 from .commerce import PRODUCE_CATEGORY_PATTERN
-from .models import CashHandover, DeliveryPersonnel, Order, OrderEvent, Product
+from .models import CashHandover, CustomerProfile, DeliveryPersonnel, Order, OrderEvent, Product
 from .serializers import OrderSerializer, ProductSerializer
 
 
@@ -18,6 +19,7 @@ def dashboard_data(user):
     end = start + timedelta(days=1)
     orders = Order.objects.filter(customer__isnull=False)
     accepted = Q(payment_status__in=['paid', 'cod', 'collected']) & ~Q(status='Cancelled')
+    sales = Q(payment_status__in=['paid', 'collected']) & ~Q(status='Cancelled')
     held = Q(payment_status='collected', cash_collected_for__isnull=False, cash_handover__isnull=True)
     received = Q(payment_status='collected') & (Q(cash_handover__isnull=False) | Q(cash_received_directly=True))
     stats = orders.aggregate(
@@ -55,6 +57,86 @@ def dashboard_data(user):
         'delivered': orders.filter(delivered_at__gte=start, delivered_at__lt=end, status='Delivered').count(),
         'needs_attention': current.filter(Q(status__in=['New', 'Delivery Attempted']) | Q(status='Packed', assigned_to__isnull=True) | Q(status='Out for Delivery', estimated_delivery_at__lt=now)).count(),
     }
+
+    week_start = start - timedelta(days=today.weekday())
+    month_start = start.replace(day=1)
+    next_month = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+    period_ranges = {
+        'today': (start, end),
+        'week': (week_start, week_start + timedelta(days=7)),
+        'month': (month_start, next_month),
+        'all': (None, None),
+    }
+    period_stats = {}
+    for period, (period_start, period_end) in period_ranges.items():
+        scoped = orders
+        if period_start is not None:
+            scoped = scoped.filter(created_at__gte=period_start, created_at__lt=period_end)
+        totals = scoped.aggregate(
+            orders=Count('pk', filter=accepted),
+            sales=Sum('total_amount', filter=sales),
+        )
+        period_stats[period] = {
+            'orders': totals['orders'] or 0,
+            'sales': str(totals['sales'] or Decimal('0.00')),
+        }
+
+    chart_series = {}
+    chart_configs = {
+        'today': (start, end, TruncHour('created_at', tzinfo=timezone.get_current_timezone())),
+        'week': (week_start, week_start + timedelta(days=7), TruncDate('created_at', tzinfo=timezone.get_current_timezone())),
+        'month': (month_start, next_month, TruncDate('created_at', tzinfo=timezone.get_current_timezone())),
+        'all': (None, None, TruncMonth('created_at', tzinfo=timezone.get_current_timezone())),
+    }
+    for period, (period_start, period_end, truncation) in chart_configs.items():
+        scoped = orders
+        if period_start is not None:
+            scoped = scoped.filter(created_at__gte=period_start, created_at__lt=period_end)
+        buckets = (
+            scoped.annotate(bucket=truncation)
+            .values('bucket')
+            .annotate(value=Sum('total_amount', filter=sales))
+            .order_by('bucket')
+        )
+        bucket_values = {}
+        for row in buckets:
+            bucket = row['bucket']
+            if period == 'today':
+                label = timezone.localtime(bucket).strftime('%H:%M')
+            elif period == 'week':
+                label = bucket.strftime('%a')
+            elif period == 'month':
+                label = bucket.strftime('%d')
+            else:
+                label = bucket.strftime('%b %y')
+            bucket_values[label] = str(row['value'] or Decimal('0.00'))
+
+        if period == 'today':
+            labels = [(start + timedelta(hours=hour)).strftime('%H:%M') for hour in range(24)]
+        elif period == 'week':
+            labels = [
+                (week_start + timedelta(days=day)).strftime('%a')
+                for day in range(7)
+            ]
+        elif period == 'month':
+            labels = [f'{day:02d}' for day in range(1, (next_month - month_start).days + 1)]
+        else:
+            first_order = orders.order_by('created_at').values_list('created_at', flat=True).first()
+            if first_order is None:
+                labels = []
+            else:
+                first_month = timezone.localtime(first_order).replace(day=1)
+                month_count = (today.year - first_month.year) * 12 + today.month - first_month.month + 1
+                labels = [
+                    (first_month + timedelta(days=32 * offset)).replace(day=1).strftime('%b %y')
+                    for offset in range(month_count)
+                ]
+        points = [
+            {'label': label, 'value': bucket_values.get(label, '0.00')}
+            for label in labels
+        ]
+        chart_series[period] = points
+
     products = Product.objects.exclude(category__iregex=PRODUCE_CATEGORY_PATTERN).select_related('image')
     inventory = products.aggregate(
         published=Count('pk', filter=Q(is_active=True)), hidden=Count('pk', filter=Q(is_active=False)),
@@ -99,7 +181,9 @@ def dashboard_data(user):
     activity.sort(key=lambda row: row['at'], reverse=True)
     details = orders.select_related('assigned_to').prefetch_related('items__product__image', 'events')
     stats.update({
-        'generated_at': now, 'today': daily, 'inventory': inventory, 'total_products': inventory['published'], 'low_stock': inventory['low_stock'],
+        'generated_at': now, 'today': daily, 'period_stats': period_stats,
+        'sales_series': chart_series, 'total_customers': CustomerProfile.objects.count(),
+        'inventory': inventory, 'total_products': inventory['published'], 'low_stock': inventory['low_stock'],
         'alerts': alerts, 'team': team, 'team_preview': team_rows,
         'active_delivery_preview': OrderSerializer(details.filter(status='Out for Delivery').order_by('dispatched_at', 'pk')[:4], many=True).data,
         'cash_employees': cash_rows, 'cash_submissions': [], 'cash_submission_supported': False,

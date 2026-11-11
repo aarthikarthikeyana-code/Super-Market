@@ -4003,9 +4003,9 @@ String groceryUnitLabel(String value) => value.trim().replaceAllMapped(
   ),
   (match) {
     final unit = match[0]!.toLowerCase();
-    if (unit.startsWith('கிலோ') || unit.startsWith('k')) return 'kg';
+    if (unit.startsWith('கிலோ') || unit.startsWith('k')) return 'Kg';
     if (unit.startsWith('லிட்டர்') || unit == 'l' || unit.startsWith('liter') || unit.startsWith('litre')) return 'L';
-    if (unit.startsWith('மில்லி') || unit == 'ml') return 'ml';
+    if (unit.startsWith('மில்லி') || unit == 'ml') return 'ML';
     return 'g';
   },
 );

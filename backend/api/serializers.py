@@ -98,9 +98,18 @@ class ProductSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Selling quantity must be a positive number.')
         if Decimal(match.group(1)) <= 0:
             raise serializers.ValidationError('Selling quantity must be positive.')
-        unit_name = match.group(2).strip().lower()
-        if unit_name == 'l':
+        raw_unit = match.group(2).strip()
+        unit_name = raw_unit.lower()
+        if unit_name in {'kg', 'kgs', 'kilogram', 'kilograms'}:
+            unit_name = 'Kg'
+        elif unit_name in {'g', 'gm', 'gms', 'gram', 'grams'}:
+            unit_name = 'g'
+        elif unit_name in {'l', 'liter', 'litre', 'liters', 'litres'}:
             unit_name = 'L'
+        elif unit_name in {'ml', 'milliliter', 'millilitre', 'milliliters', 'millilitres'}:
+            unit_name = 'ML'
+        else:
+            unit_name = raw_unit or unit_name
         return f'{match.group(1)} {unit_name}'.strip() if unit_name else match.group(1)
 
     class Meta:

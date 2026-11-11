@@ -2438,16 +2438,32 @@ class AgaramStatCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 3),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF0F172A),
-                letterSpacing: -0.4,
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 350),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.18),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              child: Text(
+                value,
+                key: ValueKey(value),
+                style: const TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.4,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
@@ -2456,26 +2472,91 @@ class AgaramStatCard extends StatelessWidget {
   }
 }
 
-/// Agaram Weekly Sales Bar Chart matching Screen 2.
+class AdminPeriodDropdown extends StatelessWidget {
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  const AdminPeriodDropdown({
+    super.key,
+    required this.value,
+    required this.onChanged,
+  });
+
+  static const _periods = <String, String>{
+    'today': 'Today',
+    'week': 'Week',
+    'month': 'Month',
+    'all': 'All',
+  };
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 34,
+    padding: const EdgeInsets.symmetric(horizontal: 10),
+    decoration: BoxDecoration(
+      color: const Color(0xFFE8F7EE),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFFC7EBD4)),
+    ),
+    child: DropdownButtonHideUnderline(
+      child: DropdownButton<String>(
+        value: _periods.containsKey(value) ? value : 'today',
+        isDense: true,
+        borderRadius: BorderRadius.circular(12),
+        icon: const Icon(
+          Icons.keyboard_arrow_down_rounded,
+          size: 17,
+          color: Color(0xFF0F7645),
+        ),
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          color: Color(0xFF0F7645),
+        ),
+        items: _periods.entries
+            .map((entry) => DropdownMenuItem(
+                  value: entry.key,
+                  child: Text(entry.value),
+                ))
+            .toList(),
+        onChanged: (selected) {
+          if (selected != null) onChanged(selected);
+        },
+      ),
+    ),
+  );
+}
+
+/// Real sales buckets displayed as an animated, smoothed line chart.
 class AgaramWeeklySalesChart extends StatelessWidget {
   final Map<String, dynamic> data;
-  final VoidCallback onReports;
+  final String period;
+  final ValueChanged<String> onPeriodChanged;
 
   const AgaramWeeklySalesChart({
     super.key,
     required this.data,
-    required this.onReports,
+    required this.period,
+    required this.onPeriodChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    final revNum = (data['revenue'] is num)
-        ? (data['revenue'] as num).toDouble()
-        : (double.tryParse('') ?? 600.0);
-
-    final weights = [0.12, 0.14, 0.10, 0.18, 0.22, 0.28, 0.16];
-    const maxWeight = 0.28;
-    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final allSeries = Map<String, dynamic>.from(data['sales_series'] ?? {});
+    final rawPoints = allSeries[period] as List? ?? const [];
+    final points = rawPoints
+        .map((point) => Map<String, dynamic>.from(point as Map))
+        .toList();
+    final values = points
+        .map((point) => double.tryParse('${point['value']}') ?? 0)
+        .toList();
+    final labels = points.map((point) => '${point['label'] ?? ''}').toList();
+    final periodLabel = switch (period) {
+      'week' => 'Week',
+      'month' => 'Month',
+      'all' => 'All time',
+      _ => 'Today',
+    };
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -2495,73 +2576,75 @@ class AgaramWeeklySalesChart extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Sales Overview',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF0F172A),
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Weekly revenue performance',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF64748B),
-                    ),
-                  ),
-                ],
-              ),
-              BouncingTap(
-                onTap: onReports,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F7EE),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFC7EBD4)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'This Week',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F7645),
-                        ),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Sales Overview',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.3,
                       ),
-                      SizedBox(width: 4),
-                      Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: Color(0xFF0F7645)),
-                    ],
-                  ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Sales performance',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+              const SizedBox(width: 8),
+              AdminPeriodDropdown(
+                value: period,
+                onChanged: onPeriodChanged,
               ),
             ],
           ),
-          const SizedBox(height: 20),
-
-          SizedBox(
-            height: 138,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
+          const SizedBox(height: 16),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 500),
+            switchInCurve: Curves.easeOutCubic,
+            child: Column(
+              key: ValueKey('$period-${values.join(',')}'),
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (int i = 0; i < 7; i++)
-                  _buildBar(
-                    day: dayNames[i],
-                    fraction: (weights[i] / maxWeight).clamp(0.18, 1.0),
-                    isPeak: weights[i] == maxWeight,
-                    amount: '₹${(revNum * weights[i]).toStringAsFixed(0)}',
+                SizedBox(
+                  height: 170,
+                  width: double.infinity,
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: 1),
+                    duration: const Duration(milliseconds: 700),
+                    curve: Curves.easeInOutCubic,
+                    builder: (context, progress, child) => CustomPaint(
+                      painter: _SmoothSalesPainter(
+                        values: values,
+                        labels: labels,
+                        progress: progress,
+                      ),
+                    ),
+                  ),
+                ),
+                if (values.isEmpty || values.every((value) => value == 0))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      'No sales recorded for $periodLabel',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -2569,71 +2652,151 @@ class AgaramWeeklySalesChart extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _SmoothSalesPainter extends CustomPainter {
+  final List<double> values;
+  final List<String> labels;
+  final double progress;
+
+  const _SmoothSalesPainter({
+    required this.values,
+    required this.labels,
+    required this.progress,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const left = 44.0;
+    const right = 8.0;
+    const top = 10.0;
+    const bottom = 28.0;
+    final plot = Rect.fromLTRB(left, top, size.width - right, size.height - bottom);
+    final maximum = values.isEmpty
+        ? 1.0
+        : values.fold<double>(0, (current, value) => value > current ? value : current);
+    final scale = maximum > 0 ? maximum : 1.0;
+    final gridPaint = Paint()
+      ..color = const Color(0xFFE8EFEB)
+      ..strokeWidth = 1;
+
+    final gridSteps = maximum > 0 ? 3 : 0;
+    for (var index = 0; index <= gridSteps; index++) {
+      final y = plot.bottom - plot.height * index / (gridSteps == 0 ? 1 : 3);
+      _drawDashedLine(canvas, Offset(plot.left, y), Offset(plot.right, y), gridPaint);
+      final amount = maximum == 0 ? 0.0 : maximum * index / 3;
+      final label = TextPainter(
+        text: TextSpan(
+          text: _compactAmount(amount),
+          style: const TextStyle(fontSize: 9, color: Color(0xFF82918A)),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: left - 6);
+      label.paint(canvas, Offset(0, y - label.height / 2));
+    }
+
+    if (values.isEmpty) return;
+    final points = <Offset>[];
+    for (var index = 0; index < values.length; index++) {
+      final x = values.length == 1
+          ? plot.center.dx
+          : plot.left + plot.width * index / (values.length - 1);
+      final y = plot.bottom - plot.height * (values[index] / scale) * progress;
+      points.add(Offset(x, y));
+    }
+
+    final line = _smoothPath(points);
+    final fill = Path.from(line)
+      ..lineTo(points.last.dx, plot.bottom)
+      ..lineTo(points.first.dx, plot.bottom)
+      ..close();
+    canvas.drawPath(
+      fill,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0x3322B981), Color(0x0022B981)],
+        ).createShader(plot),
+    );
+    canvas.drawPath(
+      line,
+      Paint()
+        ..color = const Color(0xFF059669)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
+    for (final point in points) {
+      canvas.drawCircle(point, 3.2, Paint()..color = const Color(0xFF059669));
+      canvas.drawCircle(point, 1.5, Paint()..color = Colors.white);
+    }
+
+    final visibleEvery = values.length <= 8 ? 1 : (values.length / 6).ceil();
+    for (var index = 0; index < labels.length; index++) {
+      if (index % visibleEvery != 0 && index != labels.length - 1) continue;
+      final x = values.length == 1
+          ? plot.center.dx
+          : plot.left + plot.width * index / (values.length - 1);
+      final text = TextPainter(
+        text: TextSpan(
+          text: labels[index],
+          style: const TextStyle(fontSize: 9, color: Color(0xFF64748B)),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      text.paint(
+        canvas,
+        Offset(
+          (x - text.width / 2).clamp(0.0, size.width - text.width),
+          plot.bottom + 8,
+        ),
+      );
+    }
   }
 
-  Widget _buildBar({
-    required String day,
-    required double fraction,
-    required bool isPeak,
-    required String amount,
-  }) {
-    return Expanded(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          if (isPeak)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F7645),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  amount,
-                  style: const TextStyle(
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          Container(
-            width: 22,
-            height: (72 * fraction).clamp(20.0, 72.0),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isPeak
-                    ? [const Color(0xFF10B981), const Color(0xFF047857)]
-                    : [const Color(0xFF34D399), const Color(0xFF059669)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF10B981).withOpacity(isPeak ? 0.35 : 0.15),
-                  blurRadius: isPeak ? 8 : 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            day,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: isPeak ? FontWeight.w800 : FontWeight.w600,
-              color: isPeak ? const Color(0xFF0F7645) : const Color(0xFF64748B),
-            ),
-          ),
-        ],
-      ),
-    );
+  Path _smoothPath(List<Offset> points) {
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (var index = 1; index < points.length; index++) {
+      final previous = points[index - 1];
+      final current = points[index];
+      final middle = Offset(
+        (previous.dx + current.dx) / 2,
+        (previous.dy + current.dy) / 2,
+      );
+      path.quadraticBezierTo(previous.dx, previous.dy, middle.dx, middle.dy);
+    }
+    if (points.length > 1) {
+      final last = points.last;
+      path.lineTo(last.dx, last.dy);
+    }
+    return path;
   }
+
+  void _drawDashedLine(Canvas canvas, Offset start, Offset end, Paint paint) {
+    const dash = 3.0;
+    const gap = 4.0;
+    var x = start.dx;
+    while (x < end.dx) {
+      final next = (x + dash).clamp(start.dx, end.dx);
+      canvas.drawLine(Offset(x, start.dy), Offset(next, end.dy), paint);
+      x = next + gap;
+    }
+  }
+
+  String _compactAmount(double amount) {
+    if (amount >= 1000000) return '₹${(amount / 1000000).toStringAsFixed(1)}M';
+    if (amount >= 1000) return '₹${(amount / 1000).toStringAsFixed(1)}k';
+    return '₹${amount.toStringAsFixed(0)}';
+  }
+
+  @override
+  bool shouldRepaint(covariant _SmoothSalesPainter oldDelegate) =>
+      oldDelegate.values != values ||
+      oldDelegate.labels != labels ||
+      oldDelegate.progress != progress;
 }
 
 
