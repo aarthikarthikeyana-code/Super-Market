@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'admin_dashboard.dart';
+import 'delivery_tracking.dart';
 import 'models.dart';
 import 'paged_feed.dart';
 import 'state.dart';
@@ -714,7 +715,12 @@ class OperationsMore extends StatelessWidget {
 
 class OperationsDeliveryControl extends ConsumerStatefulWidget {
   final void Function(StoreOrder) onOrder;
-  const OperationsDeliveryControl({super.key, required this.onOrder});
+  final VoidCallback onAssign;
+  const OperationsDeliveryControl({
+    super.key,
+    required this.onOrder,
+    required this.onAssign,
+  });
   @override
   ConsumerState<OperationsDeliveryControl> createState() =>
       _OperationsDeliveryControlState();
@@ -722,7 +728,7 @@ class OperationsDeliveryControl extends ConsumerStatefulWidget {
 
 class _OperationsDeliveryControlState
     extends ConsumerState<OperationsDeliveryControl> {
-  String _stage = 'Out for Delivery';
+  String _stage = 'Ready to Assign';
   @override
   Widget build(BuildContext context) {
     final api = ref.watch(storeApiProvider);
@@ -742,14 +748,48 @@ class _OperationsDeliveryControlState
                   color: Color(0xFF0F172A),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 2, 18, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: widget.onAssign,
+                  icon: const Icon(Icons.person_add_alt_1_outlined, size: 16),
+                  label: const Text('Assign employee'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF33483B),
+                    side: const BorderSide(color: Color(0xFFDDE8E1)),
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
-                child: const Icon(Icons.tune_rounded, size: 18, color: Color(0xFF0F172A)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => LiveDeliveryMonitorScreen(
+                        onOrder: widget.onOrder,
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(Icons.my_location_rounded, size: 16),
+                  label: const Text('Live riders'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF087A50),
+                    side: const BorderSide(color: Color(0xFFD2EBDD)),
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
               ),
             ],
           ),
@@ -772,10 +812,10 @@ class _OperationsDeliveryControlState
           child: Row(
             children: [
               for (final tab in [
-                ('All', 'Out for Delivery'),
-                ('Assigned', 'Packed'),
+                ('Ready to assign', 'Ready to Assign'),
+                ('Assigned', 'Assigned'),
                 ('On Delivery', 'Out for Delivery'),
-                ('Delivered', 'Delivered'),
+                ('Needs retry', 'Delivery Attempted'),
               ])
                 Expanded(
                   child: InkWell(
@@ -826,10 +866,18 @@ class _OperationsDeliveryControlState
             load: (cursor) =>
                 api.orderPage(cursor: cursor, admin: true, status: _stage),
             identity: (o) => o.id,
-            emptyTitle: _stage == 'Out for Delivery'
-                ? 'No active deliveries'
-                : 'No orders in this stage',
-            emptyMessage: 'Live delivery updates and rider progress will appear here.',
+            emptyTitle: switch (_stage) {
+              'Ready to Assign' => 'No deliveries waiting for a rider',
+              'Assigned' => 'No assigned deliveries waiting for pickup',
+              'Delivery Attempted' => 'No deliveries need another attempt',
+              _ => 'No active trips right now',
+            },
+            emptyMessage: switch (_stage) {
+              'Ready to Assign' => 'Packed orders appear here when they are ready for a delivery employee.',
+              'Assigned' => 'Orders assigned to an employee appear here until the trip starts.',
+              'Delivery Attempted' => 'Failed delivery attempts appear here for follow-up.',
+              _ => 'Orders currently out for delivery appear here with rider progress.',
+            },
             itemBuilder: (_, order, _) => DeliveryPreviewCard(
               order: order,
               onTap: () => widget.onOrder(order),
@@ -837,6 +885,120 @@ class _OperationsDeliveryControlState
           ),
         ),
       ],
+    );
+  }
+}
+
+class OrderPeriodDropdown extends StatelessWidget {
+  final String value;
+  final ValueChanged<String> onChanged;
+  const OrderPeriodDropdown({
+    super.key,
+    required this.value,
+    required this.onChanged,
+  });
+
+  static const _periods = <String, String>{
+    'today': 'Today',
+    'week': 'Week',
+    'month': 'Month',
+    'six_month': '6 Months',
+    'all': 'All',
+  };
+
+  @override
+  Widget build(BuildContext context) => PopupMenuButton<String>(
+    initialValue: _periods.containsKey(value) ? value : 'today',
+    onSelected: onChanged,
+    position: PopupMenuPosition.under,
+    offset: const Offset(0, 6),
+    color: Colors.white,
+    surfaceTintColor: Colors.white,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(14),
+      side: const BorderSide(color: Color(0xFFE1E9E4)),
+    ),
+    itemBuilder: (context) => _periods.entries
+        .map(
+          (entry) => PopupMenuItem<String>(
+            value: entry.key,
+            child: Text(
+              entry.value,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+        )
+        .toList(),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF7F0),
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: const Color(0xFFD2EBDD)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _periods[value] ?? 'Today',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF087A50),
+            ),
+          ),
+          const SizedBox(width: 5),
+          const Icon(Icons.keyboard_arrow_down_rounded, size: 17, color: Color(0xFF087A50)),
+        ],
+      ),
+    ),
+  );
+}
+
+class LiveDeliveryMonitorScreen extends ConsumerWidget {
+  final void Function(StoreOrder) onOrder;
+  const LiveDeliveryMonitorScreen({
+    super.key,
+    required this.onOrder,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final api = ref.watch(storeApiProvider);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Live riders')),
+      body: PagedFeed<StoreOrder>(
+        queryKey: ('liveDeliveryRiders', api.adminToken),
+        changes: api.feedChanges,
+        load: (cursor) => api.orderPage(
+          cursor: cursor,
+          admin: true,
+          status: 'Out for Delivery',
+        ),
+        identity: (order) => order.id,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        header: const Padding(
+          padding: EdgeInsets.fromLTRB(0, 0, 0, 8),
+          child: Text(
+            'Active deliveries and the employee’s latest shared GPS location.',
+            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+          ),
+        ),
+        emptyTitle: 'No riders on active deliveries',
+        emptyMessage: 'Assigned employee trips will appear here while orders are out for delivery.',
+        itemBuilder: (_, order, _) => Column(
+          children: [
+            DeliveryPreviewCard(
+              order: order,
+              onTap: () => onOrder(order),
+            ),
+            DeliveryTrackingCard(
+              orderId: order.id,
+              admin: true,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1,7 +1,7 @@
 import secrets
 import re
 import uuid
-from datetime import timedelta
+from datetime import date as calendar_date, datetime, time, timedelta
 from decimal import Decimal
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
@@ -735,6 +735,24 @@ def admin_orders(request):
         if not date:
             raise ValidationError({'date': 'Use YYYY-MM-DD.'})
         orders = orders.filter(created_at__date=date)
+    period = request.query_params.get('period')
+    if period:
+        if period not in ['today', 'week', 'month', 'six_month', 'all']:
+            raise ValidationError({'period': 'Choose today, week, month, six_month or all.'})
+        if period != 'all':
+            today = timezone.localdate()
+            if period == 'today':
+                start_date = today
+            elif period == 'week':
+                start_date = today - timedelta(days=today.weekday())
+            elif period == 'month':
+                start_date = today.replace(day=1)
+            else:
+                month_index = today.year * 12 + today.month - 1 - 5
+                start_date = calendar_date(month_index // 12, month_index % 12 + 1, 1)
+            start = timezone.make_aware(datetime.combine(start_date, time.min))
+            end = timezone.make_aware(datetime.combine(today + timedelta(days=1), time.min))
+            orders = orders.filter(created_at__gte=start, created_at__lt=end)
     counts = dict(orders.order_by().values('status').annotate(total=Count('pk')).values_list('status', 'total'))
     stage = request.query_params.get('status')
     if stage == 'Cash Review':
@@ -745,6 +763,8 @@ def admin_orders(request):
         orders = orders.filter(created_at__date=timezone.localdate()).filter(Q(status__in=['New', 'Delivery Attempted']) | Q(status='Packed', assigned_to__isnull=True) | Q(status='Out for Delivery', estimated_delivery_at__lt=timezone.now()))
     elif stage == 'Assigned':
         orders = orders.filter(status='Packed', assigned_to__isnull=False)
+    elif stage == 'Ready to Assign':
+        orders = orders.filter(status='Packed', assigned_to__isnull=True)
     elif stage == 'Cash Handover Complete':
         orders = orders.filter(payment_status='collected').filter(Q(cash_handover__isnull=False) | Q(cash_received_directly=True))
     elif stage == 'Pending Handover':

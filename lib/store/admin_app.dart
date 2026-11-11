@@ -27,6 +27,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   bool _signedIn = false;
   int _tab = 0;
   String _orderFilter = 'Active', _orderSearch = '', _teamSearch = '';
+  String _orderPeriod = 'all';
   bool _unassignedOnly = false, _todayOnly = false;
   Map<String, dynamic> _stageCounts = {};
   final Set<String> _selectedOrders = {};
@@ -131,7 +132,10 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                     0 => _overview(),
                     1 => _orders(),
                     2 => _products(),
-                    3 => OperationsDeliveryControl(onOrder: _openOrder),
+                    3 => OperationsDeliveryControl(
+                      onOrder: _openOrder,
+                      onAssign: () => _showOrders('Unassigned'),
+                    ),
                     4 => OperationsMore(onOpen: _openMore),
                     5 => _team(),
                     6 => OperationsCashControl(onReceive: _receiveCash),
@@ -1169,6 +1173,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
         api.adminToken,
         _orderFilter,
         _orderSearch,
+        _orderPeriod,
         _unassignedOnly,
         _todayOnly,
       ),
@@ -1179,6 +1184,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
         status: _orderFilter,
         search: _orderSearch,
         assigned: _unassignedOnly ? 'unassigned' : null,
+        period: _orderPeriod,
         date: _todayOnly
             ? DateTime.now().toIso8601String().split('T').first
             : null,
@@ -1210,57 +1216,65 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
               imageAsset: 'assets/images/admin_orders_banner.jpg',
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                for (final group in ['Active', 'Delivered', 'Cancelled']) ...[
-                  if (group != 'Active') const SizedBox(width: 6),
-                  Expanded(
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(14),
-                      onTap: () => _showOrders(group),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 10),
-                        decoration: BoxDecoration(
-                          gradient: _orderGroup == group
-                              ? const LinearGradient(
-                                  colors: [Color(0xFF10B981), Color(0xFF047857)],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                )
-                              : null,
-                          color: _orderGroup == group ? null : Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: _orderGroup == group
-                                ? Colors.transparent
-                                : const Color(0xFFDDE8E1),
-                          ),
-                          boxShadow: _orderGroup == group
-                              ? [
-                                  BoxShadow(
-                                    color: const Color(0xFF10B981).withOpacity(0.35),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: Center(
-                          child: Text(
-                            group,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: _orderGroup == group ? FontWeight.w800 : FontWeight.w600,
-                              color: _orderGroup == group ? Colors.white : const Color(0xFF475569),
-                            ),
-                          ),
-                        ),
-                      ),
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Order activity',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
                     ),
                   ),
+                  OrderPeriodDropdown(
+                    value: _orderPeriod,
+                    onChanged: (period) => setState(() {
+                      _orderPeriod = period;
+                      _todayOnly = false;
+                      _selectedOrders.clear();
+                    }),
+                  ),
                 ],
-              ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final group in <(String, String)>[
+                    ('Active', 'Active'),
+                    ('Attempted', 'Delivery Attempted'),
+                    ('Completed', 'Delivered'),
+                    ('Cancelled', 'Cancelled'),
+                  ]) ...[
+                    if (group.$1 != 'Active') const SizedBox(width: 6),
+                    ChoiceChip(
+                      label: Text(
+                        '${group.$1} (${_orderGroupCount(group.$2)})',
+                      ),
+                      selected: _orderGroup == group.$1,
+                      onSelected: (_) => _showOrders(group.$2),
+                      showCheckmark: false,
+                      selectedColor: const Color(0xFFE4F5EB),
+                      side: BorderSide(
+                        color: _orderGroup == group.$1
+                            ? const Color(0xFF9CD8B2)
+                            : const Color(0xFFE0E8E3),
+                      ),
+                      labelStyle: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: _orderGroup == group.$1
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                        color: _orderGroup == group.$1
+                            ? const Color(0xFF087A50)
+                            : const Color(0xFF475569),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -1491,15 +1505,20 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     );
   }
 
+  int _orderGroupCount(String status) =>
+      (_stageCounts[status] as num?)?.toInt() ?? 0;
+
   String get _orderGroup => _orderFilter == 'Cancelled'
       ? 'Cancelled'
+      : _orderFilter == 'Delivery Attempted'
+      ? 'Attempted'
       : [
           'Delivered',
           'Delivered Today',
           'Cash Handover Complete',
           'Pending Handover',
         ].contains(_orderFilter)
-      ? 'Delivered'
+      ? 'Completed'
       : 'Active';
 
   String _orderActionLabel(StoreOrder order) => switch (order.status) {

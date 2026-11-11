@@ -466,6 +466,7 @@ class StoreApi {
     String search = '',
     String? assigned,
     String? date,
+    String? period,
   }) => _page(
     employee
         ? '/delivery/orders/'
@@ -481,6 +482,7 @@ class StoreApi {
       if (search.isNotEmpty) 'search': search,
       if (assigned != null && assigned.isNotEmpty) 'assigned': assigned,
       'date': ?date,
+      if (admin && period != null && period.isNotEmpty) 'period': period,
       if (status != 'All') 'status': status,
       if (employee) 'scope': history ? 'completed' : 'active',
     },
