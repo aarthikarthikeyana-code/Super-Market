@@ -95,7 +95,7 @@ def dashboard_data(user):
         buckets = (
             scoped.annotate(bucket=truncation)
             .values('bucket')
-            .annotate(value=Sum('total_amount', filter=sales))
+            .annotate(value=Count('pk', filter=accepted))
             .order_by('bucket')
         )
         bucket_values = {}
@@ -109,7 +109,7 @@ def dashboard_data(user):
                 label = bucket.strftime('%d')
             else:
                 label = bucket.strftime('%b %y')
-            bucket_values[label] = str(row['value'] or Decimal('0.00'))
+            bucket_values[label] = row['value'] or 0
 
         if period == 'today':
             labels = [(start + timedelta(hours=hour)).strftime('%H:%M') for hour in range(24)]
@@ -132,7 +132,7 @@ def dashboard_data(user):
                     for offset in range(month_count)
                 ]
         points = [
-            {'label': label, 'value': bucket_values.get(label, '0.00')}
+            {'label': label, 'value': bucket_values.get(label, 0)}
             for label in labels
         ]
         chart_series[period] = points
@@ -182,7 +182,7 @@ def dashboard_data(user):
     details = orders.select_related('assigned_to').prefetch_related('items__product__image', 'events')
     stats.update({
         'generated_at': now, 'today': daily, 'period_stats': period_stats,
-        'sales_series': chart_series, 'total_customers': CustomerProfile.objects.count(),
+        'orders_series': chart_series, 'total_customers': CustomerProfile.objects.count(),
         'inventory': inventory, 'total_products': inventory['published'], 'low_stock': inventory['low_stock'],
         'alerts': alerts, 'team': team, 'team_preview': team_rows,
         'active_delivery_preview': OrderSerializer(details.filter(status='Out for Delivery').order_by('dispatched_at', 'pk')[:4], many=True).data,

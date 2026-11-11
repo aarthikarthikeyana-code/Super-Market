@@ -362,7 +362,7 @@ class _OperationsDashboardState extends ConsumerState<OperationsDashboard> {
                   const SizedBox(height: 16),
 
                   // 3. Agaram Sales Overview Weekly Bar Chart (Reference Screen 2)
-                  AgaramWeeklySalesChart(
+                  AgaramOrdersChart(
                     data: data,
                     period: _chartPeriod,
                     onPeriodChanged: (period) => setState(
