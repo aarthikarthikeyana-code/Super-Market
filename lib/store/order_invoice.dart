@@ -34,7 +34,7 @@ class OrderInvoiceScreen extends StatelessWidget {
                   backgroundColor: const Color(0xFF16A05D),
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  content: Text('Invoice #${order.shortId} downloaded successfully!'),
+                  content: Text('Invoice ${order.shortId} downloaded successfully!'),
                 ),
               );
             },
@@ -110,7 +110,7 @@ class OrderInvoiceScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '#${order.shortId}',
+                        order.shortId,
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
@@ -382,7 +382,7 @@ class OrderInvoiceScreen extends StatelessWidget {
                         backgroundColor: const Color(0xFF16A05D),
                         behavior: SnackBarBehavior.floating,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        content: Text('Invoice #${order.shortId} saved to your device.'),
+                        content: Text('Invoice ${order.shortId} saved to your device.'),
                       ),
                     );
                   },

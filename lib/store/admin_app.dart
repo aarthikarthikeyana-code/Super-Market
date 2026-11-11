@@ -16,6 +16,7 @@ import 'employee_picker.dart';
 import 'delivery_tracking.dart';
 import 'admin_dashboard.dart';
 import 'admin_pages.dart';
+import 'admin_reports.dart';
 
 class AdminConsoleScreen extends ConsumerStatefulWidget {
   const AdminConsoleScreen({super.key});
@@ -26,6 +27,7 @@ class AdminConsoleScreen extends ConsumerStatefulWidget {
 class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   bool _signedIn = false;
   int _tab = 0;
+  String _reportType = 'sales';
   String _orderFilter = 'Active', _orderSearch = '', _teamSearch = '';
   String _orderPeriod = 'all';
   bool _unassignedOnly = false, _todayOnly = false;
@@ -134,12 +136,13 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                     2 => _products(),
                     3 => OperationsDeliveryControl(
                       onOrder: _openOrder,
-                      onAssign: () => _showOrders('Unassigned'),
+                      onAssign: _assignDeliveryRider,
                     ),
                     4 => OperationsMore(onOpen: _openMore),
                     5 => _team(),
                     6 => OperationsCashControl(onReceive: _receiveCash),
-                    _ => OperationsReports(
+                    _ => AdminReportsScreen(
+                      reportType: _reportType,
                       onOrders: _showOrders,
                       onInventory: _showInventory,
                     ),
@@ -605,8 +608,11 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       setState(() => _tab = 6);
       return;
     }
-    if (action == 'reports') {
-      setState(() => _tab = 7);
+    if (action == 'reports' || action.startsWith('report_')) {
+      setState(() {
+        _reportType = action == 'reports' ? 'sales' : action.substring(7);
+        _tab = 7;
+      });
       return;
     }
     if (action == 'cancelled') {
@@ -831,7 +837,10 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     onTeam: () => setState(() => _tab = 5),
     onCash: () => setState(() => _tab = 6),
     onDelivery: () => setState(() => _tab = 3),
-    onReports: () => setState(() => _tab = 7),
+    onReports: () => setState(() {
+      _reportType = 'sales';
+      _tab = 7;
+    }),
     onOrder: _openOrder,
     onProduct: _editProduct,
     onReceiveCash: _receiveCash,
@@ -1210,20 +1219,18 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const AdminWorkflowBanner(
-              title: 'Manage orders',
-              subtitle: 'Prepare, pack and assign. Your team handles delivery.',
-              imageAsset: 'assets/images/admin_orders_banner.jpg',
-            ),
-            const SizedBox(height: 12),
             Padding(
-              padding: const EdgeInsets.only(top: 2),
+              padding: const EdgeInsets.only(top: 4, bottom: 10),
               child: Row(
                 children: [
                   const Expanded(
                     child: Text(
-                      'Order activity',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                      'Orders',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                      ),
                     ),
                   ),
                   OrderPeriodDropdown(
@@ -1237,46 +1244,6 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (final group in <(String, String)>[
-                    ('Active', 'Active'),
-                    ('Attempted', 'Delivery Attempted'),
-                    ('Completed', 'Delivered'),
-                    ('Cancelled', 'Cancelled'),
-                  ]) ...[
-                    if (group.$1 != 'Active') const SizedBox(width: 6),
-                    ChoiceChip(
-                      label: Text(
-                        '${group.$1} (${_orderGroupCount(group.$2)})',
-                      ),
-                      selected: _orderGroup == group.$1,
-                      onSelected: (_) => _showOrders(group.$2),
-                      showCheckmark: false,
-                      selectedColor: const Color(0xFFE4F5EB),
-                      side: BorderSide(
-                        color: _orderGroup == group.$1
-                            ? const Color(0xFF9CD8B2)
-                            : const Color(0xFFE0E8E3),
-                      ),
-                      labelStyle: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: _orderGroup == group.$1
-                            ? FontWeight.w800
-                            : FontWeight.w600,
-                        color: _orderGroup == group.$1
-                            ? const Color(0xFF087A50)
-                            : const Color(0xFF475569),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
             TextField(
               controller: _orderSearchInput,
               focusNode: _orderSearchFocus,
@@ -1296,6 +1263,60 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                 });
               },
             ),
+            const SizedBox(height: 10),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final groups = <(String, String)>[
+                  ('Active', 'Active'),
+                  ('Attempted', 'Delivery Attempted'),
+                  ('Completed', 'Delivered'),
+                  ('Cancelled', 'Cancelled'),
+                ];
+                const spacing = 7.0;
+                final columns = constraints.maxWidth < 520 ? 2 : 4;
+                final width =
+                    (constraints.maxWidth - spacing * (columns - 1)) / columns;
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
+                  children: [
+                    for (final group in groups)
+                      SizedBox(
+                        width: width,
+                        child: ChoiceChip(
+                          label: SizedBox(
+                            width: double.infinity,
+                            child: Text(
+                              '${group.$1} (${_orderGroupCount(group.$2)})',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          selected: _orderGroup == group.$1,
+                          onSelected: (_) => _showOrders(group.$2),
+                          showCheckmark: false,
+                          selectedColor: const Color(0xFFE4F5EB),
+                          side: BorderSide(
+                            color: _orderGroup == group.$1
+                                ? const Color(0xFF9CD8B2)
+                                : const Color(0xFFE0E8E3),
+                          ),
+                          labelStyle: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: _orderGroup == group.$1
+                                ? FontWeight.w800
+                                : FontWeight.w600,
+                            color: _orderGroup == group.$1
+                                ? const Color(0xFF087A50)
+                                : const Color(0xFF475569),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
             if (_assignmentEmployee != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -1305,72 +1326,16 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                 ),
               ),
             if (_orderGroup == 'Active') ...[
-              const SizedBox(height: 8),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (final stage in <(String, String)>[
-                      ('All active', 'Active'),
-                      ('New', 'New'),
-                      ('Preparing', 'Preparing'),
-                      ('Packed', 'Packed'),
-                      ('Assigned', 'Assigned'),
-                      ('On delivery', 'Out for Delivery'),
-                      ('Attempted', 'Delivery Attempted'),
-                      ('Delayed', 'Delayed'),
-                    ])
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(20),
-                          onTap: () => setState(() {
-                            _orderFilter = stage.$2;
-                            _selectedOrders.clear();
-                            _selectOrders = false;
-                          }),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                            decoration: BoxDecoration(
-                              gradient: _orderFilter == stage.$2
-                                  ? const LinearGradient(
-                                      colors: [Color(0xFF10B981), Color(0xFF047857)],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    )
-                                  : null,
-                              color: _orderFilter == stage.$2 ? null : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: _orderFilter == stage.$2
-                                    ? Colors.transparent
-                                    : const Color(0xFFDDE8E1),
-                              ),
-                              boxShadow: _orderFilter == stage.$2
-                                  ? [
-                                      BoxShadow(
-                                        color: const Color(0xFF10B981).withOpacity(0.3),
-                                        blurRadius: 6,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                            child: Text(
-                              _stageCounts.containsKey(stage.$2)
-                                  ? '${stage.$1} (${_stageCounts[stage.$2]})'
-                                  : stage.$1,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: _orderFilter == stage.$2 ? FontWeight.w800 : FontWeight.w600,
-                                color: _orderFilter == stage.$2 ? Colors.white : const Color(0xFF15211A),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: OrderStageDropdown(
+                  value: _orderFilter,
+                  counts: _stageCounts,
+                  onChanged: (stage) => setState(() {
+                    _orderFilter = stage;
+                    _selectedOrders.clear();
+                    _selectOrders = false;
+                  }),
                 ),
               ),
               Wrap(
@@ -1383,14 +1348,6 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                     onSelected: (value) => setState(() {
                       _unassignedOnly = value;
                       _orderFilter = 'Active';
-                      _selectedOrders.clear();
-                    }),
-                  ),
-                  FilterChip(
-                    label: const Text('Today'),
-                    selected: _todayOnly,
-                    onSelected: (value) => setState(() {
-                      _todayOnly = value;
                       _selectedOrders.clear();
                     }),
                   ),
@@ -1634,6 +1591,32 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       return;
     }
     await _openOrder(order);
+  }
+
+  Future<void> _assignDeliveryRider(StoreOrder order) async {
+    if (_quickOrderId != null ||
+        order.status != 'Packed' ||
+        order.data['assigned_to'] != null) {
+      return;
+    }
+    final employee = await showAdminEmployeePicker(context);
+    if (employee == null || !mounted) return;
+    setState(() => _quickOrderId = order.id);
+    try {
+      await ref.read(storeApiProvider).updateOrder(order.id, {
+        'assigned_to': employee['id'],
+      });
+      if (mounted) {
+        refreshCommerce(ref);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${employee['name']} assigned to ${order.shortId}.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) showStoreError(context, e);
+    } finally {
+      if (mounted) setState(() => _quickOrderId = null);
+    }
   }
 
   Future<void> _assignSelected() async {
@@ -4160,9 +4143,9 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '#${_order.shortId}',
+                              _order.shortId,
                             style: const TextStyle(
-                              fontSize: 16,
+                                fontSize: 13,
                               fontWeight: FontWeight.w900,
                               color: Color(0xFF0F172A),
                             ),

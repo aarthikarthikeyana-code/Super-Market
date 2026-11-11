@@ -663,14 +663,14 @@ class OperationsMore extends StatelessWidget {
                     opsInfo,
                     opsInfoBg,
                     [
-                      ('Sales reports', 'reports', Icons.bar_chart),
-                      ('Order reports', 'reports', Icons.receipt_long_outlined),
+                      ('Sales reports', 'report_sales', Icons.bar_chart),
+                      ('Order reports', 'report_orders', Icons.receipt_long_outlined),
                       (
                         'Inventory reports',
-                        'reports',
+                        'report_inventory',
                         Icons.inventory_outlined,
                       ),
-                      ('Delivery reports', 'reports', Icons.route),
+                      ('Delivery reports', 'report_delivery', Icons.route),
                     ],
                   ),
                   (
@@ -715,7 +715,7 @@ class OperationsMore extends StatelessWidget {
 
 class OperationsDeliveryControl extends ConsumerStatefulWidget {
   final void Function(StoreOrder) onOrder;
-  final VoidCallback onAssign;
+  final void Function(StoreOrder) onAssign;
   const OperationsDeliveryControl({
     super.key,
     required this.onOrder,
@@ -740,55 +740,33 @@ class _OperationsDeliveryControlState
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Delivery Management',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 2, 18, 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: widget.onAssign,
-                  icon: const Icon(Icons.person_add_alt_1_outlined, size: 16),
-                  label: const Text('Assign employee'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF33483B),
-                    side: const BorderSide(color: Color(0xFFDDE8E1)),
-                    padding: const EdgeInsets.symmetric(vertical: 9),
-                    textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              const Expanded(
+                child: Text(
+                  'Delivery Management',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0F172A),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => Navigator.push<void>(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => LiveDeliveryMonitorScreen(
-                        onOrder: widget.onOrder,
-                      ),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.push<void>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => LiveDeliveryMonitorScreen(
+                      onOrder: widget.onOrder,
                     ),
                   ),
-                  icon: const Icon(Icons.my_location_rounded, size: 16),
-                  label: const Text('Live riders'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF087A50),
-                    side: const BorderSide(color: Color(0xFFD2EBDD)),
-                    padding: const EdgeInsets.symmetric(vertical: 9),
-                    textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
+                ),
+                icon: const Icon(Icons.my_location_rounded, size: 15),
+                label: const Text('Live riders'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF087A50),
+                  side: const BorderSide(color: Color(0xFFD2EBDD)),
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+                  textStyle: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
                 ),
               ),
             ],
@@ -809,54 +787,75 @@ class _OperationsDeliveryControlState
               ),
             ],
           ),
-          child: Row(
-            children: [
-              for (final tab in [
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final tabs = [
                 ('Ready to assign', 'Ready to Assign'),
                 ('Assigned', 'Assigned'),
-                ('On Delivery', 'Out for Delivery'),
+                ('On delivery', 'Out for Delivery'),
                 ('Needs retry', 'Delivery Attempted'),
-              ])
-                Expanded(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: () => setState(() => _stage = tab.$2),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        gradient: _stage == tab.$2
-                            ? const LinearGradient(
-                                colors: [Color(0xFF10B981), Color(0xFF047857)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              )
-                            : null,
-                        color: _stage == tab.$2 ? null : Colors.transparent,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: _stage == tab.$2
-                            ? [
-                                BoxShadow(
-                                  color: const Color(0xFF10B981).withOpacity(0.35),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Center(
-                        child: Text(
-                          tab.$1,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: _stage == tab.$2 ? FontWeight.w800 : FontWeight.w600,
-                            color: _stage == tab.$2 ? Colors.white : const Color(0xFF475569),
+              ];
+              const spacing = 8.0;
+              final columns = constraints.maxWidth < 520 ? 2 : 4;
+              final width =
+                  (constraints.maxWidth - spacing * (columns - 1)) / columns;
+              return Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
+                children: [
+                  for (final tab in tabs)
+                    SizedBox(
+                      width: width,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => setState(() => _stage = tab.$2),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          height: 40,
+                          padding: const EdgeInsets.symmetric(horizontal: 7),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            gradient: _stage == tab.$2
+                                ? const LinearGradient(
+                                    colors: [Color(0xFF10B981), Color(0xFF047857)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  )
+                                : null,
+                            color: _stage == tab.$2 ? null : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: _stage == tab.$2
+                                ? [
+                                    BoxShadow(
+                                      color: const Color(0xFF10B981).withOpacity(0.22),
+                                      blurRadius: 7,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: Text(
+                            tab.$1,
+                            maxLines: 1,
+                            softWrap: false,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: _stage == tab.$2
+                                  ? FontWeight.w800
+                                  : FontWeight.w600,
+                              color: _stage == tab.$2
+                                  ? Colors.white
+                                  : const Color(0xFF475569),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-            ],
+                ],
+              );
+            },
           ),
         ),
         Expanded(
@@ -881,6 +880,9 @@ class _OperationsDeliveryControlState
             itemBuilder: (_, order, _) => DeliveryPreviewCard(
               order: order,
               onTap: () => widget.onOrder(order),
+              onAssign: _stage == 'Ready to Assign'
+                  ? () => widget.onAssign(order)
+                  : null,
             ),
           ),
         ),
@@ -953,6 +955,100 @@ class OrderPeriodDropdown extends StatelessWidget {
       ),
     ),
   );
+}
+
+class OrderStageDropdown extends StatelessWidget {
+  final String value;
+  final Map<String, dynamic> counts;
+  final ValueChanged<String> onChanged;
+
+  const OrderStageDropdown({
+    super.key,
+    required this.value,
+    required this.counts,
+    required this.onChanged,
+  });
+
+  static const _stages = <(String, String)>[
+    ('All active', 'Active'),
+    ('New', 'New'),
+    ('Preparing', 'Preparing'),
+    ('Packed', 'Packed'),
+    ('Assigned', 'Assigned'),
+    ('On delivery', 'Out for Delivery'),
+    ('Attempted', 'Delivery Attempted'),
+    ('Delayed', 'Delayed'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = _stages.firstWhere(
+      (stage) => stage.$2 == value,
+      orElse: () => _stages.first,
+    );
+    final count = (counts[selected.$2] as num?)?.toInt();
+    return PopupMenuButton<String>(
+      initialValue: value,
+      onSelected: onChanged,
+      position: PopupMenuPosition.under,
+      offset: const Offset(0, 6),
+      color: Colors.white,
+      surfaceTintColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Color(0xFFE1E9E4)),
+      ),
+      itemBuilder: (context) => _stages
+          .map(
+            (stage) => PopupMenuItem<String>(
+              value: stage.$2,
+              child: Row(
+                children: [
+                  Expanded(child: Text(stage.$1)),
+                  Text(
+                    '${(counts[stage.$2] as num?)?.toInt() ?? 0}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF75847C),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 38),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(color: const Color(0xFFDDE7E1)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.tune_rounded, size: 15, color: Color(0xFF52645A)),
+            const SizedBox(width: 7),
+            Text(
+              '${selected.$1}${count == null ? '' : ' · $count'}',
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF33483B),
+              ),
+            ),
+            const SizedBox(width: 3),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 17,
+              color: Color(0xFF52645A),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class LiveDeliveryMonitorScreen extends ConsumerWidget {
@@ -1167,12 +1263,11 @@ class OperationsReports extends ConsumerWidget {
                     width: w,
                     child: AgaramStatCard(
                       label: 'Total Sales',
-                      value: opsMoney(data['revenue'] ?? 248320),
+                      value: opsMoney(data['revenue']),
                       icon: Icons.currency_rupee_rounded,
                       color: const Color(0xFF0F7645),
                       background: const Color(0xFFECFDF5),
                       border: const Color(0xFFA7F3D0),
-                      growth: '12%',
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1180,26 +1275,24 @@ class OperationsReports extends ConsumerWidget {
                     width: w,
                     child: AgaramStatCard(
                       label: 'Total Orders',
-                      value: '${data['orders_placed'] ?? 520}',
+                      value: '${data['orders_placed'] ?? '—'}',
                       icon: Icons.shopping_bag_outlined,
                       color: const Color(0xFF10B981),
                       background: const Color(0xFFE8F7EE),
                       border: const Color(0xFFC7EBD4),
-                      growth: '15%',
                       onTap: () => onOrders('All'),
                     ),
                   ),
                   const SizedBox(width: 8),
                   SizedBox(
                     width: w,
-                    child: const AgaramStatCard(
+                    child: AgaramStatCard(
                       label: 'New Customers',
-                      value: '186',
+                      value: '${data['total_customers'] ?? '—'}',
                       icon: Icons.person_add_alt_1_rounded,
-                      color: Color(0xFF2563EB),
-                      background: Color(0xFFEFF6FF),
-                      border: Color(0xFFBFDBFE),
-                      growth: '20%',
+                      color: const Color(0xFF2563EB),
+                      background: const Color(0xFFEFF6FF),
+                      border: const Color(0xFFBFDBFE),
                     ),
                   ),
                 ],
@@ -1251,57 +1344,79 @@ class OperationsReports extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 18),
-                // Trend Area Graph Visualization
-                SizedBox(
-                  height: 110,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      for (final point in [
-                        ('Week 1', 0.40, '₹55k'),
-                        ('Week 2', 0.65, '₹82k'),
-                        ('Week 3', 0.50, '₹68k'),
-                        ('Week 4', 0.95, '₹1.1L'),
-                      ])
-                        Expanded(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0F7645),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  point.$3,
-                                  style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w800, color: Colors.white),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Container(
-                                width: 28,
-                                height: 65 * point.$2,
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFF10B981), Color(0xFF047857)],
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                point.$1,
-                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
-                              ),
-                            ],
+                Builder(
+                  builder: (context) {
+                    final series = Map<String, dynamic>.from(
+                      data['revenue_series'] ?? const {},
+                    );
+                    final points = List<Map<String, dynamic>>.from(
+                      series['month'] ?? const [],
+                    );
+                    final values = points
+                        .map((point) => amount(point['value']))
+                        .toList();
+                    final maxValue = values.fold<double>(
+                      0,
+                      (max, value) => value > max ? value : max,
+                    );
+                    final stride = points.length <= 6
+                        ? 1
+                        : (points.length / 6).ceil();
+                    final shown = [
+                      for (var index = 0; index < points.length; index++)
+                        if (index % stride == 0 || index == points.length - 1)
+                          points[index],
+                    ];
+                    if (maxValue <= 0) {
+                      return const SizedBox(
+                        height: 110,
+                        child: Center(
+                          child: Text(
+                            'No sales recorded this month',
+                            style: TextStyle(fontSize: 11, color: opsMuted),
                           ),
                         ),
-                    ],
-                  ),
+                      );
+                    }
+                    return SizedBox(
+                      height: 110,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          for (final point in shown)
+                            Expanded(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Container(
+                                    width: 20,
+                                    height: 65 * amount(point['value']) / maxValue,
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [Color(0xFF34D399), Color(0xFF047857)],
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                      ),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '${point['label'] ?? ''}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -1334,45 +1449,48 @@ class OperationsReports extends ConsumerWidget {
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
                     ),
                     Text(
-                      'Revenue share',
+                      'Published products',
                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
                     ),
                   ],
                 ),
                 const SizedBox(height: 14),
-                for (final cat in [
-                  ('Rice & Grains · அரிசி', 0.28, '28%', Color(0xFF0F7645)),
-                  ('Dals & Pulses · பருப்பு', 0.22, '22%', Color(0xFFD97706)),
-                  ('Oils & Pure Ghee · எண்ணெய்', 0.18, '18%', Color(0xFFEA580C)),
-                  ('Spices & Masalas · மசாலா', 0.12, '12%', Color(0xFFDC2626)),
-                  ('Tea & Coffee · பானங்கள்', 0.08, '8%', Color(0xFF7C3AED)),
-                ]) ...[
+                if ((data['inventory_categories'] as List? ?? const []).isEmpty)
+                  const Text(
+                    'No published categories',
+                    style: TextStyle(fontSize: 11, color: opsMuted),
+                  )
+                else
+                  for (final category in List<Map<String, dynamic>>.from(
+                    data['inventory_categories'],
+                  ))
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(cat.$1, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-                            Text(cat.$3, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: cat.$4)),
-                          ],
+                        Expanded(
+                          child: Text(
+                            '${category['category'] ?? 'Uncategorized'}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
                         ),
-                        const SizedBox(height: 5),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: LinearProgressIndicator(
-                            value: cat.$2,
-                            minHeight: 7,
-                            backgroundColor: cat.$4.withOpacity(0.12),
-                            valueColor: AlwaysStoppedAnimation<Color>(cat.$4),
+                        Text(
+                          '${category['products'] ?? 0}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F7645),
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
               ],
             ),
           ),

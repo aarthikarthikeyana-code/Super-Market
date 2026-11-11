@@ -909,13 +909,14 @@ class AdminOrderCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        '#${order.shortId}',
+                        order.shortId,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12.5,
                           color: Color(0xFF0F172A),
+                          letterSpacing: 0.2,
                         ),
                       ),
                     ),

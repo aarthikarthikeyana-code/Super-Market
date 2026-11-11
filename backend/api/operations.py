@@ -79,9 +79,14 @@ def dashboard_data(user):
         period_stats[period] = {
             'orders': totals['orders'] or 0,
             'sales': str(totals['sales'] or Decimal('0.00')),
+            'completed': scoped.filter(accepted & Q(status='Delivered')).count(),
+            'attempted': scoped.filter(accepted & Q(status='Delivery Attempted')).count(),
+            'cancelled': scoped.filter(status='Cancelled').count(),
+            'out_for_delivery': scoped.filter(accepted & Q(status='Out for Delivery')).count(),
         }
 
     chart_series = {}
+    revenue_series = {}
     chart_configs = {
         'today': (start, end, TruncHour('created_at', tzinfo=timezone.get_current_timezone())),
         'week': (week_start, week_start + timedelta(days=7), TruncDate('created_at', tzinfo=timezone.get_current_timezone())),
@@ -95,10 +100,14 @@ def dashboard_data(user):
         buckets = (
             scoped.annotate(bucket=truncation)
             .values('bucket')
-            .annotate(value=Count('pk', filter=accepted))
+            .annotate(
+                value=Count('pk', filter=accepted),
+                revenue=Sum('total_amount', filter=sales),
+            )
             .order_by('bucket')
         )
         bucket_values = {}
+        bucket_revenue = {}
         for row in buckets:
             bucket = row['bucket']
             if period == 'today':
@@ -110,6 +119,7 @@ def dashboard_data(user):
             else:
                 label = bucket.strftime('%b %y')
             bucket_values[label] = row['value'] or 0
+            bucket_revenue[label] = str(row['revenue'] or Decimal('0.00'))
 
         if period == 'today':
             labels = [(start + timedelta(hours=hour)).strftime('%H:%M') for hour in range(24)]
@@ -136,6 +146,10 @@ def dashboard_data(user):
             for label in labels
         ]
         chart_series[period] = points
+        revenue_series[period] = [
+            {'label': label, 'value': bucket_revenue.get(label, '0.00')}
+            for label in labels
+        ]
 
     products = Product.objects.exclude(category__iregex=PRODUCE_CATEGORY_PATTERN).select_related('image')
     inventory = products.aggregate(
@@ -144,6 +158,17 @@ def dashboard_data(user):
         out_of_stock=Count('pk', filter=Q(is_active=True) & (Q(stock_kg__lte=0) | Q(is_in_stock=False))),
         recently_updated=Count('pk', filter=Q(updated_at__gte=start, updated_at__lt=end)),
     )
+    inventory_categories = list(
+        products.filter(is_active=True)
+        .values('category')
+        .annotate(products=Count('pk'))
+        .order_by('-products', 'category')[:8]
+    )
+    for period, (period_start, period_end) in period_ranges.items():
+        updated = products
+        if period_start is not None:
+            updated = updated.filter(updated_at__gte=period_start, updated_at__lt=period_end)
+        period_stats[period]['inventory_updates'] = updated.count()
     people = DeliveryPersonnel.objects.select_related('user').annotate(
         active_jobs=Count('assigned_orders', filter=Q(assigned_orders__customer__isnull=False) & ~Q(assigned_orders__status__in=['Delivered', 'Cancelled'])),
         road_jobs=Count('assigned_orders', filter=Q(assigned_orders__customer__isnull=False, assigned_orders__status='Out for Delivery')),
@@ -182,7 +207,9 @@ def dashboard_data(user):
     details = orders.select_related('assigned_to').prefetch_related('items__product__image', 'events')
     stats.update({
         'generated_at': now, 'today': daily, 'period_stats': period_stats,
-        'orders_series': chart_series, 'total_customers': CustomerProfile.objects.count(),
+        'orders_series': chart_series, 'revenue_series': revenue_series,
+        'inventory_categories': inventory_categories,
+        'total_customers': CustomerProfile.objects.count(),
         'inventory': inventory, 'total_products': inventory['published'], 'low_stock': inventory['low_stock'],
         'alerts': alerts, 'team': team, 'team_preview': team_rows,
         'active_delivery_preview': OrderSerializer(details.filter(status='Out for Delivery').order_by('dispatched_at', 'pk')[:4], many=True).data,

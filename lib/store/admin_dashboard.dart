@@ -897,10 +897,12 @@ class _SmallMetric extends StatelessWidget {
 class DeliveryPreviewCard extends StatelessWidget {
   final StoreOrder order;
   final VoidCallback onTap;
+  final VoidCallback? onAssign;
   const DeliveryPreviewCard({
     super.key,
     required this.order,
     required this.onTap,
+    this.onAssign,
   });
 
   @override
@@ -914,6 +916,8 @@ class DeliveryPreviewCard extends StatelessWidget {
     final address = '${order.data['delivery_address'] ?? ''}'.trim();
     final deliveryNote = '${order.data['delivery_note'] ?? ''}'.trim();
     final isDelivered = order.status == 'Delivered';
+    final waitingAssignment =
+      order.status == 'Packed' && order.data['assigned_to'] == null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -945,12 +949,12 @@ class DeliveryPreviewCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      '#${order.shortId.toUpperCase()}',
+                      order.shortId.toUpperCase(),
                       style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12.5,
                         color: Color(0xFF0F172A),
-                        letterSpacing: -0.3,
+                        letterSpacing: 0.2,
                       ),
                     ),
                     AdminStatusBadge(order.status),
@@ -1031,8 +1035,10 @@ class DeliveryPreviewCard extends StatelessWidget {
                                 color: Color(0xFF16A05D),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(
-                                Icons.two_wheeler_rounded,
+                              child: Icon(
+                                waitingAssignment
+                                    ? Icons.person_add_alt_1_rounded
+                                    : Icons.two_wheeler_rounded,
                                 color: Colors.white,
                                 size: 20,
                               ),
@@ -1045,6 +1051,8 @@ class DeliveryPreviewCard extends StatelessWidget {
                                   Text(
                                     name.isNotEmpty
                                         ? name
+                                        : waitingAssignment
+                                        ? 'Waiting for rider assignment'
                                         : 'Delivery employee not recorded',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -1056,7 +1064,7 @@ class DeliveryPreviewCard extends StatelessWidget {
                                   ),
                                   if (address.isNotEmpty)
                                     Text(
-                                      address,
+                                      'Drop-off · $address',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
@@ -1084,6 +1092,29 @@ class DeliveryPreviewCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (onAssign != null) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: onAssign,
+                        icon: const Icon(Icons.person_add_alt_1_rounded, size: 17),
+                        label: const Text('Assign rider'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF087A50),
+                          side: const BorderSide(color: Color(0xFFBFE4CD)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          textStyle: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ],
             ),
