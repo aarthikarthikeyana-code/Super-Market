@@ -34,6 +34,7 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
   final _code = TextEditingController(), _password = TextEditingController();
   final _form = GlobalKey<FormState>();
   bool _signedIn = false, _busy = false, _history = false;
+  bool _obscurePassword = true;
   late final StoreApi _api;
   int _tab = 0;
   String? _error;
@@ -110,6 +111,154 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
     }
   }
 
+  Future<void> _showChangePasswordDialog() async {
+    final oldCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    bool obscureOld = true;
+    bool obscureNew = true;
+    bool obscureConfirm = true;
+    String? errorMsg;
+    bool saving = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: storeGlassMint,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.lock_reset_rounded, color: storeGreen, size: 22),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Change Password',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Set a new password for your employee account.',
+                  style: TextStyle(fontSize: 12, color: storeGrey),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: oldCtrl,
+                  obscureText: obscureOld,
+                  decoration: InputDecoration(
+                    labelText: 'Current password',
+                    prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureOld ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 19),
+                      onPressed: () => setDialogState(() => obscureOld = !obscureOld),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: newCtrl,
+                  obscureText: obscureNew,
+                  decoration: InputDecoration(
+                    labelText: 'New password',
+                    prefixIcon: const Icon(Icons.vpn_key_outlined, size: 20),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureNew ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 19),
+                      onPressed: () => setDialogState(() => obscureNew = !obscureNew),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmCtrl,
+                  obscureText: obscureConfirm,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm new password',
+                    prefixIcon: const Icon(Icons.check_circle_outline, size: 20),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 19),
+                      onPressed: () => setDialogState(() => obscureConfirm = !obscureConfirm),
+                    ),
+                  ),
+                ),
+                if (errorMsg != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    errorMsg!,
+                    style: const TextStyle(color: Color(0xFFDC2626), fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: storeGreen),
+              onPressed: saving
+                  ? null
+                  : () async {
+                      final n = newCtrl.text.trim();
+                      final c = confirmCtrl.text.trim();
+                      if (n.length < 4) {
+                        setDialogState(() => errorMsg = 'Password must be at least 4 characters.');
+                        return;
+                      }
+                      if (n != c) {
+                        setDialogState(() => errorMsg = 'New passwords do not match.');
+                        return;
+                      }
+                      setDialogState(() {
+                        saving = true;
+                        errorMsg = null;
+                      });
+                      try {
+                        await _api.deliveryChangePassword(n, oldPassword: oldCtrl.text.trim());
+                        if (!mounted) return;
+                        Navigator.pop(ctx);
+                        await showSmoothSuccessDialog(
+                          context: context,
+                          title: 'Password Updated! 🔒',
+                          message: 'Your employee login password has been changed successfully. Use it on your next login.',
+                          icon: Icons.check_circle_outline,
+                          iconColor: const Color(0xFF16A34A),
+                        );
+                      } catch (e) {
+                        setDialogState(() {
+                          saving = false;
+                          errorMsg = e.toString().replaceAll('Exception: ', '').replaceAll('FormatException: ', '');
+                        });
+                      }
+                    },
+              child: saving
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('Save Password'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: !_signedIn,
@@ -136,6 +285,11 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
           ),
           actions: [
             if (_signedIn) ...[
+              IconButton(
+                tooltip: 'Change password',
+                onPressed: _showChangePasswordDialog,
+                icon: const Icon(Icons.key_rounded),
+              ),
               IconButton(
                 tooltip: 'Refresh work',
                 onPressed: () => refreshDelivery(ref),
@@ -196,9 +350,21 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
                           TextFormField(
                             controller: _password,
                             enabled: !_busy,
-                            obscureText: true,
+                            obscureText: _obscurePassword,
                             keyboardType: TextInputType.visiblePassword,
-                            decoration: InputDecoration(labelText: 'Password'),
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              suffixIcon: IconButton(
+                                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                  color: const Color(0xFF64748B),
+                                  size: 20,
+                                ),
+                              ),
+                            ),
                             validator: (v) => (v?.isEmpty ?? true)
                                 ? 'Enter your password'
                                 : null,
@@ -271,12 +437,53 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Hello, ${summary['employee']['name']}',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Hello, ${summary['employee']['name']}',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: _showChangePasswordDialog,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: storeGreen.withOpacity(0.3)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: storeGreen.withOpacity(0.06),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.lock_reset_rounded, size: 15, color: storeGreen),
+                          SizedBox(width: 4),
+                          Text(
+                            'Change Password',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: storeGreen,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
               Text(
@@ -564,6 +771,65 @@ class _DeliveryOrderState extends ConsumerState<DeliveryOrderScreen> {
         ref.read(deliveryTrackerProvider).finish(order.id);
       }
       refreshDelivery(ref);
+      if (status == 'Delivered' && mounted) {
+        await showSmoothSuccessDialog(
+          context: context,
+          title: 'Delivery Completed! 🎉',
+          message: 'Order has been delivered successfully to customer doorstep.',
+          icon: Icons.check_circle_rounded,
+          iconColor: const Color(0xFF0F7645),
+          iconBg: const Color(0xFFE8F7EE),
+          customContent: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Order', style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                    Text(
+                      order.shortId,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF0F7645)),
+                    ),
+                  ],
+                ),
+                const Divider(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Customer', style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                    Text(
+                      '${order.data['customer_name'] ?? 'Customer'}',
+                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                    ),
+                  ],
+                ),
+                if (order.paymentStatus == 'cod') ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Cash Collected', style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                      Text(
+                        money(order.total),
+                        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, color: Color(0xFF0F7645)),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          buttonText: 'Back to Deliveries',
+        );
+        if (mounted) Navigator.pop(context);
+      }
     } catch (e) {
       if (mounted) showStoreError(context, e);
       if (mounted) await _reload();

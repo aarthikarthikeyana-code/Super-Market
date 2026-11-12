@@ -34,12 +34,20 @@ class DeliveryAddressData extends ChangeNotifier {
   Map<String, dynamic> get value => {
     'delivery_mode': mode,
     'detected_address': detectedAddress,
-    'address_line1': mode == 'manual' ? line1.text.trim() : (line1.text.trim().isNotEmpty ? line1.text.trim() : detectedAddress),
+    'address_line1': mode == 'manual'
+        ? line1.text.trim()
+        : (line1.text.trim().isNotEmpty
+            ? line1.text.trim()
+            : (detectedAddress.isNotEmpty ? detectedAddress : 'Doorstep GPS delivery')),
     'address_line2': mode == 'manual' ? line2.text.trim() : line2.text.trim(),
-    'pincode': pincode.text.trim(),
-    'city': city.text.trim(),
-    'state': state.text.trim(),
-    'landmark': landmark.text.trim(),
+    'pincode': (pincode.text.trim().isNotEmpty && RegExp(r'^[1-9][0-9]{5}$').hasMatch(pincode.text.trim()))
+        ? pincode.text.trim()
+        : '636001',
+    'city': city.text.trim().isNotEmpty ? city.text.trim() : 'Salem',
+    'state': state.text.trim().isNotEmpty ? state.text.trim() : 'Tamil Nadu',
+    'landmark': landmark.text.trim().isNotEmpty
+        ? landmark.text.trim()
+        : (detectedAddress.isNotEmpty ? detectedAddress : 'Near delivery location'),
     if (pin != null) ...{
       'latitude': pin!.latitude.toStringAsFixed(6),
       'longitude': pin!.longitude.toStringAsFixed(6),
@@ -50,12 +58,7 @@ class DeliveryAddressData extends ChangeNotifier {
 
   String get formatted {
     if (mode != 'manual' && detectedAddress.isNotEmpty) {
-      return [
-        '📍 $detectedAddress',
-        if (landmark.text.trim().isNotEmpty) 'Landmark: ${landmark.text.trim()}',
-        if (city.text.trim().isNotEmpty) city.text.trim(),
-        if (pincode.text.trim().isNotEmpty) pincode.text.trim(),
-      ].where((s) => s.isNotEmpty).join(', ');
+      return '📍 $detectedAddress';
     }
     return [
       line1.text.trim(),
@@ -597,7 +600,7 @@ class _StructuredAddressFieldsState
         ),
         const SizedBox(height: 18),
 
-        // ONLY SHOW ADDRESS 1 & ADDRESS 2 WHEN USER CHOOSES MANUAL ADDRESS
+        // ONLY SHOW MANUAL INPUT FIELDS (ADDRESS, PINCODE, CITY) WHEN USER CHOOSES MANUAL MODE
         if (isManual) ...[
           _field(a.line1, 'Address 1', hint: 'House / flat number and street'),
           _field(
@@ -606,84 +609,81 @@ class _StructuredAddressFieldsState
             hint: 'Apartment, building or area',
             optional: true,
           ),
-        ],
-
-        // Pincode with lookup
-        TextFormField(
-          controller: a.pincode,
-          enabled: widget.enabled,
-          keyboardType: TextInputType.number,
-          maxLength: 6,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          decoration: InputDecoration(
-            labelText: 'Pincode',
-            helperText: _looking ? 'Looking up city and state...' : _postalHint,
-            helperMaxLines: 3,
-            suffixIcon: _looking
-                ? const Padding(
-                    padding: EdgeInsets.all(14),
-                    child: SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                : const Icon(Icons.local_post_office_outlined),
-          ),
-          onChanged: (_) => a.edited(),
-          validator: (s) => !RegExp(r'^[1-9][0-9]{5}$').hasMatch(s ?? '')
-              ? 'Enter a 6-digit Indian PIN'
-              : _notFound == s
-              ? 'PIN was not found. Check the number.'
-              : null,
-        ),
-        if (_offices.length > 1)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              onPressed: !widget.enabled
-                  ? null
-                  : () async {
-                      final office = await showModalBottomSheet<String>(
-                        context: context,
-                        showDragHandle: true,
-                        builder: (ctx) => SafeArea(
-                          child: ListView(
-                            shrinkWrap: true,
-                            children: [
-                              const Padding(
-                                padding: EdgeInsets.all(16),
-                                child: Text(
-                                  'Choose your postal area',
-                                  style: TextStyle(fontWeight: FontWeight.w800),
-                                ),
-                              ),
-                              for (final office in _offices)
-                                ListTile(
-                                  title: Text(office),
-                                  onTap: () => Navigator.pop(ctx, office),
-                                ),
-                            ],
-                          ),
-                        ),
-                      );
-                      if (office != null && mounted) {
-                        a.city.text = office;
-                        a.edited();
-                      }
-                    },
-              child: const Text('Choose a postal area for this PIN'),
+          // Pincode with lookup (Manual mode only)
+          TextFormField(
+            controller: a.pincode,
+            enabled: widget.enabled,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(
+              labelText: 'Pincode',
+              helperText: _looking ? 'Looking up city and state...' : _postalHint,
+              helperMaxLines: 3,
+              suffixIcon: _looking
+                  ? const Padding(
+                      padding: EdgeInsets.all(14),
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : const Icon(Icons.local_post_office_outlined),
             ),
+            onChanged: (_) => a.edited(),
+            validator: (s) => !RegExp(r'^[1-9][0-9]{5}$').hasMatch(s ?? '')
+                ? 'Enter a 6-digit Indian PIN'
+                : _notFound == s
+                ? 'PIN was not found. Check the number.'
+                : null,
           ),
-        const SizedBox(height: 8),
-        _field(
-          a.city,
-          'City / town',
-          hint: 'Check the postal suggestion and edit if needed',
-          maxLength: 80,
-        ),
-        _field(a.state, 'State', maxLength: 80),
-        if (isManual)
+          if (_offices.length > 1)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: !widget.enabled
+                    ? null
+                    : () async {
+                        final office = await showModalBottomSheet<String>(
+                          context: context,
+                          showDragHandle: true,
+                          builder: (ctx) => SafeArea(
+                            child: ListView(
+                              shrinkWrap: true,
+                              children: [
+                                const Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Text(
+                                    'Choose your postal area',
+                                    style: TextStyle(fontWeight: FontWeight.w800),
+                                  ),
+                                ),
+                                for (final office in _offices)
+                                  ListTile(
+                                    title: Text(office),
+                                    onTap: () => Navigator.pop(ctx, office),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                        if (office != null && mounted) {
+                          a.city.text = office;
+                          a.edited();
+                        }
+                      },
+                child: const Text('Choose a postal area for this PIN'),
+              ),
+            ),
+          const SizedBox(height: 8),
+          _field(
+            a.city,
+            'City / town',
+            hint: 'Check the postal suggestion and edit if needed',
+            maxLength: 80,
+          ),
+          _field(a.state, 'State', maxLength: 80),
           _field(
             a.landmark,
             'Landmark',
@@ -691,6 +691,7 @@ class _StructuredAddressFieldsState
             maxLength: 160,
             optional: true,
           ),
+        ],
       ],
     );
   }
@@ -792,21 +793,6 @@ class _StructuredAddressFieldsState
       ),
     );
   }
-}
-
-class _PinTailClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    final path = Path();
-    path.moveTo(0, 0);
-    path.lineTo(size.width, 0);
-    path.lineTo(size.width / 2, size.height);
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
 
 class ZomatoLocationPickerModal extends StatefulWidget {
@@ -949,8 +935,8 @@ class _ZomatoLocationPickerModalState extends State<ZomatoLocationPickerModal> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
+                urlTemplate: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                subdomains: const ['0', '1', '2', '3'],
                 userAgentPackageName: 'com.agaram.supermarket',
               ),
             ],
@@ -1090,12 +1076,12 @@ class _ZomatoLocationPickerModalState extends State<ZomatoLocationPickerModal> {
                           size: 20,
                         ),
                       ),
-                      ClipPath(
-                        clipper: _PinTailClipper(),
-                        child: Container(
-                          width: 12,
-                          height: 8,
-                          color: const Color(0xFFC61C2C),
+                      Transform.translate(
+                        offset: const Offset(0, -6),
+                        child: const Icon(
+                          Icons.arrow_drop_down_rounded,
+                          color: Color(0xFFC61C2C),
+                          size: 26,
                         ),
                       ),
                     ],

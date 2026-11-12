@@ -22,6 +22,7 @@ urlpatterns = [
     path('orders/<str:order_id>/cancel/', views.cancel_checkout),
     path('delivery/login/', views.employee_login),
     path('delivery/logout/', views.employee_logout),
+    path('delivery/change-password/', views.employee_change_password),
     path('delivery/dashboard/', views.employee_dashboard),
     path('delivery/orders/', views.employee_orders),
     path('delivery/receipts/', views.employee_receipts),

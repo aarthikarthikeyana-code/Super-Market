@@ -123,6 +123,146 @@ void showStoreError(BuildContext context, Object error) {
   );
 }
 
+Future<void> showSmoothSuccessDialog({
+  required BuildContext context,
+  required String title,
+  required String message,
+  IconData icon = Icons.check_circle_rounded,
+  Color iconColor = const Color(0xFF0F7645),
+  Color iconBg = const Color(0xFFE8F7EE),
+  String? badgeText,
+  Widget? customContent,
+  String buttonText = 'Done',
+  VoidCallback? onConfirm,
+}) {
+  return showDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    builder: (ctx) => Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 28,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.fromLTRB(22, 26, 22, 22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Glowing animated-style icon avatar
+            Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                color: iconBg,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: iconColor.withOpacity(0.2),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Icon(
+                  icon,
+                  color: iconColor,
+                  size: 36,
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            // Title
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF0F172A),
+                height: 1.25,
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Subtitle
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 12.5,
+                color: Color(0xFF64748B),
+                height: 1.45,
+              ),
+            ),
+            if (badgeText != null) ...[
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Text(
+                  badgeText,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+            ],
+            if (customContent != null) ...[
+              const SizedBox(height: 16),
+              customContent,
+            ],
+            const SizedBox(height: 22),
+            // Confirmation Button
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F7645),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  if (onConfirm != null) onConfirm();
+                },
+                child: Text(
+                  buttonText,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class DataView<T> extends StatelessWidget {
   final AsyncValue<T> value;
   final Widget Function(T) builder;

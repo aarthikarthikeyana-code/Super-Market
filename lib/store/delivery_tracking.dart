@@ -429,9 +429,9 @@ class _DeliveryTrackingCardState extends ConsumerState<DeliveryTrackingCard> {
                     urlTemplate: const String.fromEnvironment(
                       'MAP_TILE_URL',
                       defaultValue:
-                          'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+                          'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
                     ),
-                    subdomains: const ['a', 'b', 'c', 'd'],
+                    subdomains: const ['0', '1', '2', '3'],
                     userAgentPackageName: 'com.agaram.supermarket',
                   ),
                   if (locations.length >= 2)

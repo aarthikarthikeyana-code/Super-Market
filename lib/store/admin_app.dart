@@ -46,6 +46,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   Timer? _searchDebounce, _teamDebounce;
   Timer? _poll;
   late final StoreApi _api;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   @override
   void initState() {
     super.initState();
@@ -128,6 +129,8 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
         child: !_signedIn
             ? AdminSignInScreen(onSuccess: _loginSuccess)
             : Scaffold(
+                key: _scaffoldKey,
+                drawer: _buildAdminDrawer(context),
                 appBar: _header(),
                 body: AdminCanvas(
                   child: switch (_tab) {
@@ -157,6 +160,461 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     );
   }
 
+  Widget _buildAdminDrawer(BuildContext context) {
+    final snapshot = ref.watch(adminDashboardProvider);
+    final data = snapshot.asData?.value;
+    final team = data?['team'] as Map<String, dynamic>?;
+    final totalEmployees = data?['team']?['total'] ??
+        ((team?['available'] as num? ?? 0) +
+         (team?['on_delivery'] as num? ?? 0) +
+         (team?['inactive'] as num? ?? 0) +
+         (team?['needs_verification'] as num? ?? 0));
+    final pendingOrdersCount = data?['pending_orders'] ?? (data?['stages']?['pending'] ?? (data?['stages']?['active'] ?? 0));
+    final cashToHandover = amount(data?['cash']?['to_handover'] ?? data?['cash_to_handover'] ?? 0);
+
+    return Drawer(
+      backgroundColor: const Color(0xFFF8FAFC),
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Header card
+            Container(
+              margin: const EdgeInsets.fromLTRB(14, 12, 14, 16),
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFE8F7EE), Color(0xFFD6F2E2)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                border: Border.all(color: Colors.white, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0F7645).withOpacity(0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF0F7645).withOpacity(0.1),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.storefront_rounded,
+                              color: Color(0xFF0F7645),
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                'AGARAM',
+                                style: TextStyle(
+                                  color: Color(0xFF0F7645),
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.5,
+                                  fontSize: 18,
+                                ),
+                              ),
+                              Text(
+                                'ADMIN CONSOLE',
+                                style: TextStyle(
+                                  color: Color(0xFF1E3A2F),
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.8,
+                                  fontSize: 9,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      InkWell(
+                        onTap: () => Navigator.pop(context),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            color: Color(0xFF334155),
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.white, width: 1.2),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: const Color(0xFFE8F7EE),
+                          child: const Text(
+                            'A',
+                            style: TextStyle(
+                              color: Color(0xFF0F7645),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                'Agaram Administrator',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Store Operations',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF64748B),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDCFCE7),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            '● Live',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF166534),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Menu Items List
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                children: [
+                  _adminDrawerItem(
+                    icon: Icons.trending_up_rounded,
+                    iconColor: const Color(0xFF0F7645),
+                    iconBg: const Color(0xFFE8F7EE),
+                    title: 'Sales Report',
+                    subtitle: 'Sales analytics, trends & revenue',
+                    isSelected: _tab == 7 && _reportType == 'sales',
+                    onTap: () {
+                      Navigator.pop(context);
+                      setState(() {
+                        _reportType = 'sales';
+                        _tab = 7;
+                      });
+                    },
+                  ),
+                  _adminDrawerItem(
+                    icon: Icons.pie_chart_outline_rounded,
+                    iconColor: const Color(0xFF2563EB),
+                    iconBg: const Color(0xFFEFF6FF),
+                    title: 'Order Report',
+                    subtitle: 'Fulfillment & volume reports',
+                    isSelected: _tab == 7 && _reportType == 'orders',
+                    onTap: () {
+                      Navigator.pop(context);
+                      setState(() {
+                        _reportType = 'orders';
+                        _tab = 7;
+                      });
+                    },
+                  ),
+                  _adminDrawerItem(
+                    icon: Icons.people_alt_rounded,
+                    iconColor: const Color(0xFF7C3AED),
+                    iconBg: const Color(0xFFF5F3FF),
+                    title: 'Employees',
+                    subtitle: 'Staff list, reset passwords & access',
+                    badge: totalEmployees > 0 ? '$totalEmployees' : null,
+                    badgeColor: const Color(0xFF7C3AED),
+                    isSelected: _tab == 5,
+                    onTap: () {
+                      Navigator.pop(context);
+                      setState(() => _tab = 5);
+                    },
+                  ),
+                  _adminDrawerItem(
+                    icon: Icons.hourglass_top_rounded,
+                    iconColor: const Color(0xFFD97706),
+                    iconBg: const Color(0xFFFFFBEB),
+                    title: 'Pending Orders',
+                    subtitle: 'All active undelivered orders',
+                    badge: pendingOrdersCount > 0 ? '$pendingOrdersCount' : null,
+                    badgeColor: const Color(0xFFD97706),
+                    isSelected: _tab == 1 && _orderFilter == 'Active',
+                    onTap: () {
+                      Navigator.pop(context);
+                      setState(() {
+                        _orderFilter = 'Active';
+                        _tab = 1;
+                      });
+                    },
+                  ),
+                  _adminDrawerItem(
+                    icon: Icons.payments_rounded,
+                    iconColor: const Color(0xFF059669),
+                    iconBg: const Color(0xFFECFDF5),
+                    title: 'COD Handover',
+                    subtitle: 'Collect cash held by delivery staff',
+                    badge: cashToHandover > 0 ? money(cashToHandover) : null,
+                    badgeColor: const Color(0xFF059669),
+                    isSelected: _tab == 6,
+                    onTap: () {
+                      Navigator.pop(context);
+                      setState(() => _tab = 6);
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            // Logout Footer
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+              child: InkWell(
+                onTap: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      title: const Text('Logout Admin?'),
+                      content: const Text('Are you sure you want to sign out from the Admin Console?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Cancel'),
+                        ),
+                        FilledButton(
+                          style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Logout'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    if (context.mounted) Navigator.pop(context);
+                    await _logout();
+                  }
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFFECACA)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(Icons.logout_rounded, color: Color(0xFFDC2626), size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Logout',
+                        style: TextStyle(
+                          color: Color(0xFFDC2626),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _adminDrawerItem({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required String title,
+    required String subtitle,
+    String? badge,
+    Color? badgeColor,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: isSelected ? Colors.white : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        border: isSelected ? Border.all(color: const Color(0xFFB9E6CE), width: 1.5) : null,
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: const Color(0xFF0F7645).withOpacity(0.06),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ]
+            : null,
+      ),
+      child: ListTile(
+        onTap: onTap,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        leading: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: iconBg,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: iconColor, size: 20),
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+            color: isSelected ? const Color(0xFF0F7645) : const Color(0xFF0F172A),
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(
+            fontSize: 11,
+            color: Color(0xFF64748B),
+          ),
+        ),
+        trailing: badge != null
+            ? Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: (badgeColor ?? const Color(0xFF0F7645)).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  badge,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: badgeColor ?? const Color(0xFF0F7645),
+                  ),
+                ),
+              )
+            : const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8), size: 18),
+      ),
+    );
+  }
+
+  Future<void> _toggleEmployeeActive(Map<String, dynamic> person) async {
+    final bool currentlyActive = person['is_active'] == true;
+    final String name = person['name'] ?? 'this employee';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(
+              currentlyActive ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+              color: currentlyActive ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+            ),
+            const SizedBox(width: 8),
+            Text(currentlyActive ? 'Remove Employee?' : 'Reactivate Employee?'),
+          ],
+        ),
+        content: Text(
+          currentlyActive
+              ? 'Are you sure you want to remove / deactivate $name? Once deactivated, they will NOT be able to log in or deliver any orders.'
+              : 'Do you want to reactivate $name? They will be allowed to log in and accept deliveries again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: currentlyActive ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(currentlyActive ? 'Deactivate' : 'Reactivate'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await ref.read(storeApiProvider).savePerson({'is_active': !currentlyActive}, id: person['id']);
+      ref.read(storeApiProvider).feedChanges.value++;
+      ref.invalidate(deliveryTeamProvider);
+      ref.invalidate(adminDashboardProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(currentlyActive ? '$name has been deactivated and cannot log in.' : '$name has been reactivated.'),
+            backgroundColor: currentlyActive ? const Color(0xFF991B1B) : const Color(0xFF166534),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) showStoreError(context, e);
+    }
+  }
+
   PreferredSizeWidget _header() {
     final snapshot = ref.watch(adminDashboardProvider);
     final data = snapshot.asData?.value;
@@ -168,8 +626,20 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       toolbarHeight: 60,
       title: Row(
         children: [
-          const AdminIcon(Icons.storefront_rounded, size: 34),
-          const SizedBox(width: 8),
+          InkWell(
+            onTap: () => _scaffoldKey.currentState?.openDrawer(),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F7EE),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFB9E6CE), width: 1.2),
+              ),
+              child: const AdminIcon(Icons.storefront_rounded, size: 26),
+            ),
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1479,12 +1949,12 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       : 'Active';
 
   String _orderActionLabel(StoreOrder order) => switch (order.status) {
-    'New' => 'Start Preparing',
-    'Preparing' => 'Mark Packed',
+    'New' => '1. Accept & Prepare',
+    'Preparing' => '2. Mark Packed',
     'Packed' =>
       order.data['assigned_to'] == null
-          ? 'Assign Employee'
-          : 'Waiting for pickup',
+          ? '3. Assign Partner 🛵'
+          : '4. Handover & Start Delivery 🚀',
     'Out for Delivery' => 'Track delivery',
     'Delivered' =>
       order.paymentStatus == 'collected' &&
@@ -1578,6 +2048,20 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       }
       return;
     }
+    if (order.status == 'Packed' && order.data['assigned_to'] != null) {
+      setState(() => _quickOrderId = order.id);
+      try {
+        await ref.read(storeApiProvider).updateOrder(order.id, {
+          'status': 'Out for Delivery',
+        });
+        if (mounted) refreshCommerce(ref);
+      } catch (e) {
+        if (mounted) showStoreError(context, e);
+      } finally {
+        if (mounted) setState(() => _quickOrderId = null);
+      }
+      return;
+    }
     if (_orderActionLabel(order) == 'Receive cash' &&
         order.data['assigned_to'] != null) {
       try {
@@ -1608,8 +2092,14 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       });
       if (mounted) {
         refreshCommerce(ref);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${employee['name']} assigned to ${order.shortId}.')),
+        await showSmoothSuccessDialog(
+          context: context,
+          title: 'Order Assigned Successfully! 🛵',
+          message: 'Order ${order.shortId} is now assigned to ${employee['name']} for delivery.',
+          icon: Icons.delivery_dining_rounded,
+          iconColor: const Color(0xFF0F7645),
+          iconBg: const Color(0xFFE8F7EE),
+          buttonText: 'Done',
         );
       }
     } catch (e) {
@@ -1833,7 +2323,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                 TextButton.icon(
                   onPressed: () => _editPerson(p),
                   icon: const Icon(Icons.person_outline, size: 16),
-                  label: const Text('Profile', style: TextStyle(fontSize: 11)),
+                  label: const Text('Edit / Password', style: TextStyle(fontSize: 11)),
                 ),
                 TextButton.icon(
                   onPressed: p['ready_for_deliveries'] == true
@@ -1850,6 +2340,28 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                   label: const Text(
                     'Receive cash',
                     style: TextStyle(fontSize: 11),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () => _toggleEmployeeActive(p),
+                  icon: Icon(
+                    p['is_active'] == true
+                        ? Icons.person_off_outlined
+                        : Icons.person_add_alt_1_outlined,
+                    size: 16,
+                    color: p['is_active'] == true
+                        ? const Color(0xFFDC2626)
+                        : const Color(0xFF16A34A),
+                  ),
+                  label: Text(
+                    p['is_active'] == true ? 'Remove' : 'Reactivate',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: p['is_active'] == true
+                          ? const Color(0xFFDC2626)
+                          : const Color(0xFF16A34A),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
@@ -2214,97 +2726,6 @@ class _AdminSignInState extends ConsumerState<AdminSignInScreen> {
                           height: 50,
                           onPressed: _busy ? null : _login,
                           label: Text(_busy ? 'Signing in…' : 'Login'),
-                        ),
-                        const SizedBox(height: 18),
-
-                        // Or divider (Screen 1)
-                        const Row(
-                          children: [
-                            Expanded(child: Divider(color: Color(0xFFE2E8F0))),
-                            Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 10),
-                              child: Text(
-                                'or',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  color: Color(0xFF94A3B8),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            Expanded(child: Divider(color: Color(0xFFE2E8F0))),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Social Buttons (Screen 1)
-                        OutlinedButton(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Google Workspace SSO is configured for internal staff.')),
-                            );
-                          },
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(44),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            side: const BorderSide(color: Color(0xFFE2E8F0)),
-                            backgroundColor: const Color(0xFFF8FAFC),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'G',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFFEA4335),
-                                ),
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                'Continue with Google',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF334155),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        OutlinedButton(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Apple ID Sign-in is available on iOS app.')),
-                            );
-                          },
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(44),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            side: const BorderSide(color: Color(0xFFE2E8F0)),
-                            backgroundColor: const Color(0xFFF8FAFC),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.apple, size: 19, color: Color(0xFF0F172A)),
-                              SizedBox(width: 8),
-                              Text(
-                                'Continue with Apple',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF334155),
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
                       ],
                     ),
@@ -3980,6 +4401,17 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
   }
 
   Future<void> _advance() async {
+    if (_order.status == 'Packed' && (_person == null || _personName.isEmpty)) {
+      final employee = await showAdminEmployeePicker(context);
+      if (employee != null && mounted) {
+        setState(() {
+          _person = employee['id'];
+          _personName = employee['name'];
+        });
+        await _update();
+      }
+      return;
+    }
     final next = _order.nextStatus;
     if (next == 'Delivered') {
       final extra = await showDialog<Map<String, dynamic>>(
@@ -4076,18 +4508,24 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
                     onPressed: _busy ? null : _advance,
                     icon: Icon(
                       _order.status == 'New'
-                          ? Icons.shopping_bag_outlined
-                          : Icons.inventory_2_outlined,
-                      size: 19,
+                          ? Icons.check_circle_outline_rounded
+                          : _order.status == 'Preparing'
+                              ? Icons.inventory_2_outlined
+                              : (_person == null || _personName.isEmpty)
+                                  ? Icons.person_add_alt_1_rounded
+                                  : Icons.local_shipping_rounded,
+                      size: 20,
                     ),
                     label: Text(
                       _busy
                           ? 'Updating…'
                           : _order.status == 'New'
-                              ? 'Accept & Start Preparing'
+                              ? '1. Accept & Start Preparing'
                               : _order.status == 'Preparing'
-                                  ? 'Items Checked · Mark Packed'
-                                  : 'Update Order Status',
+                                  ? '2. Items Checked · Mark Packed'
+                                  : (_person == null || _personName.isEmpty)
+                                      ? '3. Assign Delivery Partner 🛵'
+                                      : '4. Handover & Start Delivery 🚀',
                     ),
                   ),
                 ),

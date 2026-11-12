@@ -919,6 +919,20 @@ def employee_logout(request):
     return Response(status=204)
 
 
+@api_view(['POST'])
+@permission_classes([IsDeliveryEmployee])
+def employee_change_password(request):
+    old_password = request.data.get('old_password', '')
+    new_password = request.data.get('new_password', '')
+    if not isinstance(new_password, str) or len(new_password) < 4:
+        raise ValidationError({'detail': 'New password must be at least 4 characters.'})
+    if old_password and not request.user.check_password(old_password):
+        raise ValidationError({'detail': 'Current password is incorrect.'})
+    request.user.set_password(new_password)
+    request.user.save(update_fields=['password'])
+    return Response({'detail': 'Password changed successfully.'})
+
+
 @api_view(['GET'])
 @permission_classes([IsDeliveryEmployee])
 def employee_dashboard(request):

@@ -32,6 +32,7 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
   final Map<String, GlobalKey<FormFieldState<String>>> _fieldKeys = {};
   Map<String, dynamic>? _person;
   bool _busy = false, _active = true, _consent = false, _verified = false;
+  bool _obscurePassword = true;
   String _vehicle = 'bicycle', _idType = '', _kind = 'identity';
   int _setupStep = 0;
   final _scroll = ScrollController();
@@ -149,12 +150,70 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
         _fields['password']!.clear();
       });
       ref.invalidate(deliveryTeamProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Employee ${person['employee_code']} saved. Login uses this ID or mobile number and the employee password.',
+      await showSmoothSuccessDialog(
+        context: context,
+        title: 'Employee Saved Successfully! 👤',
+        message: 'Delivery partner profile is registered. Login credentials have been generated.',
+        icon: Icons.badge_rounded,
+        iconColor: const Color(0xFF0F7645),
+        iconBg: const Color(0xFFE8F7EE),
+        customContent: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Employee Code', style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F7EE),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${person['employee_code']}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F7645),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Name', style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                  Text(
+                    '${person['name']}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Login Mobile', style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                  Text(
+                    '${person['phone']}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
+        buttonText: 'Done',
       );
     } catch (e) {
       if (mounted) showStoreError(context, e);
@@ -315,7 +374,7 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
       key: _fieldKeys[key],
       controller: _fields[key],
       enabled: !_busy,
-      obscureText: secret,
+      obscureText: secret ? _obscurePassword : false,
       maxLines: lines,
       maxLength: phone ? 10 : length,
       inputFormatters: phone
@@ -331,7 +390,21 @@ class _EmployeeEditorState extends ConsumerState<EmployeeEditorScreen> {
           : key == 'email'
           ? TextInputType.emailAddress
           : TextInputType.text,
-      decoration: InputDecoration(labelText: required ? '$label *' : label),
+      decoration: InputDecoration(
+        labelText: required ? '$label *' : label,
+        suffixIcon: secret
+            ? IconButton(
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                icon: Icon(
+                  _obscurePassword
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  color: const Color(0xFF64748B),
+                  size: 20,
+                ),
+              )
+            : null,
+      ),
       validator: (value) {
         final v = value?.trim() ?? '';
         if (required && v.isEmpty) return 'Enter $label';

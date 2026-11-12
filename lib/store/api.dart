@@ -775,6 +775,18 @@ class StoreApi {
     }
   }
 
+  Future<void> deliveryChangePassword(String newPassword, {String? oldPassword}) async {
+    await request(
+      'POST',
+      '/delivery/change-password/',
+      body: {
+        'new_password': newPassword,
+        if (oldPassword != null && oldPassword.isNotEmpty) 'old_password': oldPassword,
+      },
+      employee: true,
+    );
+  }
+
   Future<Map<String, dynamic>> deliveryDashboard() async =>
       Map<String, dynamic>.from(
         await request('GET', '/delivery/dashboard/', employee: true),
