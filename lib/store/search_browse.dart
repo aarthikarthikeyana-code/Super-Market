@@ -299,19 +299,33 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     return Scaffold(
       backgroundColor: storeCream,
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            // Top App Bar with large input
-            _buildSearchHeader(),
+            Column(
+              children: [
+                // Top App Bar with large input
+                _buildSearchHeader(),
 
-            // Content Area
-            Expanded(
-              child: _submitted
-                  ? _buildSearchResults()
-                  : _currentQuery.isNotEmpty
-                  ? _buildSuggestionsList()
-                  : _buildRecentAndPopularSearches(),
+                // Content Area
+                Expanded(
+                  child: _submitted
+                      ? _buildSearchResults()
+                      : _currentQuery.isNotEmpty
+                      ? _buildSuggestionsList()
+                      : _buildRecentAndPopularSearches(),
+                ),
+              ],
             ),
+            if (ref.watch(storeCartProvider).isNotEmpty)
+              Positioned(
+                bottom: 16,
+                left: 16,
+                right: 16,
+                child: FloatingCartBar(
+                  cart: ref.watch(storeCartProvider),
+                  onTap: () => Navigator.pop(context, true),
+                ),
+              ),
           ],
         ),
       ),
@@ -867,7 +881,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                   collection: _collection,
                 ),
                 identity: (p) => p.id,
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                padding: EdgeInsets.fromLTRB(16, 12, 16, cart.isEmpty ? 24 : 96),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: constraints.maxWidth > 700 ? 4 : 2,
                   mainAxisExtent: groceryProductCardExtent(
@@ -993,7 +1007,8 @@ mixin CatalogActions<T extends ConsumerStatefulWidget> on ConsumerState<T> {
 
 // The home page and browse rail share the same eleven illustrated departments.
 class BrowseGroceriesScreen extends ConsumerStatefulWidget {
-  const BrowseGroceriesScreen({super.key});
+  final bool isTab;
+  const BrowseGroceriesScreen({super.key, this.isTab = false});
   @override
   ConsumerState<BrowseGroceriesScreen> createState() => _BrowseGroceriesState();
 }
@@ -1008,36 +1023,9 @@ class _BrowseGroceriesState extends ConsumerState<BrowseGroceriesScreen>
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: storeCream,
-    appBar: AppBar(
-      title: const Text(
-        'Browse Groceries',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: storeForestGreen,
-          fontWeight: FontWeight.w900,
-          fontSize: 18,
-        ),
-      ),
-      actions: [
-        IconButton(
-          tooltip: 'Refresh catalog',
-          onPressed: _refresh,
-          icon: const Icon(Icons.refresh),
-        ),
-        IconButton(
-          tooltip: 'Search groceries',
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const SearchScreen()),
-          ),
-          icon: const Icon(Icons.search_rounded),
-        ),
-      ],
-    ),
-    body: LayoutBuilder(
+  Widget build(BuildContext context) {
+    final cart = ref.watch(storeCartProvider);
+    final content = LayoutBuilder(
       builder: (context, constraints) {
         final railWidth = (constraints.maxWidth * .25).clamp(80.0, 120.0);
         return Row(
@@ -1054,7 +1042,7 @@ class _BrowseGroceriesState extends ConsumerState<BrowseGroceriesScreen>
                     Expanded(
                       child: ListView.builder(
                         key: const ValueKey('browse-rail-list'),
-                        padding: const EdgeInsets.only(bottom: 12),
+                        padding: EdgeInsets.only(bottom: cart.isEmpty ? 12 : 90),
                         itemCount: homeGroceryCategories.length,
                         itemBuilder: (_, index) =>
                             _railEntry(homeGroceryCategories[index]),
@@ -1069,8 +1057,61 @@ class _BrowseGroceriesState extends ConsumerState<BrowseGroceriesScreen>
           ],
         );
       },
-    ),
-  );
+    );
+
+    if (widget.isTab) {
+      return Container(
+        color: storeCream,
+        child: content,
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: storeCream,
+      appBar: AppBar(
+        title: const Text(
+          'Categories',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: storeForestGreen,
+            fontWeight: FontWeight.w900,
+            fontSize: 18,
+          ),
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh catalog',
+            onPressed: _refresh,
+            icon: const Icon(Icons.refresh),
+          ),
+          IconButton(
+            tooltip: 'Search groceries',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SearchScreen()),
+            ),
+            icon: const Icon(Icons.search_rounded),
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          content,
+          if (cart.isNotEmpty)
+            Positioned(
+              bottom: 16,
+              left: 16,
+              right: 16,
+              child: FloatingCartBar(
+                cart: cart,
+                onTap: () => Navigator.pop(context, true),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   Widget _railEntry(Map<String, String>? category) {
     final selected = category?['query'] == _selectedDepartment?['query'];
@@ -1179,7 +1220,7 @@ class _BrowseGroceriesState extends ConsumerState<BrowseGroceriesScreen>
             ),
           ),
         ),
-        padding: const EdgeInsets.fromLTRB(8, 0, 8, 20),
+        padding: EdgeInsets.fromLTRB(8, 0, 8, cart.isEmpty ? 20 : 96),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
           mainAxisExtent: groceryProductCardExtent(

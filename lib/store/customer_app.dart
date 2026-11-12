@@ -244,13 +244,27 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
         ),
         body: _showCart
             ? _cartView(cart)
-            : switch (_tab) {
-                0 => _homeView(),
-                1 => _categoriesView(),
-                2 => _offersView(),
-                3 => _ordersView(),
-                _ => _accountView(),
-              },
+            : Stack(
+                children: [
+                  switch (_tab) {
+                    0 => _homeView(),
+                    1 => _categoriesView(),
+                    2 => _offersView(),
+                    3 => _ordersView(),
+                    _ => _accountView(),
+                  },
+                  if (cart.isNotEmpty && _tab != 3 && _tab != 4)
+                    Positioned(
+                      bottom: 16,
+                      left: 16,
+                      right: 16,
+                      child: FloatingCartBar(
+                        cart: cart,
+                        onTap: () => setState(() => _showCart = true),
+                      ),
+                    ),
+                ],
+              ),
         bottomNavigationBar: _showCart
             ? null
             : CustomerFloatingBottomNav(
@@ -481,17 +495,17 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                     ],
                   ),
                 ),
-                padding: EdgeInsets.fromLTRB(14, 0, 14, cart.isEmpty ? 24 : 96),
+                padding: EdgeInsets.fromLTRB(12, 0, 12, cart.isEmpty ? 24 : 96),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: constraints.maxWidth > 700 ? 4 : 2,
+                  crossAxisCount: constraints.maxWidth > 700 ? 5 : 3,
                   mainAxisExtent: groceryProductCardExtent(
                     context,
                     (constraints.maxWidth -
-                            28 -
-                            (constraints.maxWidth > 700 ? 3 : 1) * 10) /
-                        (constraints.maxWidth > 700 ? 4 : 2),
+                            24 -
+                            (constraints.maxWidth > 700 ? 4 : 2) * 12) /
+                        (constraints.maxWidth > 700 ? 5 : 3),
                   ),
-                  crossAxisSpacing: 10,
+                  crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                 ),
                 itemBuilder: (_, product, _) {
@@ -514,15 +528,6 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                 emptyTitle: 'No matching products',
                 emptyMessage:
                     'Try searching another grocery name or select another category.',
-              ),
-
-            // Floating View Cart Bar if cart has items
-            if (cart.isNotEmpty)
-              Positioned(
-                bottom: 16,
-                left: 16,
-                right: 16,
-                child: _floatingCartBar(cart),
               ),
           ],
         ),
@@ -550,10 +555,10 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
         ),
       );
     }
-    final crossAxisCount = constraints.maxWidth > 700 ? 4 : 2;
+    final crossAxisCount = constraints.maxWidth > 700 ? 5 : 3;
     final cardWidth = (constraints.maxWidth -
-            28 -
-            (crossAxisCount - 1) * 10) /
+            24 -
+            (crossAxisCount - 1) * 12) /
         crossAxisCount;
     final extent = groceryProductCardExtent(context, cardWidth);
 
@@ -565,7 +570,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
         mainAxisExtent: extent,
-        crossAxisSpacing: 10,
+        crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
       itemBuilder: (_, index) {
@@ -657,347 +662,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
   );
 
   Widget _categoriesView() {
-    final browse =
-        ref.watch(catalogBrowseProvider).asData?.value ?? <String, dynamic>{};
-    final allCats = [
-      ('All', Icons.grid_view_rounded, storeMint),
-      for (final entry in homeGroceryCategories)
-        (
-          groceryCategoryQuery(entry, catalogEntries(browse, 'categories')),
-          Icons.shopping_basket_outlined,
-          storeMint,
-        ),
-    ];
-
-    String? backendOrdering;
-    if (_categorySortBy == 'price_asc') backendOrdering = 'price';
-    if (_categorySortBy == 'price_desc') backendOrdering = '-price';
-
-    return Container(
-      color: const Color(0xFFFAFBF9),
-      child: Column(
-        children: [
-          // 1. Search Bar Header with Back Button (Matching reference screen)
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(6, 8, 16, 8),
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed: () => setState(() => _tab = 0),
-                  icon: const Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    color: Color(0xFF0F172A),
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Container(
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: const Color(0xFFE2E8F0),
-                        width: 1.2,
-                      ),
-                    ),
-                    child: TextField(
-                      controller: _searchInput,
-                      onChanged: (text) {
-                        _searchDebounce?.cancel();
-                        _searchDebounce = Timer(const Duration(milliseconds: 350), () {
-                          if (mounted) setState(() => _search = text.trim());
-                        });
-                      },
-                      textInputAction: TextInputAction.search,
-                      style: const TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF0F172A),
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Search groceries, brands ...',
-                        hintStyle: const TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 13.5,
-                        ),
-                        prefixIcon: const Icon(
-                          Icons.search_rounded,
-                          color: Color(0xFF0F7645),
-                          size: 22,
-                        ),
-                        suffixIcon: _searchInput.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(
-                                  Icons.clear_rounded,
-                                  color: Color(0xFF94A3B8),
-                                  size: 18,
-                                ),
-                                onPressed: () {
-                                  _searchInput.clear();
-                                  setState(() => _search = '');
-                                },
-                              )
-                            : null,
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 13,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // 2. Title & Sort/Filter Toolbar
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _search.isNotEmpty
-                        ? '"$_search"'
-                        : (_category == 'All' ? 'All' : _category),
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF0F172A),
-                      letterSpacing: -0.5,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
-                    backgroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                  ),
-                  icon: const Icon(
-                    Icons.swap_vert_rounded,
-                    size: 19,
-                    color: Color(0xFF0F7645),
-                  ),
-                  label: const Text(
-                    'Sort',
-                    style: TextStyle(
-                      color: Color(0xFF0F172A),
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
-                  ),
-                  onPressed: _openCategorySortDialog,
-                ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFE8F7EE),
-                    foregroundColor: const Color(0xFF0F7645),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: const BorderSide(color: Color(0xFFC7EBD4), width: 1.2),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                  ),
-                  icon: const Icon(
-                    Icons.tune_rounded,
-                    size: 18,
-                    color: Color(0xFF0F7645),
-                  ),
-                  label: const Text(
-                    'Filter',
-                    style: TextStyle(
-                      color: Color(0xFF0F7645),
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                    ),
-                  ),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => SearchScreen(initialCategory: _category),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          // 3. Quick Filter Chips
-          Container(
-            height: 44,
-            color: Colors.white,
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              scrollDirection: Axis.horizontal,
-              children: [
-                for (final chip in [
-                  'All',
-                  'Under ₹100',
-                  'Under ₹200',
-                  'In Stock',
-                ])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      showCheckmark: false,
-                      label: Text(chip),
-                      labelStyle: TextStyle(
-                        fontSize: 12,
-                        fontWeight: _activeCategoryQuickChip == chip
-                            ? FontWeight.w800
-                            : FontWeight.w600,
-                        color: _activeCategoryQuickChip == chip
-                            ? Colors.white
-                            : const Color(0xFF334155),
-                      ),
-                      selected: _activeCategoryQuickChip == chip,
-                      selectedColor: const Color(0xFF0A5C36),
-                      backgroundColor: const Color(0xFFF1F5F9),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                        side: BorderSide(
-                          color: _activeCategoryQuickChip == chip
-                              ? const Color(0xFF0A5C36)
-                              : const Color(0xFFE2E8F0),
-                          width: 1,
-                        ),
-                      ),
-                      onSelected: (_) => _applyCategoryQuickChip(chip),
-                    ),
-                  ),
-                // Additional Category Pills
-                for (int i = 1; i < allCats.length; i++) ...[
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      showCheckmark: false,
-                      label: Text(homeGroceryCategories[i - 1]['tamil']!),
-                      labelStyle: TextStyle(
-                        fontSize: 12,
-                        fontWeight: _category == allCats[i].$1
-                            ? FontWeight.w800
-                            : FontWeight.w600,
-                        color: _category == allCats[i].$1
-                            ? Colors.white
-                            : const Color(0xFF334155),
-                      ),
-                      selected: _category == allCats[i].$1,
-                      selectedColor: const Color(0xFF0A5C36),
-                      backgroundColor: const Color(0xFFF1F5F9),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                        side: BorderSide(
-                          color: _category == allCats[i].$1
-                              ? const Color(0xFF0A5C36)
-                              : const Color(0xFFE2E8F0),
-                          width: 1,
-                        ),
-                      ),
-                      onSelected: (_) {
-                        setState(() {
-                          _category =
-                              _category == allCats[i].$1 ? 'All' : allCats[i].$1;
-                        });
-                      },
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const Divider(color: Color(0xFFE2E8F0), height: 1),
-
-          // 4. Products Grid
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final api = ref.watch(storeApiProvider);
-                final cart = ref.watch(storeCartProvider);
-                final cartQuantityMap = {
-                  for (final l in cart) l.product.id: l.quantity,
-                };
-                final wishlistIds =
-                    ref.watch(wishlistIdsProvider).asData?.value ?? <String>[];
-
-                return PagedFeed<StoreProduct>(
-                  queryKey: (
-                    'category_view',
-                    _search,
-                    _category,
-                    _activeCategoryQuickChip,
-                    _categorySortBy,
-                  ),
-                  changes: api.feedChanges,
-                  load: (cursor) => api.productPage(
-                    cursor: cursor,
-                    search: _search,
-                    category: _category,
-                    minPrice: null,
-                    maxPrice: _categoryMaxPrice,
-                    inStock: _categoryInStockOnly,
-                    ordering: backendOrdering,
-                  ),
-                  identity: (p) => p.id,
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: constraints.maxWidth > 700 ? 4 : 2,
-                    mainAxisExtent: groceryProductCardExtent(
-                      context,
-                      (constraints.maxWidth -
-                              32 -
-                              (constraints.maxWidth > 700 ? 3 : 1) * 12) /
-                          (constraints.maxWidth > 700 ? 4 : 2),
-                    ),
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                  ),
-                  itemBuilder: (_, product, _) {
-                    final quantity = cartQuantityMap[product.id] ?? 0;
-                    final wishlisted = wishlistIds.contains(product.id);
-                    return ProductCard(
-                      product: product,
-                      cartQuantity: quantity,
-                      isWishlisted: wishlisted,
-                      onTap: () => _showProduct(product),
-                      onAddToCart: () => _addToCart(product),
-                      onIncrement: () =>
-                          ref.read(storeCartProvider.notifier).add(product),
-                      onDecrement: () => ref
-                          .read(storeCartProvider.notifier)
-                          .change(product.id, -1),
-                      onToggleWishlist: () => _toggleWishlist(product),
-                    );
-                  },
-                  emptyTitle: 'No items in this category',
-                  emptyMessage: 'Select another category to view products.',
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
+    return const BrowseGroceriesScreen(isTab: true);
   }
 
   // ===========================================================================
@@ -1018,7 +683,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
         beforeRefresh: api.clearPublicCache,
         load: (cursor) => api.productPage(cursor: cursor, collection: 'offers'),
         identity: (product) => product.id,
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        padding: EdgeInsets.fromLTRB(16, 12, 16, cart.isEmpty ? 24 : 96),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: columns,
           mainAxisExtent: groceryProductCardExtent(

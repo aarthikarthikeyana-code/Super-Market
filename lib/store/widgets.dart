@@ -2346,41 +2346,59 @@ class QuantitySelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = height < 30;
     return Container(
       height: height,
+      padding: EdgeInsets.symmetric(horizontal: isCompact ? 2 : 4),
       decoration: BoxDecoration(
         color: const Color(0xFF0A5C36),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(isCompact ? 8 : 14),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF0A5C36).withOpacity(0.25),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          IconButton(
-            icon: const Icon(Icons.remove, size: 15, color: Colors.white),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 28),
-            onPressed: onDecrement,
-          ),
-          Text(
-            '$quantity',
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 13,
-              color: Colors.white,
+          InkWell(
+            onTap: onDecrement,
+            borderRadius: BorderRadius.circular(4),
+            child: Padding(
+              padding: EdgeInsets.all(isCompact ? 2 : 4),
+              child: Icon(
+                Icons.remove,
+                size: isCompact ? 13 : 15,
+                color: Colors.white,
+              ),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.add, size: 15, color: Colors.white),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 28),
-            onPressed: onIncrement,
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: isCompact ? 4 : 6),
+            child: Text(
+              '$quantity',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: isCompact ? 11 : 13,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: onIncrement,
+            borderRadius: BorderRadius.circular(4),
+            child: Padding(
+              padding: EdgeInsets.all(isCompact ? 2 : 4),
+              child: Icon(
+                Icons.add,
+                size: isCompact ? 13 : 15,
+                color: Colors.white,
+              ),
+            ),
           ),
         ],
       ),
@@ -4020,11 +4038,11 @@ double groceryProductCardExtent(
   bool compact = false,
 }) {
   final imageHeight = compact
-      ? (cardWidth - 16).clamp(76.0, 180.0)
-      : (cardWidth - 20).clamp(104.0, 220.0);
+      ? (cardWidth - 12).clamp(55.0, 95.0)
+      : (cardWidth - 14).clamp(60.0, 105.0);
   final scale = MediaQuery.textScalerOf(context).scale(1);
-  final baseline = imageHeight + (compact ? 80 : 100) + (compact ? 74 : 86) * scale;
-  return baseline + (compact ? 14 : 18);
+  final baseline = imageHeight + 46 + (28 * scale);
+  return baseline + 12;
 }
 
 class PremiumProductCard extends StatelessWidget {
@@ -4053,8 +4071,8 @@ class PremiumProductCard extends StatelessWidget {
     builder: (context, constraints) {
       final scale = MediaQuery.textScalerOf(context).scale(1);
       final imageHeight = compact
-          ? (constraints.maxWidth - 16).clamp(76.0, 180.0)
-          : (constraints.maxWidth - 20).clamp(104.0, 220.0);
+          ? (constraints.maxWidth - 12).clamp(55.0, 95.0)
+          : (constraints.maxWidth - 14).clamp(60.0, 105.0);
       final title = product.tamilName.trim().isNotEmpty
           ? product.tamilName.trim()
           : product.name;
@@ -4072,16 +4090,16 @@ class PremiumProductCard extends StatelessWidget {
 
       return Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: homeDeepGreen.withOpacity(0.06),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
+              color: homeDeepGreen.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
             ),
             BoxShadow(
               color: Colors.black.withOpacity(0.02),
-              blurRadius: 4,
+              blurRadius: 3,
               offset: const Offset(0, 1),
             ),
           ],
@@ -4090,18 +4108,18 @@ class PremiumProductCard extends StatelessWidget {
           color: Colors.white,
           clipBehavior: Clip.antiAlias,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(16),
             side: BorderSide(
               color: cartQuantity > 0
                   ? homePrimaryGreen.withOpacity(0.55)
-                  : const Color(0xFFE4EDE7),
-              width: cartQuantity > 0 ? 1.5 : 1,
+                  : const Color(0xFFE8ECE9),
+              width: cartQuantity > 0 ? 1.4 : 0.8,
             ),
           ),
           child: InkWell(
             onTap: onTap,
             child: Padding(
-              padding: EdgeInsets.all(compact ? 8 : 10),
+              padding: EdgeInsets.all(compact ? 6 : 7),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -4109,7 +4127,7 @@ class PremiumProductCard extends StatelessWidget {
                   Stack(
                     children: [
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(12),
                         child: Container(
                           height: imageHeight,
                           width: double.infinity,
@@ -4117,14 +4135,14 @@ class PremiumProductCard extends StatelessWidget {
                             color: const Color(0xFFF8FAFC),
                             border: Border.all(
                               color: const Color(0xFFF1F5F9),
-                              width: 1,
+                              width: 0.8,
                             ),
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          padding: const EdgeInsets.all(8),
+                          padding: const EdgeInsets.all(4),
                           child: ProductPhoto(
                             product.imageUrl,
-                            height: imageHeight - 16,
+                            height: imageHeight - 8,
                             fit: BoxFit.contain,
                           ),
                         ),
@@ -4133,23 +4151,22 @@ class PremiumProductCard extends StatelessWidget {
                       // Discount Tag top-left
                       if (effectiveDiscount > 0)
                         Positioned(
-                          left: 6,
-                          top: 6,
+                          left: 4,
+                          top: 4,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 3.5,
+                              horizontal: 5,
+                              vertical: 2,
                             ),
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
                                 colors: [Color(0xFF0D8648), Color(0xFF065E32)],
                               ),
-                              borderRadius: BorderRadius.circular(7),
+                              borderRadius: BorderRadius.circular(5),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF0D8648)
-                                      .withOpacity(0.3),
-                                  blurRadius: 5,
+                                  color: const Color(0xFF0D8648).withOpacity(0.25),
+                                  blurRadius: 3,
                                   offset: const Offset(0, 1),
                                 ),
                               ],
@@ -4158,9 +4175,9 @@ class PremiumProductCard extends StatelessWidget {
                               '% OFF',
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 9,
+                                fontSize: 8,
                                 fontWeight: FontWeight.w900,
-                                letterSpacing: 0.3,
+                                letterSpacing: 0.2,
                               ),
                             ),
                           ),
@@ -4168,20 +4185,20 @@ class PremiumProductCard extends StatelessWidget {
 
                       // Wishlist Button top-right
                       Positioned(
-                        right: 6,
-                        top: 6,
+                        right: 4,
+                        top: 4,
                         child: GestureDetector(
                           onTap: onToggleWishlist,
                           child: Container(
-                            width: compact ? 30 : 34,
-                            height: compact ? 30 : 34,
+                            width: compact ? 26 : 28,
+                            height: compact ? 26 : 28,
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: Colors.white.withOpacity(0.9),
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.08),
-                                  blurRadius: 4,
+                                  color: Colors.black.withOpacity(0.06),
+                                  blurRadius: 3,
                                   offset: const Offset(0, 1),
                                 ),
                               ],
@@ -4192,82 +4209,91 @@ class PremiumProductCard extends StatelessWidget {
                                   : Icons.favorite_border_rounded,
                               color: isWishlisted
                                   ? const Color(0xFFE53935)
-                                  : const Color(0xFF64748B),
-                              size: compact ? 17 : 19,
+                                  : const Color(0xFF94A3B8),
+                              size: compact ? 15 : 16,
                             ),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: compact ? 6 : 9),
+                  const SizedBox(height: 5),
 
-                  // Tamil Product Title (2 lines)
-                  SizedBox(
-                    height: (compact ? 36 : 42) * scale,
-                    child: Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: 'NotoSansTamil',
-                        fontSize: compact ? 12.5 : 14.5,
-                        height: compact ? 1.3 : 1.35,
-                        fontWeight: FontWeight.w800,
-                        color: homeTextDark,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-
-                  // Unit Badge Pill (e.g. 1 kg)
+                  // Unit Badge Pill & Delivery Hint (JioMart compact style)
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       if (unitLabel.isNotEmpty)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
+                            horizontal: 4,
+                            vertical: 1,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF0F6F2),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: const Color(0xFFDAE8DF),
-                              width: 0.8,
-                            ),
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             unitLabel,
                             style: const TextStyle(
-                              fontSize: 10.5,
+                              fontSize: 9,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF2C5E45),
+                              color: Color(0xFF475569),
                             ),
                           ),
-                        ),
-                      if (!compact && product.brand.isNotEmpty) ...[
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            product.brand,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: homeTextMuted,
-                              fontWeight: FontWeight.w500,
+                        )
+                      else
+                        const SizedBox.shrink(),
+
+                      // Compact ADD button in top or action area (JioMart outline style)
+                      if (cartQuantity == 0)
+                        InkWell(
+                          onTap: product.available ? onAddToCart : null,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: product.available
+                                  ? Colors.white
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: product.available
+                                    ? const Color(0xFF0F7645)
+                                    : const Color(0xFFCBD5E1),
+                                width: 1.1,
+                              ),
+                            ),
+                            child: Text(
+                              product.available ? 'ADD' : 'Out',
+                              style: TextStyle(
+                                color: product.available
+                                    ? const Color(0xFF0F7645)
+                                    : const Color(0xFF94A3B8),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.2,
+                              ),
                             ),
                           ),
+                        )
+                      else
+                        QuantitySelector(
+                          height: 24,
+                          quantity: cartQuantity,
+                          onIncrement: onIncrement ?? onAddToCart,
+                          onDecrement: onDecrement ?? () {},
                         ),
-                      ],
                     ],
                   ),
-                  SizedBox(height: compact ? 6 : 8),
+                  const SizedBox(height: 3),
 
-                  // Price Row: Selling Price + Strikethrough MRP + Save badge
+                  // Price Row: Selling Price + Strikethrough MRP
                   SizedBox(
-                    height: (compact ? 22 : 26) * scale,
+                    height: 16 * scale,
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
@@ -4278,41 +4304,22 @@ class PremiumProductCard extends StatelessWidget {
                           Text(
                             priceText,
                             style: const TextStyle(
-                              fontSize: 18.5,
-                              height: 1.15,
+                              fontSize: 13.5,
+                              height: 1.1,
                               fontWeight: FontWeight.w900,
-                              color: Color(0xFF0F1D15),
-                              letterSpacing: -0.3,
+                              color: Color(0xFF0F172A),
+                              letterSpacing: -0.2,
                             ),
                           ),
-                          const SizedBox(width: 6),
                           if (effectiveMrp > sellingPrice) ...[
+                            const SizedBox(width: 4),
                             Text(
                               money(effectiveMrp),
                               style: const TextStyle(
-                                fontSize: 11.5,
-                                color: Color(0xFF8F9E96),
+                                fontSize: 9.5,
+                                color: Color(0xFF94A3B8),
                                 decoration: TextDecoration.lineThrough,
                                 fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 5,
-                                vertical: 1.5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE4F7EC),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'Save ${money(savings)}',
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  color: Color(0xFF087247),
-                                  fontWeight: FontWeight.w800,
-                                ),
                               ),
                             ),
                           ],
@@ -4320,55 +4327,58 @@ class PremiumProductCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  SizedBox(height: compact ? 8 : 10),
+                  const SizedBox(height: 2),
 
-                  // High-Conversion Modern ADD Button / Stepper
-                  SizedBox(
-                    height: compact ? 36 : 40,
-                    width: double.infinity,
-                    child: cartQuantity > 0
-                        ? QuantitySelector(
-                            height: compact ? 36 : 40,
-                            quantity: cartQuantity,
-                            onIncrement: onIncrement ?? onAddToCart,
-                            onDecrement: onDecrement ?? () {},
-                          )
-                        : InkWell(
-                            onTap: product.available ? onAddToCart : null,
-                            borderRadius: BorderRadius.circular(14),
-                            child: Container(
-                              height: compact ? 36 : 40,
-                              decoration: BoxDecoration(
-                                color: product.available
-                                    ? const Color(0xFF0A5C36)
-                                    : const Color(0xFFE2E7E4),
-                                borderRadius: BorderRadius.circular(14),
-                                boxShadow: product.available
-                                    ? [
-                                        BoxShadow(
-                                          color: const Color(0xFF0A5C36)
-                                              .withOpacity(0.25),
-                                          blurRadius: 6,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ]
-                                    : null,
-                              ),
-                              child: Center(
-                                child: Text(
-                                  product.available ? '+ ADD' : 'Out of stock',
-                                  style: TextStyle(
-                                    color: product.available
-                                        ? Colors.white
-                                        : const Color(0xFF7D8E84),
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.8,
-                                  ),
-                                ),
-                              ),
-                            ),
+                  // Tamil/English Product Title (Clean 1 line with ellipsis)
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: 'NotoSansTamil',
+                      fontSize: compact ? 9.5 : 10.2,
+                      height: 1.2,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+
+                  // Delivery speed / brand footnote (JioMart style)
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.bolt_rounded,
+                        size: 10,
+                        color: Color(0xFF0F7645),
+                      ),
+                      const SizedBox(width: 2),
+                      Expanded(
+                        child: Text(
+                          product.brand.isNotEmpty
+                              ? product.brand
+                              : '15 Mins',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F7645),
                           ),
+                        ),
+                      ),
+                    ],
+                  ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F7645),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -4563,3 +4573,90 @@ class CustomerFloatingBottomNav extends StatelessWidget {
     );
   }
 }
+
+/// Floating View Cart Bar shown whenever the cart has items
+class FloatingCartBar extends StatelessWidget {
+  final List<CartLine> cart;
+  final VoidCallback onTap;
+
+  const FloatingCartBar({
+    super.key,
+    required this.cart,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (cart.isEmpty) return const SizedBox.shrink();
+    final count = cart.fold(0, (s, l) => s + l.quantity);
+    final total = cart.fold<double>(0, (s, l) => s + l.total);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 14,
+        ),
+        decoration: BoxDecoration(
+          color: const Color(0xFF087247),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.4),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF087247).withOpacity(0.35),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.shopping_bag_outlined,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                '$count items · ${money(total)}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14.5,
+                ),
+              ),
+            ),
+            const Text(
+              'View Cart',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(
+              Icons.arrow_forward_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

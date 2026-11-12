@@ -218,7 +218,7 @@ def product_facets(products, field):
             for row in products.exclude(**{field: ''}).values(field).annotate(count=Count('pk'), photo=Subquery(photos[:1])).order_by(field)]
 
 
-def get_top_sales_products(limit=10):
+def get_top_sales_products(limit=12):
     from datetime import timedelta
     from django.utils import timezone
     from django.db.models import Sum
@@ -306,7 +306,7 @@ def get_top_sales_products(limit=10):
     return [products_by_id[pid] for pid in selected_ids if pid in products_by_id][:limit]
 
 
-def get_new_launch_products(limit=10):
+def get_new_launch_products(limit=12):
     catalog = commerce.grocery_products().select_related('image')
     return list(catalog.order_by('-updated_at', '-id')[:limit])
 
@@ -327,8 +327,8 @@ def browse_catalog(request):
         if count:
             photo = queryset.filter(image__isnull=False).order_by('pk').values_list('image__secure_url', flat=True).first()
             collections.append({'key': key, 'label': label, 'count': count, 'image_url': photo or ''})
-    top_sales = get_top_sales_products(10)
-    new_launch = get_new_launch_products(10)
+    top_sales = get_top_sales_products(12)
+    new_launch = get_new_launch_products(12)
     return Response({'categories': product_facets(products, 'category'), 'brands': product_facets(products, 'brand'),
         'collections': collections, 'capabilities': {'deals': products.filter(offer_percent__gt=0, base_price__gt=F('price')).exists(), 'new_arrivals': True, 'value_packs': False},
         'total_products': products.count(),
