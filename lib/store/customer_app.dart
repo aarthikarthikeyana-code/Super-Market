@@ -676,19 +676,19 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
         for (final line in cart) line.product.id: line.quantity,
       };
       final saved = ref.watch(wishlistIdsProvider).asData?.value ?? <String>[];
-      final columns = constraints.maxWidth > 700 ? 4 : 2;
+      final columns = constraints.maxWidth > 700 ? 5 : 3;
       return PagedFeed<StoreProduct>(
         queryKey: 'customer-offers',
         changes: api.feedChanges,
         beforeRefresh: api.clearPublicCache,
         load: (cursor) => api.productPage(cursor: cursor, collection: 'offers'),
         identity: (product) => product.id,
-        padding: EdgeInsets.fromLTRB(16, 12, 16, cart.isEmpty ? 24 : 96),
+        padding: EdgeInsets.fromLTRB(12, 12, 12, cart.isEmpty ? 24 : 96),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: columns,
           mainAxisExtent: groceryProductCardExtent(
             context,
-            (constraints.maxWidth - 32 - (columns - 1) * 12) / columns,
+            (constraints.maxWidth - 24 - (columns - 1) * 12) / columns,
           ),
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
@@ -1529,13 +1529,13 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                           );
                         }
                         return GridView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
                           gridDelegate:
                               SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
+                                crossAxisCount: 3,
                                 mainAxisExtent: groceryProductCardExtent(
                                   context,
-                                  (MediaQuery.sizeOf(context).width - 44) / 2,
+                                  (MediaQuery.sizeOf(context).width - 48) / 3,
                                 ),
                                 crossAxisSpacing: 12,
                                 mainAxisSpacing: 12,
@@ -2003,10 +2003,37 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
       _notes = TextEditingController();
   final _deliveryAddress = DeliveryAddressData();
   bool _busy = false;
+  String _selectedSlot = '';
+  List<String> _availableSlots = [];
+
   @override
   void initState() {
     super.initState();
+    _generateSlots();
     _restoreAddress();
+  }
+
+  void _generateSlots() {
+    final now = DateTime.now();
+    final List<String> slots = [];
+    int startHour = now.hour;
+
+    for (int i = 0; i < 4; i++) {
+      int h1 = (startHour + i) % 24;
+      int h2 = (startHour + i + 1) % 24;
+
+      String fmt(int h) {
+        final period = h >= 12 ? 'PM' : 'AM';
+        final display = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+        return '$display:00 $period';
+      }
+
+      slots.add('${fmt(h1)} - ${fmt(h2)}');
+    }
+    _availableSlots = slots;
+    if (_availableSlots.isNotEmpty) {
+      _selectedSlot = _availableSlots.first;
+    }
   }
 
   bool _loadingProfile = true;
@@ -2057,7 +2084,7 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
         'name': _name.text.trim(),
         'address': _deliveryAddress.formatted,
         'address_details': _deliveryAddress.value,
-        'delivery_instructions': _notes.text.trim(),
+        'delivery_instructions': 'Delivery Slot: $_selectedSlot',
       });
       if (!mounted) return;
       ref.invalidate(customerProfileProvider);
@@ -2067,7 +2094,8 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
         'customer_phone': _phone.text.trim(),
         'delivery_address': _deliveryAddress.formatted,
         'address_details': _deliveryAddress.value,
-        'delivery_instructions': _notes.text.trim(),
+        'delivery_instructions': 'Delivery Slot: $_selectedSlot',
+        'delivery_slot': _selectedSlot,
         'payment_method': 'cod',
         'expected_total':
             (lines.fold(0.0, (sum, line) => sum + line.total) +
@@ -2173,14 +2201,109 @@ class _CheckoutState extends ConsumerState<CheckoutScreen> {
                     address: _deliveryAddress,
                     enabled: !_busy && !_loadingProfile,
                   ),
-                  TextFormField(
-                    controller: _notes,
-                    enabled: !_busy,
-                    maxLength: 500,
-                    decoration: const InputDecoration(
-                      labelText: 'Note for delivery employee (optional)',
-                      helperText: 'Gate access, floor, or a request to call on arrival. Leave blank if not needed.',
-                      helperMaxLines: 3,
+                  const SizedBox(height: 18),
+
+                  // Delivery Time Slot Selector (Blinkit / Zepto / BigBasket style)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0F7645).withOpacity(0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F7EE),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.access_time_filled_rounded,
+                                color: Color(0xFF0F7645),
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Choose Delivery Time Slot',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final slot in _availableSlots)
+                              InkWell(
+                                onTap: _busy ? null : () => setState(() => _selectedSlot = slot),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 9,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _selectedSlot == slot
+                                        ? const Color(0xFF0F7645)
+                                        : const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: _selectedSlot == slot
+                                        ? const Color(0xFF0F7645)
+                                        : const Color(0xFFCBD5E1),
+                                      width: 1.2,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        _selectedSlot == slot
+                                            ? Icons.check_circle_rounded
+                                            : Icons.schedule_rounded,
+                                        size: 15,
+                                        color: _selectedSlot == slot
+                                            ? Colors.white
+                                            : const Color(0xFF64748B),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        slot,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: _selectedSlot == slot
+                                              ? FontWeight.w800
+                                              : FontWeight.w600,
+                                          color: _selectedSlot == slot
+                                              ? Colors.white
+                                              : const Color(0xFF1E293B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 18),

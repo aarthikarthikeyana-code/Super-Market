@@ -4041,8 +4041,8 @@ double groceryProductCardExtent(
       ? (cardWidth - 12).clamp(55.0, 95.0)
       : (cardWidth - 14).clamp(60.0, 105.0);
   final scale = MediaQuery.textScalerOf(context).scale(1);
-  final baseline = imageHeight + 46 + (28 * scale);
-  return baseline + 12;
+  final baseline = imageHeight + 50 + (32 * scale);
+  return baseline + 18;
 }
 
 class PremiumProductCard extends StatelessWidget {
@@ -4362,17 +4362,6 @@ class PremiumProductCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF0F7645),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 9.5,
                             fontWeight: FontWeight.w700,
                             color: Color(0xFF0F7645),
                           ),

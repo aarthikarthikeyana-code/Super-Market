@@ -36,24 +36,67 @@ def lookup_pincode(pincode):
 
 def reverse_geocode(latitude, longitude):
     import json
+    import re
+    import urllib.parse
     from urllib.request import Request, urlopen
     from django.core.cache import cache
-    key = f'reverse-geo-v1:{latitude:.4f}:{longitude:.4f}'
+    key = f'reverse-geo-v2:{latitude:.4f}:{longitude:.4f}'
     cached = cache.get(key)
     if cached is not None:
         return cached
     try:
-        url = f'https://nominatim.openstreetmap.org/reverse?lat={latitude}&lon={longitude}&format=json&addressdetails=1'
+        url = f'https://nominatim.openstreetmap.org/reverse?lat={latitude}&lon={longitude}&format=json&addressdetails=1&zoom=18'
         req = Request(url, headers={'User-Agent': 'AgaramSupermarketApp/1.0 (agaram.supermarket@gmail.com)', 'Accept': 'application/json'})
         with urlopen(req, timeout=6) as resp:
             data = json.loads(resp.read(1024 * 1024))
         addr = data.get('address', {})
         line1_parts = [addr.get(k) for k in ['house_number', 'building', 'amenity', 'road'] if addr.get(k)]
         line2_parts = [addr.get(k) for k in ['neighbourhood', 'suburb', 'residential', 'commercial'] if addr.get(k)]
-        city = addr.get('city') or addr.get('town') or addr.get('village') or addr.get('county') or ''
+        city = addr.get('city') or addr.get('town') or addr.get('state_district') or addr.get('village') or addr.get('county') or ''
         state = addr.get('state') or ''
         pincode = addr.get('postcode') or ''
         landmark = addr.get('landmark') or addr.get('amenity') or ''
+
+        # Cross-verify and refine pincode with official India Post database
+        locality_candidates = []
+        for k in ['suburb', 'neighbourhood', 'village', 'residential', 'subdistrict']:
+            val = addr.get(k)
+            if val and val not in locality_candidates:
+                locality_candidates.append(val)
+        name_val = data.get('name')
+        if name_val and name_val not in locality_candidates:
+            locality_candidates.append(name_val)
+
+        expected_district = (addr.get('state_district') or addr.get('county') or city or '').lower()
+
+        for cand in locality_candidates:
+            if len(cand) < 3:
+                continue
+            try:
+                po_url = f'https://api.postalpincode.in/postoffice/{urllib.parse.quote(cand)}'
+                po_req = Request(po_url, headers={'User-Agent': 'AgaramSupermarketApp/1.0 (agaram.supermarket@gmail.com)', 'Accept': 'application/json'})
+                with urlopen(po_req, timeout=3) as po_resp:
+                    po_data = json.loads(po_resp.read(256 * 1024))
+                    if po_data and po_data[0].get('Status') == 'Success':
+                        po_list = po_data[0].get('PostOffice') or []
+                        matched_pin = None
+                        for po in po_list:
+                            po_dist = (po.get('District') or '').lower()
+                            if expected_district and (expected_district in po_dist or po_dist in expected_district):
+                                matched_pin = po.get('Pincode')
+                                break
+                        if not matched_pin and po_list and state:
+                            for po in po_list:
+                                po_state = (po.get('State') or '').lower()
+                                if state.lower() in po_state:
+                                    matched_pin = po.get('Pincode')
+                                    break
+                        if matched_pin and re.match(r'^[1-9][0-9]{5}$', str(matched_pin)):
+                            pincode = str(matched_pin)
+                            break
+            except Exception:
+                pass
+
         result = {
             'line1': ', '.join(line1_parts) if line1_parts else data.get('name', ''),
             'line2': ', '.join(line2_parts) if line2_parts else '',

@@ -881,15 +881,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                   collection: _collection,
                 ),
                 identity: (p) => p.id,
-                padding: EdgeInsets.fromLTRB(16, 12, 16, cart.isEmpty ? 24 : 96),
+                padding: EdgeInsets.fromLTRB(12, 12, 12, cart.isEmpty ? 24 : 96),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: constraints.maxWidth > 700 ? 4 : 2,
+                  crossAxisCount: constraints.maxWidth > 700 ? 5 : 3,
                   mainAxisExtent: groceryProductCardExtent(
                     context,
                     (constraints.maxWidth -
-                            32 -
-                            (constraints.maxWidth > 700 ? 3 : 1) * 12) /
-                        (constraints.maxWidth > 700 ? 4 : 2),
+                            24 -
+                            (constraints.maxWidth > 700 ? 4 : 2) * 12) /
+                        (constraints.maxWidth > 700 ? 5 : 3),
                   ),
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,

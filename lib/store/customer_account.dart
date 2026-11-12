@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,11 +26,16 @@ class DeliveryAddressData extends ChangeNotifier {
       landmark = TextEditingController();
   LatLng? pin;
   double? accuracy;
-  String source = 'map', legacy = '';
+  String source = 'gps', legacy = '';
+  String mode = 'current'; // 'current', 'pin', 'manual'
+  String detectedAddress = '';
   bool restoring = false, dirty = false, savedPin = false;
+
   Map<String, dynamic> get value => {
-    'address_line1': line1.text.trim(),
-    'address_line2': line2.text.trim(),
+    'delivery_mode': mode,
+    'detected_address': detectedAddress,
+    'address_line1': mode == 'manual' ? line1.text.trim() : (line1.text.trim().isNotEmpty ? line1.text.trim() : detectedAddress),
+    'address_line2': mode == 'manual' ? line2.text.trim() : line2.text.trim(),
     'pincode': pincode.text.trim(),
     'city': city.text.trim(),
     'state': state.text.trim(),
@@ -41,18 +47,31 @@ class DeliveryAddressData extends ChangeNotifier {
       if (accuracy != null) 'location_accuracy': accuracy,
     },
   };
-  String get formatted => [
-    line1.text.trim(),
-    if (line2.text.trim().isNotEmpty) line2.text.trim(),
-    'Landmark: ${landmark.text.trim()}',
-    city.text.trim(),
-    state.text.trim(),
-    pincode.text.trim(),
-  ].where((s) => s.isNotEmpty).join(', ');
+
+  String get formatted {
+    if (mode != 'manual' && detectedAddress.isNotEmpty) {
+      return [
+        '📍 $detectedAddress',
+        if (landmark.text.trim().isNotEmpty) 'Landmark: ${landmark.text.trim()}',
+        if (city.text.trim().isNotEmpty) city.text.trim(),
+        if (pincode.text.trim().isNotEmpty) pincode.text.trim(),
+      ].where((s) => s.isNotEmpty).join(', ');
+    }
+    return [
+      line1.text.trim(),
+      if (line2.text.trim().isNotEmpty) line2.text.trim(),
+      if (landmark.text.trim().isNotEmpty) 'Landmark: ${landmark.text.trim()}',
+      city.text.trim(),
+      state.text.trim(),
+      pincode.text.trim(),
+    ].where((s) => s.isNotEmpty).join(', ');
+  }
   void restore(Map<String, dynamic> profile) {
     if (dirty) return;
     restoring = true;
     final details = Map<String, dynamic>.from(profile['address_details'] ?? {});
+    mode = '${details['delivery_mode'] ?? (details['latitude'] != null ? 'pin' : (details['address_line1'] != null && details['address_line1'].toString().trim().isNotEmpty ? 'manual' : 'current'))}';
+    detectedAddress = '${details['detected_address'] ?? ''}';
     legacy = details.isEmpty ? '${profile['address'] ?? ''}' : '';
     line1.text = '${details['address_line1'] ?? legacy}';
     line2.text = '${details['address_line2'] ?? ''}';
@@ -233,110 +252,19 @@ class _StructuredAddressFieldsState
     String candidateSource = 'map',
   }) async {
     if (!widget.enabled) return;
-    LatLng? selected = candidate ?? a.pin;
-    final original = selected;
+    final LatLng startPoint = candidate ?? a.pin ?? const LatLng(11.6643, 78.1460);
+    final original = a.pin;
+
     final result = await showModalBottomSheet<LatLng>(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, update) => SafeArea(
-          child: SizedBox(
-            height: MediaQuery.sizeOf(ctx).height * .76,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Choose delivery location',
-                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Move and zoom the map. Tap your building entrance, then confirm the pin.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: Colors.black54,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: FlutterMap(
-                        options: MapOptions(
-                          initialCenter:
-                              original ?? const LatLng(20.5937, 78.9629),
-                          initialZoom: original == null ? 4 : 17,
-                          onTap: (_, point) => update(() => selected = point),
-                        ),
-                        children: [
-                          TileLayer(
-                            urlTemplate: const String.fromEnvironment(
-                              'MAP_TILE_URL',
-                              defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            ),
-                            userAgentPackageName: 'com.agaram.supermarket',
-                          ),
-                          if (selected != null)
-                            MarkerLayer(
-                              markers: [
-                                Marker(
-                                  point: selected!,
-                                  width: 44,
-                                  height: 44,
-                                  child: const Icon(
-                                    Icons.location_pin,
-                                    color: storeGreen,
-                                    size: 42,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          RichAttributionWidget(
-                            attributions: [
-                              TextSourceAttribution(
-                                'OpenStreetMap contributors',
-                                onTap: () => openDeliveryLink(
-                                  ctx,
-                                  Uri.parse(
-                                    'https://www.openstreetmap.org/copyright',
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    selected == null
-                        ? 'No delivery pin selected yet.'
-                        : 'Selected: ${selected!.latitude.toStringAsFixed(6)}, ${selected!.longitude.toStringAsFixed(6)}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: selected == null
-                          ? null
-                          : () => Navigator.pop(ctx, selected),
-                      icon: const Icon(Icons.check),
-                      label: const Text('Confirm delivery pin'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => ZomatoLocationPickerModal(
+        initialPoint: startPoint,
+        api: ref.read(storeApiProvider),
       ),
     );
+
     if (result != null && mounted) {
       final unchanged =
           original != null &&
@@ -351,9 +279,51 @@ class _StructuredAddressFieldsState
             ? (candidate != null ? candidateSource : a.source)
             : 'map',
       );
+      setState(() {
+        a.mode = (candidateSource == 'gps') ? 'current' : 'pin';
+        a.dirty = true;
+      });
       // Amazon/Zomato style: automatically fetch street, area, city, pincode from pin
       _fetchAddressDetailsForPoint(result);
     }
+  }
+
+  Future<String?> _refineIndianPincode(List<String> localities, String city) async {
+    final dio = Dio();
+    for (final loc in localities) {
+      if (loc.trim().length < 3) continue;
+      final parts = loc
+          .split(RegExp(r'[,-/]'))
+          .map((s) => s.trim())
+          .where((s) => s.length >= 3 && !RegExp(r'^\d+$').hasMatch(s));
+      for (final part in parts) {
+        try {
+          final res = await dio.get(
+            'https://api.postalpincode.in/postoffice/${Uri.encodeComponent(part)}',
+            options: Options(receiveTimeout: const Duration(milliseconds: 2500)),
+          );
+          if (res.statusCode == 200 && res.data is List && (res.data as List).isNotEmpty) {
+            final entry = (res.data as List)[0];
+            if (entry is Map && entry['Status'] == 'Success' && entry['PostOffice'] is List) {
+              final poList = entry['PostOffice'] as List;
+              final targetCity = city.trim().toLowerCase();
+              for (final po in poList) {
+                if (po is Map) {
+                  final poDist = (po['District'] ?? '').toString().toLowerCase();
+                  if (targetCity.isEmpty || targetCity.contains(poDist) || poDist.contains(targetCity)) {
+                    final pin = po['Pincode']?.toString();
+                    if (pin != null && RegExp(r'^[1-9][0-9]{5}$').hasMatch(pin)) {
+                      return pin;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      }
+    }
+    return null;
   }
 
   Future<void> _fetchAddressDetailsForPoint(LatLng point) async {
@@ -362,32 +332,47 @@ class _StructuredAddressFieldsState
           .read(storeApiProvider)
           .reverseGeocode(point.latitude, point.longitude);
       if (!mounted) return;
-      if (details['line1'] != null && details['line1'].toString().isNotEmpty) {
-        if (a.line1.text.trim().isEmpty) {
-          a.line1.text = details['line1'].toString();
-        }
+      final l1 = '${details['line1'] ?? ''}'.trim();
+      final l2 = '${details['line2'] ?? ''}'.trim();
+      final fullLoc = [l1, l2].where((s) => s.isNotEmpty).join(', ');
+      if (fullLoc.isNotEmpty) {
+        a.detectedAddress = fullLoc;
       }
-      if (details['line2'] != null && details['line2'].toString().isNotEmpty) {
-        if (a.line2.text.trim().isEmpty) {
-          a.line2.text = details['line2'].toString();
-        }
+      if (l1.isNotEmpty) {
+        a.line1.text = l1;
       }
-      if (details['city'] != null && details['city'].toString().isNotEmpty) {
-        a.city.text = details['city'].toString();
+      if (l2.isNotEmpty) {
+        a.line2.text = l2;
+      }
+      final cityName = details['city']?.toString() ?? '';
+      if (cityName.isNotEmpty) {
+        a.city.text = cityName;
       }
       if (details['state'] != null && details['state'].toString().isNotEmpty) {
         a.state.text = details['state'].toString();
-      }
-      if (details['pincode'] != null && details['pincode'].toString().isNotEmpty) {
-        a.pincode.text = details['pincode'].toString();
       }
       if (details['landmark'] != null && details['landmark'].toString().isNotEmpty) {
         if (a.landmark.text.trim().isEmpty) {
           a.landmark.text = details['landmark'].toString();
         }
       }
+
+      // Check authoritative India Post PIN if locality is known (e.g., Mamangam -> 636302)
+      String? finalPin = details['pincode']?.toString();
+      final candidateLocalities = [l2, l1].where((s) => s.isNotEmpty).toList();
+      final refined = await _refineIndianPincode(
+        candidateLocalities,
+        a.city.text.isNotEmpty ? a.city.text : cityName,
+      );
+      if (refined != null && refined.isNotEmpty) {
+        finalPin = refined;
+      }
+      if (finalPin != null && finalPin.isNotEmpty) {
+        a.pincode.text = finalPin;
+      }
+
       setState(() {
-        _postalHint = 'Address and pincode automatically detected from GPS location.';
+        _postalHint = 'Address and pincode automatically detected from location.';
       });
     } catch (_) {}
   }
@@ -429,157 +414,864 @@ class _StructuredAddressFieldsState
   );
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Card(
-        child: Padding(
-          padding: const EdgeInsets.all(14),
+  Widget build(BuildContext context) {
+    final hasPin = a.pin != null;
+    final isManual = a.mode == 'manual';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Professional Modern Delivery Selection Card
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0F7645).withOpacity(0.06),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Delivery pin',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                a.pin == null
-                    ? 'Add a pin to help the employee find your entrance. You can also enter the address manually.'
-                    : '${a.source == 'gps' ? 'GPS location' : 'Selected map pin'}${a.accuracy == null ? '' : ' · accuracy ±${a.accuracy!.round()} m'}\nCheck the pin matches your delivery address.',
-                style: const TextStyle(
-                  fontSize: 12,
-                  height: 1.5,
-                  color: Colors.black54,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
+              Row(
                 children: [
-                  OutlinedButton.icon(
-                    onPressed: !widget.enabled || _locating ? null : _locate,
-                    icon: const Icon(Icons.my_location, size: 18),
-                    label: Text(
-                      _locating
-                          ? 'Finding location...'
-                          : 'Use current location',
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F7EE),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.location_on_rounded,
+                      color: Color(0xFF0F7645),
+                      size: 20,
                     ),
                   ),
-                  TextButton.icon(
-                    onPressed: !widget.enabled || _locating ? null : _choosePin,
-                    icon: const Icon(Icons.map_outlined, size: 18),
-                    label: Text(a.pin == null ? 'Select on map' : 'Adjust pin'),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Delivery Location',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        Text(
+                          'Select your location for fast, accurate delivery',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 16),
+
+              // 3-Way Segmented Mode Buttons: [GPS Location] [Set on Map] [Type Address]
+              Row(
+                children: [
+                  Expanded(
+                    child: _modeButton(
+                      title: 'GPS',
+                      subtitle: 'Auto-detect',
+                      icon: Icons.gps_fixed_rounded,
+                      iconColor: const Color(0xFF0F7645),
+                      iconBg: const Color(0xFFE8F7EE),
+                      selected: a.mode == 'current',
+                      isLoading: _locating,
+                      onTap: () {
+                        setState(() => a.mode = 'current');
+                        _locate();
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _modeButton(
+                      title: 'Set on Map',
+                      subtitle: 'Drag pin',
+                      icon: Icons.pin_drop_rounded,
+                      iconColor: const Color(0xFF4F46E5),
+                      iconBg: const Color(0xFFEEF2FF),
+                      selected: a.mode == 'pin',
+                      onTap: () {
+                        setState(() => a.mode = 'pin');
+                        _choosePin();
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _modeButton(
+                      title: 'Manual',
+                      subtitle: 'Type address',
+                      icon: Icons.home_rounded,
+                      iconColor: const Color(0xFFEA580C),
+                      iconBg: const Color(0xFFFFF7ED),
+                      selected: a.mode == 'manual',
+                      onTap: () {
+                        setState(() {
+                          a.mode = 'manual';
+                          a.dirty = true;
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+
+              // Active Location Card (Shown when Current Location or Pin is active)
+              if (!isManual) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: hasPin ? const Color(0xFFC7EBD4) : const Color(0xFFE2E8F0),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        hasPin ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                        color: hasPin ? const Color(0xFF0F7645) : const Color(0xFF94A3B8),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              hasPin
+                                  ? (a.mode == 'current'
+                                      ? 'GPS Location Selected'
+                                      : 'Pin Location Confirmed')
+                                  : 'Tap "Current" or "Adjust Pin" to set location',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: hasPin ? const Color(0xFF0F7645) : const Color(0xFF334155),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              a.detectedAddress.isNotEmpty
+                                  ? a.detectedAddress
+                                  : (hasPin
+                                      ? '${a.pin!.latitude.toStringAsFixed(5)}, ${a.pin!.longitude.toStringAsFixed(5)}'
+                                      : 'Address 1 & 2 are automatically detected from your map point.'),
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                color: Color(0xFF475569),
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+
+        // ONLY SHOW ADDRESS 1 & ADDRESS 2 WHEN USER CHOOSES MANUAL ADDRESS
+        if (isManual) ...[
+          _field(a.line1, 'Address 1', hint: 'House / flat number and street'),
+          _field(
+            a.line2,
+            'Address 2 (optional)',
+            hint: 'Apartment, building or area',
+            optional: true,
+          ),
+        ],
+
+        // Pincode with lookup
+        TextFormField(
+          controller: a.pincode,
+          enabled: widget.enabled,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: InputDecoration(
+            labelText: 'Pincode',
+            helperText: _looking ? 'Looking up city and state...' : _postalHint,
+            helperMaxLines: 3,
+            suffixIcon: _looking
+                ? const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : const Icon(Icons.local_post_office_outlined),
+          ),
+          onChanged: (_) => a.edited(),
+          validator: (s) => !RegExp(r'^[1-9][0-9]{5}$').hasMatch(s ?? '')
+              ? 'Enter a 6-digit Indian PIN'
+              : _notFound == s
+              ? 'PIN was not found. Check the number.'
+              : null,
+        ),
+        if (_offices.length > 1)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: !widget.enabled
+                  ? null
+                  : () async {
+                      final office = await showModalBottomSheet<String>(
+                        context: context,
+                        showDragHandle: true,
+                        builder: (ctx) => SafeArea(
+                          child: ListView(
+                            shrinkWrap: true,
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Text(
+                                  'Choose your postal area',
+                                  style: TextStyle(fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                              for (final office in _offices)
+                                ListTile(
+                                  title: Text(office),
+                                  onTap: () => Navigator.pop(ctx, office),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                      if (office != null && mounted) {
+                        a.city.text = office;
+                        a.edited();
+                      }
+                    },
+              child: const Text('Choose a postal area for this PIN'),
+            ),
+          ),
+        const SizedBox(height: 8),
+        _field(
+          a.city,
+          'City / town',
+          hint: 'Check the postal suggestion and edit if needed',
+          maxLength: 80,
+        ),
+        _field(a.state, 'State', maxLength: 80),
+        if (isManual)
+          _field(
+            a.landmark,
+            'Landmark',
+            hint: 'A nearby place that helps identify your building',
+            maxLength: 160,
+            optional: true,
+          ),
+      ],
+    );
+  }
+
+  Widget _modeButton({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required bool selected,
+    required VoidCallback onTap,
+    bool isLoading = false,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: widget.enabled && !isLoading ? onTap : null,
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFF0F7645) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? const Color(0xFF0F7645) : const Color(0xFFE2E8F0),
+              width: selected ? 1.8 : 1.2,
+            ),
+            boxShadow: [
+              if (selected)
+                BoxShadow(
+                  color: const Color(0xFF0F7645).withOpacity(0.24),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              else
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: selected ? Colors.white.withOpacity(0.22) : iconBg,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Icon(
+                          icon,
+                          size: 20,
+                          color: selected ? Colors.white : iconColor,
+                        ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                  color: selected ? Colors.white : const Color(0xFF1E293B),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  color: selected ? Colors.white.withOpacity(0.85) : const Color(0xFF94A3B8),
+                ),
               ),
             ],
           ),
         ),
       ),
-      const SizedBox(height: 18),
-      if (a.legacy.isNotEmpty)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 14),
-          child: Text(
-            'Your saved address uses the earlier format. Confirm the separate fields below.\n${a.legacy}',
-            style: const TextStyle(
-              fontSize: 12,
-              height: 1.5,
-              color: Colors.black54,
+    );
+  }
+}
+
+class _PinTailClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    path.moveTo(0, 0);
+    path.lineTo(size.width, 0);
+    path.lineTo(size.width / 2, size.height);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+class ZomatoLocationPickerModal extends StatefulWidget {
+  final LatLng initialPoint;
+  final StoreApi api;
+
+  const ZomatoLocationPickerModal({
+    super.key,
+    required this.initialPoint,
+    required this.api,
+  });
+
+  @override
+  State<ZomatoLocationPickerModal> createState() => _ZomatoLocationPickerModalState();
+}
+
+class _ZomatoLocationPickerModalState extends State<ZomatoLocationPickerModal> {
+  late final MapController _mapController;
+  late LatLng _currentCenter;
+  String _areaTitle = 'Locating address...';
+  String _subAddress = 'Move the map to set your exact location';
+  bool _isLocatingGps = false;
+  bool _isDragging = false;
+  Timer? _debounceTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _mapController = MapController();
+    _currentCenter = widget.initialPoint;
+    _lookupAddress(_currentCenter);
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  void _onPositionChanged(MapCamera camera, bool hasGesture) {
+    _currentCenter = camera.center;
+    if (hasGesture) {
+      if (!_isDragging) {
+        setState(() {
+          _isDragging = true;
+          _areaTitle = 'Locating address...';
+        });
+      }
+      _debounceTimer?.cancel();
+      _debounceTimer = Timer(const Duration(milliseconds: 380), () {
+        if (mounted) {
+          setState(() => _isDragging = false);
+          _lookupAddress(_currentCenter);
+        }
+      });
+    }
+  }
+
+  Future<void> _lookupAddress(LatLng point) async {
+    try {
+      final details = await widget.api.reverseGeocode(point.latitude, point.longitude);
+      if (!mounted) return;
+      final l1 = '${details['line1'] ?? ''}'.trim();
+      final l2 = '${details['line2'] ?? ''}'.trim();
+      final city = '${details['city'] ?? ''}'.trim();
+      final state = '${details['state'] ?? ''}'.trim();
+      final pin = '${details['pincode'] ?? ''}'.trim();
+
+      String title = l2.isNotEmpty ? l2 : (l1.isNotEmpty ? l1 : (city.isNotEmpty ? city : 'Selected Location'));
+      String subtitle = [l1, l2, city, state, pin].where((s) => s.isNotEmpty && s != title).join(', ');
+
+      setState(() {
+        _areaTitle = title;
+        _subAddress = subtitle.isNotEmpty
+            ? subtitle
+            : '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _areaTitle = 'Selected Location';
+          _subAddress = '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
+        });
+      }
+    }
+  }
+
+  Future<void> _locateMe() async {
+    if (_isLocatingGps) return;
+    setState(() => _isLocatingGps = true);
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        throw StoreException('Please enable location on your device.');
+      }
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+        throw StoreException('Location permission was denied.');
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+      final newPoint = LatLng(pos.latitude, pos.longitude);
+      _mapController.move(newPoint, 17.5);
+      _currentCenter = newPoint;
+      _lookupAddress(newPoint);
+    } catch (e) {
+      if (mounted) showStoreError(context, e);
+    } finally {
+      if (mounted) setState(() => _isLocatingGps = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.sizeOf(context).height * 0.88,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          // 1. Modern CartoDB Voyager Map (Zomato / Rapido style)
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: _currentCenter,
+              initialZoom: 17.0,
+              minZoom: 4,
+              maxZoom: 19,
+              onPositionChanged: _onPositionChanged,
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+                subdomains: const ['a', 'b', 'c', 'd'],
+                userAgentPackageName: 'com.agaram.supermarket',
+              ),
+            ],
+          ),
+
+          // 2. Top Floating Header Bar
+          Positioned(
+            top: 16,
+            left: 16,
+            right: 16,
+            child: Row(
+              children: [
+                Material(
+                  elevation: 4,
+                  shadowColor: Colors.black26,
+                  shape: const CircleBorder(),
+                  color: Colors.white,
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => Navigator.pop(context),
+                    child: const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: Icon(Icons.arrow_back_rounded, color: Color(0xFF1E293B), size: 22),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.12),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.near_me_rounded, color: Color(0xFF0F7645), size: 18),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Drag map to position pin',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF334155),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-      _field(a.line1, 'Address 1', hint: 'House / flat number and street'),
-      _field(
-        a.line2,
-        'Address 2 (optional)',
-        hint: 'Apartment, building or area',
-        optional: true,
-      ),
-      TextFormField(
-        controller: a.pincode,
-        enabled: widget.enabled,
-        keyboardType: TextInputType.number,
-        maxLength: 6,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        decoration: InputDecoration(
-          labelText: 'Pincode',
-          helperText: _looking ? 'Looking up city and state...' : _postalHint,
-          helperMaxLines: 3,
-          suffixIcon: _looking
-              ? const Padding(
-                  padding: EdgeInsets.all(14),
-                  child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+
+          // 3. Center Fixed Floating Pin (Zomato / Rapido interactive style)
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Tooltip badge
+                Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
-                )
-              : const Icon(Icons.local_post_office_outlined),
-        ),
-        onChanged: (_) => a.edited(),
-        validator: (s) => !RegExp(r'^[1-9][0-9]{5}$').hasMatch(s ?? '')
-            ? 'Enter a 6-digit Indian PIN'
-            : _notFound == s
-            ? 'PIN was not found. Check the number.'
-            : null,
-      ),
-      if (_offices.length > 1)
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton(
-            onPressed: !widget.enabled
-                ? null
-                : () async {
-                    final office = await showModalBottomSheet<String>(
-                      context: context,
-                      showDragHandle: true,
-                      builder: (ctx) => SafeArea(
-                        child: ListView(
-                          shrinkWrap: true,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF10B981),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 7),
+                      const Text(
+                        'Order will be delivered here',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Animated Pin
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  transform: Matrix4.translationValues(0, _isDragging ? -12 : 0, 0),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFE23744), Color(0xFFC61C2C)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFE23744).withOpacity(0.4),
+                              blurRadius: 12,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.shopping_bag_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      ClipPath(
+                        clipper: _PinTailClipper(),
+                        child: Container(
+                          width: 12,
+                          height: 8,
+                          color: const Color(0xFFC61C2C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Ground dot shadow
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: _isDragging ? 8 : 12,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(_isDragging ? 0.15 : 0.4),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                const SizedBox(height: 40),
+              ],
+            ),
+          ),
+
+          // 4. Floating GPS Re-center Button
+          Positioned(
+            right: 16,
+            bottom: 215,
+            child: Material(
+              elevation: 4,
+              shadowColor: Colors.black26,
+              shape: const CircleBorder(),
+              color: Colors.white,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: _locateMe,
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  padding: const EdgeInsets.all(12),
+                  child: _isLocatingGps
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Color(0xFF0F7645),
+                          ),
+                        )
+                      : const Icon(
+                          Icons.my_location_rounded,
+                          color: Color(0xFF0F7645),
+                          size: 24,
+                        ),
+                ),
+              ),
+            ),
+          ),
+
+          // 5. Zomato Bottom Delivery Confirmation Sheet
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 20,
+                    offset: const Offset(0, -6),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 36,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFCBD5E1),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F7EE),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(
+                            Icons.location_on_rounded,
+                            color: Color(0xFF0F7645),
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _areaTitle,
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0F172A),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                _subAddress,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF64748B),
+                                  height: 1.35,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F7645),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        onPressed: () => Navigator.pop(context, _currentCenter),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Padding(
-                              padding: EdgeInsets.all(16),
-                              child: Text(
-                                'Choose your postal area',
-                                style: TextStyle(fontWeight: FontWeight.w800),
+                            Text(
+                              'Confirm Location',
+                              style: TextStyle(
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.3,
                               ),
                             ),
-                            for (final office in _offices)
-                              ListTile(
-                                title: Text(office),
-                                onTap: () => Navigator.pop(ctx, office),
-                              ),
+                            SizedBox(width: 8),
+                            Icon(Icons.arrow_forward_rounded, size: 19),
                           ],
                         ),
                       ),
-                    );
-                    if (office != null && mounted) {
-                      a.city.text = office;
-                      a.edited();
-                    }
-                  },
-            child: const Text('Choose a postal area for this PIN'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
-      const SizedBox(height: 8),
-      _field(
-        a.city,
-        'City / town',
-        hint: 'Check the postal suggestion and edit if needed',
-        maxLength: 80,
+        ],
       ),
-      _field(a.state, 'State', maxLength: 80),
-      _field(
-        a.landmark,
-        'Landmark',
-        hint: 'A nearby place that helps identify your building',
-        maxLength: 160,
-      ),
-    ],
-  );
+    );
+  }
 }
 
 Future<bool> ensureCustomerAccount(BuildContext context, WidgetRef ref) async {

@@ -34,21 +34,25 @@ final homeCuratedSectionsProvider =
     for (final j in rawNew) StoreProduct.fromJson(Map<String, dynamic>.from(j))
   ];
 
-  if (topSales.isEmpty || newLaunch.isEmpty) {
+  // If live server returned fewer than 12 (or still on cached/previous 10), fill up to 12
+  if (topSales.length < 12 || newLaunch.length < 12) {
     try {
       final page = await api.productPage();
-      if (topSales.isEmpty) {
-        topSales = page.items.take(10).toList();
+      final allItems = page.items;
+      if (topSales.length < 12) {
+        final existingIds = topSales.map((p) => p.id).toSet();
+        topSales.addAll(allItems.where((p) => !existingIds.contains(p.id)).take(12 - topSales.length));
       }
-      if (newLaunch.isEmpty) {
-        newLaunch = page.items.reversed.take(10).toList();
+      if (newLaunch.length < 12) {
+        final existingIds = newLaunch.map((p) => p.id).toSet();
+        newLaunch.addAll(allItems.reversed.where((p) => !existingIds.contains(p.id)).take(12 - newLaunch.length));
       }
     } catch (_) {}
   }
 
   return {
-    'top_sales': topSales.take(10).toList(),
-    'new_launch': newLaunch.take(10).toList(),
+    'top_sales': topSales.take(12).toList(),
+    'new_launch': newLaunch.take(12).toList(),
   };
 });
 final storeConfigProvider = FutureProvider<Map<String, dynamic>>(
