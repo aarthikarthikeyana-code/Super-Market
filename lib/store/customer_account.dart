@@ -1593,27 +1593,28 @@ class CustomerAccountScreen extends ConsumerStatefulWidget {
 class _CustomerAccountState extends ConsumerState<CustomerAccountScreen> {
   bool _busy = false;
   Future<void> _removeNumber({bool change = false}) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          change ? 'Change your mobile number?' : 'Log out of this account?',
-        ),
-        content: const Text(
-          'Saved addresses and orders stay with this mobile number. This device will be signed out.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(change ? 'Change number' : 'Log out'),
-          ),
-        ],
-      ),
-    );
+    final confirmed = change
+        ? await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Text('Change your mobile number?'),
+              content: const Text(
+                'Saved addresses and orders stay with this mobile number.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Change number'),
+                ),
+              ],
+            ),
+          )
+        : await showLogoutConfirmationDialog(context);
     if (confirmed != true || !mounted) return;
     setState(() => _busy = true);
     try {
@@ -1628,7 +1629,11 @@ class _CustomerAccountState extends ConsumerState<CustomerAccountScreen> {
       ref.invalidate(wishlistProvider);
       ref.invalidate(wishlistIdsProvider);
       ref.invalidate(storeCartProvider);
-      if (change) await ensureCustomerAccount(context, ref);
+      if (change) {
+        await ensureCustomerAccount(context, ref);
+      } else {
+        showLogoutSuccessSnackBar(context);
+      }
     } catch (e) {
       if (mounted) showStoreError(context, e);
     } finally {

@@ -109,6 +109,7 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
     if (mounted) {
       setState(() => _signedIn = false);
       refreshDelivery(ref);
+      showLogoutSuccessSnackBar(context);
     }
   }
 
@@ -322,7 +323,12 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
               ),
               IconButton(
                 tooltip: 'Sign out',
-                onPressed: _logout,
+                onPressed: () async {
+                  final confirm = await showLogoutConfirmationDialog(context);
+                  if (confirm == true) {
+                    await _logout();
+                  }
+                },
                 icon: const Icon(Icons.logout),
               ),
             ],

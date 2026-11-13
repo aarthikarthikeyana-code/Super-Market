@@ -123,6 +123,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     ref.read(activeRoleProvider.notifier).setRole('admin');
     ref.read(activeEmployeeProvider.notifier).setEmployee(null);
     refreshCommerce(ref);
+    showLogoutSuccessSnackBar(context);
     context.go('/');
   }
 
@@ -466,25 +467,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
               padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
               child: InkWell(
                 onTap: () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      title: const Text('Logout Admin?'),
-                      content: const Text('Are you sure you want to sign out from the Admin Console?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Cancel'),
-                        ),
-                        FilledButton(
-                          style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('Logout'),
-                        ),
-                      ],
-                    ),
-                  );
+                  final confirm = await showLogoutConfirmationDialog(context);
                   if (confirm == true) {
                     if (context.mounted) Navigator.pop(context);
                     await _logout();
@@ -1053,9 +1036,12 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                         fontSize: 14.5,
                       ),
                     ),
-                    onPressed: () {
+                    onPressed: () async {
                       Navigator.pop(ctx);
-                      _logout();
+                      final confirm = await showLogoutConfirmationDialog(context);
+                      if (confirm == true) {
+                        await _logout();
+                      }
                     },
                   ),
                 ),
@@ -1165,7 +1151,10 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       return;
     }
     if (action == 'logout') {
-      await _logout();
+      final confirm = await showLogoutConfirmationDialog(context);
+      if (confirm == true) {
+        await _logout();
+      }
       return;
     }
     if (action == 'requests') {

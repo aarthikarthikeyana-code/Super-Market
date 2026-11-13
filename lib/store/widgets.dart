@@ -123,6 +123,74 @@ void showStoreError(BuildContext context, Object error) {
   );
 }
 
+Future<bool?> showLogoutConfirmationDialog(BuildContext context) {
+  return showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text(
+        'Do you want to logout?',
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w800,
+          color: Color(0xFF0F172A),
+        ),
+      ),
+      content: const Text(
+        'Are you sure you want to log out of your account?',
+        style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text(
+            'Cancel',
+            style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+          ),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFDC2626),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          ),
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text(
+            'Logout',
+            style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+void showLogoutSuccessSnackBar(BuildContext context) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.all(16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      backgroundColor: const Color(0xFF166534),
+      content: const Row(
+        children: [
+          Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 20),
+          SizedBox(width: 10),
+          Text(
+            'successfully logged out',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 14.5,
+            ),
+          ),
+        ],
+      ),
+      duration: const Duration(seconds: 2),
+    ),
+  );
+}
+
 Future<void> showSmoothSuccessDialog({
   required BuildContext context,
   required String title,
@@ -1876,9 +1944,12 @@ class AgaramDrawer extends StatelessWidget {
                       label: 'Logout',
                       iconColor: storeRed,
                       textColor: storeRed,
-                      onTap: () {
+                      onTap: () async {
                         Navigator.pop(context);
-                        onLogout!();
+                        final confirm = await showLogoutConfirmationDialog(context);
+                        if (confirm == true) {
+                          onLogout?.call();
+                        }
                       },
                     ),
                   ],

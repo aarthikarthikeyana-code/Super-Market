@@ -183,12 +183,14 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
               cartNotifier.clear();
               await cartNotifier.flush();
               await ref.read(storeApiProvider).logoutCustomer();
+              if (!mounted) return;
               ref.invalidate(customerAccountProvider);
               ref.invalidate(customerProfileProvider);
               ref.invalidate(myOrdersProvider);
               ref.invalidate(wishlistProvider);
               ref.invalidate(wishlistIdsProvider);
               ref.invalidate(storeCartProvider);
+              if (mounted) showLogoutSuccessSnackBar(this.context);
             },
           ),
           body: _showCart
