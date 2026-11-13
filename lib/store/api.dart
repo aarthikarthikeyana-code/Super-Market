@@ -779,7 +779,7 @@ class StoreApi {
     await request(
       'POST',
       '/delivery/change-password/',
-      body: {
+      data: {
         'new_password': newPassword,
         if (oldPassword != null && oldPassword.isNotEmpty) 'old_password': oldPassword,
       },
