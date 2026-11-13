@@ -26,94 +26,47 @@ class StorefrontScreen extends ConsumerStatefulWidget {
 class _StorefrontState extends ConsumerState<StorefrontScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _tab = 0;
+  final List<int> _tabHistory = [0];
   bool _showCart = false;
+
+  void _setTab(int tab) {
+    if (_tab == tab && !_showCart) return;
+    setState(() {
+      _showCart = false;
+      _tab = tab;
+      if (_tabHistory.isEmpty || _tabHistory.last != tab) {
+        _tabHistory.add(tab);
+      }
+    });
+  }
+
+  bool _handleBack() {
+    if (_showCart) {
+      setState(() => _showCart = false);
+      return true;
+    }
+    if (_tabHistory.length > 1) {
+      setState(() {
+        _tabHistory.removeLast();
+        _tab = _tabHistory.last;
+      });
+      return true;
+    } else if (_tab != 0) {
+      setState(() {
+        _tab = 0;
+        _tabHistory.clear();
+        _tabHistory.add(0);
+      });
+      return true;
+    }
+    return false;
+  }
   String _search = '', _category = 'All';
   Timer? _poll, _searchDebounce;
   final _searchInput = TextEditingController();
   List<String> _categories = ['All'];
   bool _accountActionBusy = false;
   final Set<String> _savingWishlist = {};
-
-  // Categories View Sort & Filter state (matching reference screen)
-  String _activeCategoryQuickChip = 'All';
-  String _categorySortBy = 'recommended';
-  double? _categoryMaxPrice;
-  bool _categoryInStockOnly = false;
-
-  void _openCategorySortDialog() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                child: Text(
-                  'Sort Products By',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-              ),
-              const Divider(),
-              _catSortTile('Product name', 'recommended'),
-              _catSortTile('Price: Low to High', 'price_asc'),
-              _catSortTile('Price: High to Low', 'price_desc'),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _catSortTile(String title, String value) {
-    final selected = _categorySortBy == value;
-    return ListTile(
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-          color: selected ? const Color(0xFF0F7645) : const Color(0xFF0F172A),
-        ),
-      ),
-      trailing: selected
-          ? const Icon(Icons.check_rounded, color: Color(0xFF0F7645))
-          : null,
-      onTap: () {
-        Navigator.pop(context);
-        setState(() => _categorySortBy = value);
-      },
-    );
-  }
-
-  void _applyCategoryQuickChip(String chip) {
-    setState(() {
-      _activeCategoryQuickChip = chip;
-      if (chip == 'All') {
-        _categoryMaxPrice = null;
-        _categoryInStockOnly = false;
-      } else if (chip == 'Under ₹100') {
-        _categoryMaxPrice = 99.99;
-        _categoryInStockOnly = false;
-      } else if (chip == 'Under ₹200') {
-        _categoryMaxPrice = 199.99;
-        _categoryInStockOnly = false;
-      } else if (chip == 'In Stock') {
-        _categoryMaxPrice = null;
-        _categoryInStockOnly = true;
-      }
-    });
-  }
 
   Future<bool> _addToCart(StoreProduct product) async {
     if (_accountActionBusy) return false;
@@ -171,114 +124,108 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
     final count = cart.fold(0, (sum, l) => sum + l.quantity);
     final profile = ref.watch(customerProfileProvider).asData?.value;
 
-    return Theme(
-      data: storeTheme(),
-      child: Scaffold(
-        key: _scaffoldKey,
-        appBar: _showCart || _tab != 0
-            ? AgaramAppBar(
-                showBackButton: _showCart,
-                onBackPressed: () => setState(() => _showCart = false),
-                onMenuPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                onCartPressed: () => setState(() => _showCart = !_showCart),
-                cartCount: count,
-              )
-            : HomeTopHeader(
-                onMenuPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                onCartPressed: () => setState(() => _showCart = !_showCart),
-                cartCount: count,
-              ),
-        drawer: AgaramDrawer(
-          customerProfile: profile,
-          onLoginPressed: () async {
-            // Close drawer first, then push login screen
-            _scaffoldKey.currentState?.closeDrawer();
-            await Future.delayed(const Duration(milliseconds: 250));
-            if (!context.mounted) return;
-            final loggedIn = await Navigator.push<bool>(
-              context,
-              MaterialPageRoute(builder: (_) => const CustomerLoginScreen()),
-            );
-            if (loggedIn == true && mounted) {
-              ref.invalidate(customerProfileProvider);
+    return PopScope(
+      canPop: !_showCart && _tab == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: Theme(
+        data: storeTheme(),
+        child: Scaffold(
+          key: _scaffoldKey,
+          appBar: _showCart || _tab != 0
+              ? AgaramAppBar(
+                  showBackButton: _showCart || _tab != 0,
+                  onBackPressed: _handleBack,
+                  onMenuPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                  onCartPressed: () => setState(() => _showCart = !_showCart),
+                  cartCount: count,
+                )
+              : HomeTopHeader(
+                  onMenuPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                  onCartPressed: () => setState(() => _showCart = !_showCart),
+                  cartCount: count,
+                ),
+          drawer: AgaramDrawer(
+            customerProfile: profile,
+            onLoginPressed: () async {
+              // Close drawer first, then push login screen
+              _scaffoldKey.currentState?.closeDrawer();
+              await Future.delayed(const Duration(milliseconds: 250));
+              if (!context.mounted) return;
+              final loggedIn = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(builder: (_) => const CustomerLoginScreen()),
+              );
+              if (loggedIn == true && mounted) {
+                ref.invalidate(customerProfileProvider);
+                ref.invalidate(customerAccountProvider);
+              }
+            },
+            onSelectCategories: () => _setTab(1),
+            onSelectOffers: () => _setTab(2),
+            onSelectWishlist: () {
+              setState(() => _showCart = false);
+              _showWishlistModal();
+            },
+            onSelectOrders: () {
+              _setTab(3);
+              ref.invalidate(myOrdersProvider);
+            },
+            onSelectAccount: () => _setTab(4),
+            onSelectHelp: _showHelpModal,
+            onSelectContact: _showContactModal,
+            onAdminLogin: () => context.push('/admin'),
+            onDeliveryLogin: () => context.push('/delivery'),
+            onLogout: () async {
+              final cartNotifier = ref.read(storeCartProvider.notifier);
+              cartNotifier.clear();
+              await cartNotifier.flush();
+              await ref.read(storeApiProvider).logoutCustomer();
               ref.invalidate(customerAccountProvider);
-            }
-          },
-          onSelectCategories: () => setState(() {
-            _showCart = false;
-            _tab = 1;
-          }),
-          onSelectOffers: () => setState(() {
-            _showCart = false;
-            _tab = 2;
-          }),
-          onSelectWishlist: () {
-            setState(() => _showCart = false);
-            _showWishlistModal();
-          },
-          onSelectOrders: () => setState(() {
-            _showCart = false;
-            _tab = 3;
-            ref.invalidate(myOrdersProvider);
-          }),
-          onSelectAccount: () => setState(() {
-            _showCart = false;
-            _tab = 4;
-          }),
-          onSelectHelp: _showHelpModal,
-          onSelectContact: _showContactModal,
-          onAdminLogin: () => context.push('/admin'),
-          onDeliveryLogin: () => context.push('/delivery'),
-          onLogout: () async {
-            final cartNotifier = ref.read(storeCartProvider.notifier);
-            cartNotifier.clear();
-            await cartNotifier.flush();
-            await ref.read(storeApiProvider).logoutCustomer();
-            ref.invalidate(customerAccountProvider);
-            ref.invalidate(customerProfileProvider);
-            ref.invalidate(myOrdersProvider);
-            ref.invalidate(wishlistProvider);
-            ref.invalidate(wishlistIdsProvider);
-            ref.invalidate(storeCartProvider);
-          },
-        ),
-        body: _showCart
-            ? _cartView(cart)
-            : Stack(
-                children: [
-                  switch (_tab) {
-                    0 => _homeView(),
-                    1 => _categoriesView(),
-                    2 => _offersView(),
-                    3 => _ordersView(),
-                    _ => _accountView(),
-                  },
-                  if (cart.isNotEmpty && _tab != 3 && _tab != 4)
-                    Positioned(
-                      bottom: 16,
-                      left: 16,
-                      right: 16,
-                      child: FloatingCartBar(
-                        cart: cart,
-                        onTap: () => setState(() => _showCart = true),
+              ref.invalidate(customerProfileProvider);
+              ref.invalidate(myOrdersProvider);
+              ref.invalidate(wishlistProvider);
+              ref.invalidate(wishlistIdsProvider);
+              ref.invalidate(storeCartProvider);
+            },
+          ),
+          body: _showCart
+              ? _cartView(cart)
+              : Stack(
+                  children: [
+                    switch (_tab) {
+                      0 => _homeView(),
+                      1 => _categoriesView(),
+                      2 => _offersView(),
+                      3 => _ordersView(),
+                      _ => _accountView(),
+                    },
+                    if (cart.isNotEmpty && _tab != 3 && _tab != 4)
+                      Positioned(
+                        bottom: 16,
+                        left: 16,
+                        right: 16,
+                        child: FloatingCartBar(
+                          cart: cart,
+                          onTap: () => setState(() => _showCart = true),
+                        ),
                       ),
-                    ),
-                ],
-              ),
-        bottomNavigationBar: _showCart
-            ? null
-            : CustomerFloatingBottomNav(
-                selectedIndex: _tab,
-                cartCount: cart.fold(0, (s, l) => s + l.quantity),
-                onCartPressed: () => setState(() => _showCart = true),
-                onItemSelected: (i) {
-                  setState(() {
-                    _tab = i;
-                    _showCart = false;
-                  });
-                  if (i == 3) ref.invalidate(myOrdersProvider);
-                },
-              ),
+                  ],
+                ),
+          bottomNavigationBar: _showCart
+              ? null
+              : CustomerFloatingBottomNav(
+                  selectedIndex: _tab,
+                  cartCount: cart.fold(0, (s, l) => s + l.quantity),
+                  onCartPressed: () => setState(() => _showCart = true),
+                  onItemSelected: (i) {
+                    _setTab(i);
+                    if (i == 3) ref.invalidate(myOrdersProvider);
+                  },
+                ),
+        ),
       ),
     );
   }
@@ -594,73 +541,6 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
     );
   }
 
-  Widget _floatingCartBar(List<CartLine> cart) => InkWell(
-    onTap: () => setState(() => _showCart = true),
-    borderRadius: BorderRadius.circular(24),
-    child: Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 20,
-        vertical: 14,
-      ),
-      decoration: BoxDecoration(
-        color: const Color(0xFF087247),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.4),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF087247).withOpacity(0.35),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.shopping_bag_outlined,
-              color: Colors.white,
-              size: 18,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              '${cart.fold(0, (s, l) => s + l.quantity)} items · ${money(cart.fold<double>(0, (s, l) => s + l.total))}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 14.5,
-              ),
-            ),
-          ),
-          const Text(
-            'View Cart',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(width: 4),
-          const Icon(
-            Icons.arrow_forward_rounded,
-            color: Colors.white,
-            size: 18,
-          ),
-        ],
-      ),
-    ),
-  );
-
   Widget _categoriesView() {
     return const BrowseGroceriesScreen(isTab: true);
   }
@@ -897,7 +777,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                   icon: Icons.percent_rounded,
                   iconColor: storeOrange,
                   title: 'My Offers (5)',
-                  onTap: () => setState(() => _tab = 2),
+                  onTap: () => _setTab(2),
                 ),
               ),
               const SizedBox(width: 10),
@@ -917,7 +797,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
           SectionHeader(
             title: 'My Recent Orders',
             action: 'View All Orders >',
-            onAction: () => setState(() => _tab = 3),
+            onAction: () => _setTab(3),
           ),
           const SizedBox(height: 12),
           _recentOrdersPreview(),
@@ -1095,10 +975,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
   Widget _cartView(List<CartLine> lines) {
     if (lines.isEmpty) {
       return EmptyCartWidget(
-        onStartShopping: () => setState(() {
-          _showCart = false;
-          _tab = 0;
-        }),
+        onStartShopping: () => _setTab(0),
       );
     }
 
@@ -1325,10 +1202,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                   MaterialPageRoute(builder: (_) => const CheckoutScreen()),
                 );
                 if (placed != null && mounted) {
-                  setState(() {
-                    _showCart = false;
-                    _tab = 3;
-                  });
+                  _setTab(3);
                   final browse = await Navigator.push<bool>(
                     context,
                     MaterialPageRoute(
@@ -1336,10 +1210,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
                     ),
                   );
                   if (browse == true && mounted) {
-                    setState(() {
-                      _showCart = false;
-                      _tab = 0;
-                    });
+                    _setTab(0);
                   }
                 }
               },
@@ -1385,10 +1256,7 @@ class _StorefrontState extends ConsumerState<StorefrontScreen> {
         SectionHeader(
           title: 'You May Also Like',
           action: 'See All >',
-          onAction: () => setState(() {
-            _showCart = false;
-            _tab = 0;
-          }),
+          onAction: () => _setTab(0),
         ),
         const SizedBox(height: 10),
         SizedBox(

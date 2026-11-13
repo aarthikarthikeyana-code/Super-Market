@@ -27,6 +27,35 @@ class AdminConsoleScreen extends ConsumerStatefulWidget {
 class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   bool _signedIn = false;
   int _tab = 0;
+  final List<int> _tabHistory = [0];
+
+  void _setAdminTab(int tab) {
+    if (_tab == tab) return;
+    setState(() {
+      _tab = tab;
+      if (_tabHistory.isEmpty || _tabHistory.last != tab) {
+        _tabHistory.add(tab);
+      }
+    });
+  }
+
+  bool _handleAdminBack() {
+    if (_tabHistory.length > 1) {
+      setState(() {
+        _tabHistory.removeLast();
+        _tab = _tabHistory.last;
+      });
+      return true;
+    } else if (_tab != 0) {
+      setState(() {
+        _tab = 0;
+        _tabHistory.clear();
+        _tabHistory.add(0);
+      });
+      return true;
+    }
+    return false;
+  }
   String _reportType = 'sales';
   String _orderFilter = 'Active', _orderSearch = '', _teamSearch = '';
   String _orderPeriod = 'all';
@@ -123,7 +152,18 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     }
 
     return PopScope(
-      canPop: !_signedIn,
+      canPop: !_signedIn || (_tab == 0 && !Navigator.canPop(context)),
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_handleAdminBack()) {
+          return;
+        }
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        } else {
+          context.go('/');
+        }
+      },
       child: Theme(
         data: operationsTheme(),
         child: !_signedIn
@@ -153,7 +193,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                 ),
                 bottomNavigationBar: AdminBottomNavigation(
                   selected: _tab <= 4 ? _tab : 4,
-                  onSelected: (index) => setState(() => _tab = index),
+                  onSelected: (index) => _setAdminTab(index),
                 ),
               ),
       ),
@@ -353,8 +393,8 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                       Navigator.pop(context);
                       setState(() {
                         _reportType = 'sales';
-                        _tab = 7;
                       });
+                      _setAdminTab(7);
                     },
                   ),
                   _adminDrawerItem(
@@ -368,8 +408,8 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                       Navigator.pop(context);
                       setState(() {
                         _reportType = 'orders';
-                        _tab = 7;
                       });
+                      _setAdminTab(7);
                     },
                   ),
                   _adminDrawerItem(
@@ -383,7 +423,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                     isSelected: _tab == 5,
                     onTap: () {
                       Navigator.pop(context);
-                      setState(() => _tab = 5);
+                      _setAdminTab(5);
                     },
                   ),
                   _adminDrawerItem(
@@ -399,8 +439,8 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                       Navigator.pop(context);
                       setState(() {
                         _orderFilter = 'Active';
-                        _tab = 1;
                       });
+                      _setAdminTab(1);
                     },
                   ),
                   _adminDrawerItem(
@@ -414,7 +454,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                     isSelected: _tab == 6,
                     onTap: () {
                       Navigator.pop(context);
-                      setState(() => _tab = 6);
+                      _setAdminTab(6);
                     },
                   ),
                 ],
@@ -626,6 +666,34 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       toolbarHeight: 60,
       title: Row(
         children: [
+          if (_tab != 0 || Navigator.canPop(context)) ...[
+            InkWell(
+              onTap: () {
+                if (_tab != 0) {
+                  _handleAdminBack();
+                } else if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                } else {
+                  context.go('/');
+                }
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                ),
+                child: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  size: 18,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           InkWell(
             onTap: () => _scaffoldKey.currentState?.openDrawer(),
             borderRadius: BorderRadius.circular(12),
@@ -700,7 +768,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
         IconButton(
           tooltip: 'Search orders',
           onPressed: () {
-            setState(() => _tab = 1);
+            _setAdminTab(1);
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) _orderSearchFocus.requestFocus();
             });
@@ -740,6 +808,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   void _showOrders(String stage, {Map<String, dynamic>? employee}) {
     final today = stage.startsWith('Today ');
     final selected = today ? stage.substring(6) : stage;
+    if (_tabHistory.isEmpty || _tabHistory.last != 1) _tabHistory.add(1);
     setState(() {
       _tab = 1;
       _orderFilter = selected == 'Unassigned'
@@ -760,6 +829,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   }
 
   void _showInventory(String filter) {
+    if (_tabHistory.isEmpty || _tabHistory.last != 2) _tabHistory.add(2);
     setState(() {
       _tab = 2;
       _productFilter = filter;
@@ -771,6 +841,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
   }
 
   void _showCategory(String category) {
+    if (_tabHistory.isEmpty || _tabHistory.last != 2) _tabHistory.add(2);
     setState(() {
       _tab = 2;
       _productFilter = 'all';
@@ -1032,11 +1103,11 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                               Navigator.pop(ctx);
                               final key = alert['key'];
                               if (key == 'cash') {
-                                setState(() => _tab = 6);
+                                _setAdminTab(6);
                               } else if (key == 'stock') {
                                 _showInventory('low');
                               } else if (key == 'team') {
-                                setState(() => _tab = 5);
+                                _setAdminTab(5);
                               } else {
                                 _showOrders(
                                   key == 'cash_review'
@@ -1067,7 +1138,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
 
   Future<void> _openMore(String action) async {
     if (action == 'team') {
-      setState(() => _tab = 5);
+      _setAdminTab(5);
       return;
     }
     if (action == 'inventory' || action == 'low') {
@@ -1075,14 +1146,14 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
       return;
     }
     if (action == 'cash') {
-      setState(() => _tab = 6);
+      _setAdminTab(6);
       return;
     }
     if (action == 'reports' || action.startsWith('report_')) {
       setState(() {
         _reportType = action == 'reports' ? 'sales' : action.substring(7);
-        _tab = 7;
       });
+      _setAdminTab(7);
       return;
     }
     if (action == 'cancelled') {
@@ -1224,6 +1295,7 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
                                 ),
                                 onTap: () {
                                   Navigator.pop(ctx);
+                                  if (_tabHistory.isEmpty || _tabHistory.last != 2) _tabHistory.add(2);
                                   setState(() {
                                     _tab = 2;
                                     _productFilter = 'all';
@@ -1304,13 +1376,13 @@ class _AdminConsoleState extends ConsumerState<AdminConsoleScreen> {
     onCategory: _showCategory,
     onAddProduct: () => _editProduct(),
     onCreateEmployee: () => _editPerson(),
-    onTeam: () => setState(() => _tab = 5),
-    onCash: () => setState(() => _tab = 6),
-    onDelivery: () => setState(() => _tab = 3),
-    onReports: () => setState(() {
-      _reportType = 'sales';
-      _tab = 7;
-    }),
+    onTeam: () => _setAdminTab(5),
+    onCash: () => _setAdminTab(6),
+    onDelivery: () => _setAdminTab(3),
+    onReports: () {
+      setState(() => _reportType = 'sales');
+      _setAdminTab(7);
+    },
     onOrder: _openOrder,
     onProduct: _editProduct,
     onReceiveCash: _receiveCash,
@@ -3166,9 +3238,23 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
     }
   }
 
+  void _safeClose() {
+    if (!_busy && !_uploading) {
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      } else {
+        context.go('/admin');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: !_busy && !_uploading,
+    onPopInvokedWithResult: (didPop, result) {
+      if (didPop) return;
+      _safeClose();
+    },
     child: Theme(
       data: operationsTheme(),
       child: Scaffold(
@@ -3177,7 +3263,7 @@ class _ProductEditorState extends ConsumerState<ProductEditorScreen> {
           elevation: 0,
           leading: BackButton(
             color: const Color(0xFF0F172A),
-            onPressed: () => Navigator.pop(context),
+            onPressed: _safeClose,
           ),
           title: Text(
             widget.product == null ? 'Add New Product' : 'Edit Product',
@@ -4456,6 +4542,14 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
     return (month >= 1 && month <= 12) ? m[month - 1] : '';
   }
 
+  void _safeClose() {
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      context.go('/admin');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final date = DateTime.tryParse('${_order.data['created_at']}')?.toLocal();
@@ -4468,17 +4562,23 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
     );
     final deliveryCharge = amount(_order.data['delivery_charge'] ?? 0.0);
 
-    return Theme(
-      data: operationsTheme(),
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF6FBF7),
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          leading: BackButton(
-            color: const Color(0xFF0F172A),
-            onPressed: () => Navigator.pop(context),
-          ),
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _safeClose();
+      },
+      child: Theme(
+        data: operationsTheme(),
+        child: Scaffold(
+          backgroundColor: const Color(0xFFF6FBF7),
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leading: BackButton(
+              color: const Color(0xFF0F172A),
+              onPressed: _safeClose,
+            ),
           title: const Text(
             'Order Details',
             style: TextStyle(
@@ -5130,6 +5230,7 @@ class _AdminOrderState extends ConsumerState<AdminOrderScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

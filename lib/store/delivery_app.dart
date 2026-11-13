@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'state.dart';
 import 'api.dart';
@@ -234,7 +235,7 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
                       try {
                         await _api.deliveryChangePassword(n, oldPassword: oldCtrl.text.trim());
                         if (!mounted) return;
-                        Navigator.pop(ctx);
+                        if (ctx.mounted) Navigator.pop(ctx);
                         await showSmoothSuccessDialog(
                           context: context,
                           title: 'Password Updated! 🔒',
@@ -261,15 +262,32 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
 
   @override
   Widget build(BuildContext context) => PopScope(
-    canPop: !_signedIn,
+    canPop: !_signedIn || (_tab == 0 && !Navigator.canPop(context)),
+    onPopInvokedWithResult: (didPop, result) {
+      if (didPop) return;
+      if (_tab != 0) {
+        setState(() => _tab = 0);
+        return;
+      }
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      } else {
+        context.go('/');
+      }
+    },
     child: Theme(
       data: storeTheme(),
       child: Scaffold(
         appBar: AppBar(
           automaticallyImplyLeading: !_signedIn,
-          leading: widget.onExit == null
-              ? null
-              : IconButton(
+          leading: (_signedIn && _tab != 0)
+              ? IconButton(
+                  tooltip: 'Back',
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => setState(() => _tab = 0),
+                )
+              : widget.onExit != null
+              ? IconButton(
                   tooltip: 'Return to admin',
                   icon: const Icon(Icons.arrow_back),
                   onPressed: _busy
@@ -279,7 +297,14 @@ class _DeliveryConsoleState extends ConsumerState<DeliveryConsoleScreen> {
                           await _api.useAdminWorkspace();
                           if (mounted) widget.onExit?.call();
                         },
-                ),
+                )
+              : (Navigator.canPop(context))
+              ? IconButton(
+                  tooltip: 'Back',
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => Navigator.pop(context),
+                )
+              : null,
           title: Text(
             _signedIn ? 'Agaram Delivery' : 'Delivery employee login',
           ),

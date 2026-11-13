@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'customer_account.dart';
 import 'loading.dart';
@@ -294,39 +295,54 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     );
   }
 
+  void _safeBack() {
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      context.go('/');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: storeCream,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                // Top App Bar with large input
-                _buildSearchHeader(),
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _safeBack();
+      },
+      child: Scaffold(
+        backgroundColor: storeCream,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  // Top App Bar with large input
+                  _buildSearchHeader(),
 
-                // Content Area
-                Expanded(
-                  child: _submitted
-                      ? _buildSearchResults()
-                      : _currentQuery.isNotEmpty
-                      ? _buildSuggestionsList()
-                      : _buildRecentAndPopularSearches(),
-                ),
-              ],
-            ),
-            if (ref.watch(storeCartProvider).isNotEmpty)
-              Positioned(
-                bottom: 16,
-                left: 16,
-                right: 16,
-                child: FloatingCartBar(
-                  cart: ref.watch(storeCartProvider),
-                  onTap: () => Navigator.pop(context, true),
-                ),
+                  // Content Area
+                  Expanded(
+                    child: _submitted
+                        ? _buildSearchResults()
+                        : _currentQuery.isNotEmpty
+                        ? _buildSuggestionsList()
+                        : _buildRecentAndPopularSearches(),
+                  ),
+                ],
               ),
-          ],
+              if (ref.watch(storeCartProvider).isNotEmpty)
+                Positioned(
+                  bottom: 16,
+                  left: 16,
+                  right: 16,
+                  child: FloatingCartBar(
+                    cart: ref.watch(storeCartProvider),
+                    onTap: () => Navigator.pop(context, true),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -344,7 +360,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       child: Row(
         children: [
           IconButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: _safeBack,
             icon: const Icon(
               Icons.arrow_back_ios_new_rounded,
               color: Color(0xFF0F172A),

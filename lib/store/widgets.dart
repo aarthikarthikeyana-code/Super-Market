@@ -4222,7 +4222,6 @@ class PremiumProductCard extends StatelessWidget {
       // Comparison prices must come from backend data, never a price multiplier.
       final effectiveMrp = product.mrp;
       final effectiveDiscount = product.discountPercent;
-      final savings = effectiveMrp - sellingPrice;
 
       final priceText = sellingPrice == sellingPrice.truncateToDouble()
           ? '₹${sellingPrice.toStringAsFixed(0)}'
